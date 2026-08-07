@@ -85,5 +85,9 @@ if not defined READY (
     exit /b 1
 )
 
-start "" "http://localhost:%READY%/"
+REM Se abre el ADMIN, no la raiz. La raiz es el router de arranque de PANTALLAS:
+REM sin identidad guardada redirige a /pair, y eso es lo que hay que hacer en una
+REM tablet, no en el PC servidor. Aqui quien esta delante es el administrador, y
+REM la primera vez /admin.html lleva a crear la contrasena.
+start "" "http://localhost:%READY%/admin.html"
 exit /b 0
