@@ -43,6 +43,12 @@ Source: "..\start_signalos.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\vendor\*"; DestDir: "{app}\vendor"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+; Extensión de Chrome para enviar divisas desde cualquier web. Google no permite
+; instalarla en silencio desde un instalador —lo bloqueó por abuso de adware—, así
+; que se copia la carpeta y se guía al usuario con instalar-extension.html.
+Source: "..\signalos-extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "instalar-extension.html"; DestDir: "{app}"; Flags: ignoreversion
+
 ; NO empaquetar nunca:
 ;   content.json / screens.json  -> server.py los crea vacíos al arrancar
 ;                                   (init_file, server.py:200-201). Enviarlos
@@ -53,6 +59,7 @@ Source: "..\vendor\*"; DestDir: "{app}\vendor"; Flags: ignoreversion recursesubd
 
 [Icons]
 Name: "{group}\SignalOS Pro"; Filename: "{app}\start_signalos.bat"; WorkingDir: "{app}"
+Name: "{group}\Instalar extension de divisas"; Filename: "{app}\instalar-extension.html"; WorkingDir: "{app}"
 Name: "{group}\Desinstalar"; Filename: "{uninstallexe}"
 Name: "{commondesktop}\SignalOS Pro"; Filename: "{app}\start_signalos.bat"; WorkingDir: "{app}"; Tasks: desktopicon
 

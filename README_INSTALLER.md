@@ -48,7 +48,10 @@ Digital Signage/
 ├── config.json         (se instala con onlyifdoesntexist)
 ├── start_signalos.bat
 ├── assets/
-└── vendor/
+├── vendor/
+├── signalos-extension/ ← se copia a {app}\extension\
+└── installer/
+    └── instalar-extension.html  ← la guía de 3 pasos
 ```
 
 **Nunca se empaquetan** `content.json` ni `screens.json` (el servidor los crea
@@ -73,6 +76,30 @@ O abre `installer/setup.iss` con Inno Setup y pulsa *Compile*.
 ```
 dist/installer/SignalOS_Pro_Setup_v1.0.0.exe
 ```
+
+## La extensión de Chrome
+
+El instalador copia la extensión a `{app}\extension\` y crea un acceso directo
+**«Instalar extension de divisas»** que abre una página con los pasos.
+
+**No se puede instalar sola, y no es un descuido.** Google bloqueó la
+instalación silenciosa de extensiones desde instaladores de Windows porque era
+el vector habitual del adware. El mecanismo clásico —una clave de registro
+apuntando a un `.crx` local— lleva desactivado desde Chrome 33: la extensión se
+instala y el navegador la deshabilita. Los tutoriales que lo explican están
+obsoletos.
+
+Quedan dos vías legítimas si algún día hace falta la instalación automática:
+
+- **Política de empresa** (`ExtensionInstallForcelist` en
+  `HKLM\SOFTWARE\Policies\Google\Chrome`) apuntando a un `update.xml` propio.
+  SignalOS ya es un servidor HTTP y podría alojarlo. A cambio hay que firmar la
+  extensión y el cliente no puede desinstalarla desde Chrome.
+- **Chrome Web Store** como extensión *no listada*, visible solo con el enlace.
+  Cuesta 5 USD una vez, pasa revisión de Google y se actualiza sola.
+
+Mientras tanto, cargarla en modo desarrollador funciona exactamente igual y son
+tres clics una sola vez.
 
 ## Qué hace el instalador
 

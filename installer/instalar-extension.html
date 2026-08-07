@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Instalar la extensión de divisas — SignalOS Pro</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#07182b;color:#eaf1f9;font-family:'Segoe UI',system-ui,sans-serif;
+       line-height:1.6;padding:40px 24px}
+  .wrap{max-width:720px;margin:0 auto}
+  .logo{font-family:ui-monospace,Consolas,monospace;font-size:12px;letter-spacing:4px;
+        color:#FF7F00;font-weight:600;margin-bottom:6px}
+  h1{font-size:26px;font-weight:600;margin-bottom:8px}
+  .lead{color:#7a8ca3;font-size:15px;margin-bottom:32px}
+  .step{display:flex;gap:16px;margin-bottom:24px;background:#0A2540;border:1px solid #1d3a5c;
+        border-radius:10px;padding:18px 20px}
+  .num{flex-shrink:0;width:30px;height:30px;border-radius:50%;background:#FF7F00;color:#07182b;
+       font-weight:700;display:flex;align-items:center;justify-content:center;font-size:15px}
+  .step h2{font-size:16px;font-weight:600;margin-bottom:4px}
+  .step p{color:#a9bcd0;font-size:14px}
+  code{background:#0e2d4d;border:1px solid #1d3a5c;border-radius:5px;padding:2px 7px;
+       font-family:ui-monospace,Consolas,monospace;font-size:13px;color:#eaf1f9}
+  .ruta{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  .ruta code{flex:1;min-width:260px;padding:9px 12px;word-break:break-all}
+  button{background:#FF7F00;color:#07182b;border:none;border-radius:6px;padding:9px 16px;
+         font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+  button:hover{background:#e67200}
+  .nota{background:rgba(255,127,0,.08);border-left:3px solid #FF7F00;padding:14px 18px;
+        border-radius:0 8px 8px 0;font-size:13.5px;color:#c8d6e5;margin-top:28px}
+  .nota strong{color:#eaf1f9}
+  .pie{margin-top:30px;color:#54697f;font-size:12.5px;border-top:1px solid #1d3a5c;padding-top:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">SIGNAL/OS PRO</div>
+  <h1>Instalar la extensión de divisas</h1>
+  <p class="lead">Sirve para enviar tipos de cambio a tus pantallas desde cualquier web.
+     Solo hay que hacerlo una vez.</p>
+
+  <div class="step">
+    <div class="num">1</div>
+    <div>
+      <h2>Abre la página de extensiones</h2>
+      <p>En Chrome escribe <code>chrome://extensions</code> en la barra de direcciones.
+         Si usas Edge, es <code>edge://extensions</code>.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">2</div>
+    <div>
+      <h2>Activa el «Modo de desarrollador»</h2>
+      <p>Es un interruptor en la esquina superior derecha de esa página.
+         En Edge está en la columna de la izquierda.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">3</div>
+    <div>
+      <h2>Pulsa «Cargar descomprimida» y elige esta carpeta</h2>
+      <p>En Edge el botón se llama «Cargar desempaquetada».</p>
+      <div class="ruta">
+        <code id="ruta">…</code>
+        <button id="copiar">Copiar ruta</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="nota">
+    <strong>Después de instalarla:</strong> abre el panel lateral desde el icono de la
+    extensión y rellena la dirección del servidor y el <em>token de API</em>, que
+    encuentras en el panel de administración de SignalOS, en
+    <strong>Ajustes → Seguridad y acceso</strong>.
+  </div>
+
+  <div class="nota">
+    <strong>¿Por qué hace falta el modo de desarrollador?</strong> Google solo permite la
+    instalación automática de extensiones publicadas en su tienda. Es una medida contra el
+    software malicioso. La extensión funciona exactamente igual cargada de esta forma.
+  </div>
+
+  <p class="pie">Si Chrome avisa de las «extensiones en modo de desarrollador» cada vez que
+     arranca, puedes cerrar ese aviso sin problema: la extensión sigue activa.</p>
+</div>
+
+<script>
+// La página vive dentro de la carpeta de instalación, así que su propia URL dice
+// dónde está. Así la ruta es siempre correcta aunque se instale en otro disco.
+(function () {
+  var dir = location.href.replace(/[^\/]*$/, '');          // quita el nombre del archivo
+  dir = decodeURIComponent(dir).replace(/^file:\/\/\//, ''); // file:///C:/... -> C:/...
+  var ruta = (dir + 'extension').replace(/\//g, '\\');
+  document.getElementById('ruta').textContent = ruta;
+  document.getElementById('copiar').addEventListener('click', function () {
+    var btn = this;
+    navigator.clipboard.writeText(ruta).then(function () {
+      btn.textContent = '✓ Copiada';
+      setTimeout(function () { btn.textContent = 'Copiar ruta'; }, 1800);
+    }).catch(function () {
+      // Sin permiso de portapapeles: al menos dejarla seleccionada
+      var r = document.createRange();
+      r.selectNode(document.getElementById('ruta'));
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(r);
+      btn.textContent = 'Copia con Ctrl+C';
+    });
+  });
+})();
+</script>
+</body>
+</html>
