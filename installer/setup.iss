@@ -10,7 +10,7 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 UninstallDisplayIcon={app}\start_signalos.bat
 
@@ -19,12 +19,19 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "Crear acceso directo en escritorio"; GroupDescription: "Accesos directos:"; Flags: checked
-Name: "startupicon"; Description: "Iniciar SignalOS Pro automáticamente al encender el equipo (recomendado)"; GroupDescription: "Arranque:"; Flags: checked
+; Sin "Flags: checked": ese flag no existe en Inno Setup y aborta la compilación.
+; Las tareas ya salen marcadas por defecto; el flag que sí existe es "unchecked".
+Name: "desktopicon"; Description: "Crear acceso directo en escritorio"; GroupDescription: "Accesos directos:"
+Name: "startupicon"; Description: "Iniciar SignalOS Pro automáticamente al encender el equipo (recomendado)"; GroupDescription: "Arranque:"
 
 [Registry]
-; Arranque automático con Windows (se elimina al desinstalar)
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "SignalOS Pro"; ValueData: """{app}\start_signalos.bat"""; Tasks: startupicon; Flags: uninsdeletevalue
+; Arranque automático con Windows (se elimina al desinstalar).
+; Va en HKLM y no en HKCU a propósito: el instalador corre elevado, así que
+; HKCU sería el registro del ADMINISTRADOR, no el del usuario que va a usar el
+; equipo. Con credenciales de otra cuenta la pantalla no arrancaría sola y no
+; habría ningún error que lo delatara. En HKLM arranca con cualquier sesión,
+; que es justo lo que se quiere en un PC dedicado a señalización.
+Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "SignalOS Pro"; ValueData: """{app}\start_signalos.bat"""; Tasks: startupicon; Flags: uninsdeletevalue
 
 [Files]
 Source: "..\server.py"; DestDir: "{app}"; Flags: ignoreversion
