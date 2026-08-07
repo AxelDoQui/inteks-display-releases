@@ -490,6 +490,20 @@ function showSlide(idx){
   }
 }
 
+// Agrupa filas en páginas según la altura disponible. Pura a propósito: recibe
+// las alturas ya medidas, para poder probarla sin DOM (tests/fx-pagination.test.js).
+// Una fila más alta que `avail` se coloca igualmente en su propia página: el
+// guardo `used>0` evita el bucle infinito y las páginas vacías.
+function groupRowsIntoPages(heights, avail){
+  const pages=[]; let page=[]; let used=0;
+  heights.forEach((h,i)=>{
+    if(used>0 && used+h>avail){ pages.push(page); page=[]; used=0; }
+    page.push(i); used+=h;
+  });
+  if(page.length) pages.push(page);
+  return pages;
+}
+
 // Pagina el módulo de divisas según lo que cabe en pantalla. Muestra una página
 // cada perPageMs y llama onDone() cuando ha mostrado todas (entonces avanza el slide).
 function setupFxPagination(slide, perPageMs, onDone){
@@ -507,13 +521,7 @@ function setupFxPagination(slide, perPageMs, onDone){
     startProgress(perPageMs); timer=setTimeout(onDone, perPageMs); return;
   }
   // Agrupar filas en páginas según la altura disponible (medición real del DOM)
-  const pages=[]; let page=[]; let used=0;
-  rows.forEach(r=>{
-    const h=r.offsetHeight;
-    if(used>0 && used+h>avail){ pages.push(page); page=[]; used=0; }
-    page.push(r); used+=h;
-  });
-  if(page.length) pages.push(page);
+  const pages=groupRowsIntoPages(rows.map(r=>r.offsetHeight), avail).map(idxs=>idxs.map(i=>rows[i]));
 
   if(pages.length<=1){                                 // caben todas: comportamiento normal
     if(indicator) indicator.style.display="none";
