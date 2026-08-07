@@ -304,8 +304,22 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     <div class="fg" style="margin-bottom:14px"><label class="flabel">Duración (seg)</label><input class="finput" id="fx-dur" type="number" value="15" min="5" style="width:90px"></div>
     <div class="fg" style="margin-bottom:14px"><label class="flabel">Mensaje al pie (opcional)</label><input class="finput" id="fx-note" placeholder="Ej: Tipos sujetos a variación sin previo aviso"></div>
     <div class="fg" style="margin-bottom:10px">
-      <label class="flabel">Vista previa en pantalla</label>
-      <select class="finput" id="fx-prev-screen" onchange="renderFxPreview()"></select>
+      <label class="flabel">Vista previa — resolución de la pantalla</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select class="finput" id="fx-prev-preset" onchange="applyFxPreset()" style="flex:1;min-width:210px">
+          <option value="1920x1080">Full HD horizontal — 1920×1080</option>
+          <option value="3840x2160">4K horizontal — 3840×2160</option>
+          <option value="1366x768">Portátil / TV básico — 1366×768</option>
+          <option value="1280x720">HD horizontal — 1280×720</option>
+          <option value="1080x1920">Full HD vertical — 1080×1920</option>
+          <option value="800x1280">Tablet vertical — 800×1280</option>
+          <option value="custom">Personalizada…</option>
+        </select>
+        <input class="finput" id="fx-prev-w" type="number" min="240" max="7680" value="1920" style="width:92px" title="Ancho en píxeles">
+        <span style="color:var(--muted)">×</span>
+        <input class="finput" id="fx-prev-h" type="number" min="240" max="7680" value="1080" style="width:92px" title="Alto en píxeles">
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">Para una pantalla girada escribe la resolución tal y como se ve, p.ej. 1080×1920 en vertical.</div>
     </div>
     <div id="fx-prev-stage" style="position:relative;overflow:hidden;border:1px solid var(--b);border-radius:var(--r);background:#000"></div>
     <div id="fx-prev-info" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
@@ -895,7 +909,7 @@ function showPage(id,btn){
   document.getElementById("page-"+id).classList.add("active");
   if(btn) btn.classList.add("active");
   if(id==="packages"){ renderPkgPicker(); renderPackages(); }  // refrescar con la librería actual
-  if(id==="fx"){ loadFxPreviewScreens(); }                     // geometrías al día
+  if(id==="fx"){ loadFxPreviewSize(); }                        // recuperar la resolución elegida
 }
 function updateStats(){
   const sids=new Set([...Object.keys(regScreens),...Object.keys(content.screens||{})]);
@@ -1773,30 +1787,45 @@ function cancelFxEdit(){
 // lo devuelve por postMessage, así que no hay lógica de maquetación duplicada
 // que se desincronice al tocar el CSS.
 let fxPrevReady=false;
+const FX_PREV_KEY="signalos_fx_preview_size";
 
-async function loadFxPreviewScreens(){
-  const sel=document.getElementById("fx-prev-screen");
-  if(!sel) return;
-  let screens={};
-  try{ screens=await (await fetch("/api/screens")).json(); }catch(e){}
-  const cfgs=content.screens||{};
-  const prev=sel.value;
-  sel.innerHTML="";
-  const ids=Object.keys(screens);
-  if(!ids.length){
-    sel.innerHTML='<option data-w="1920" data-h="1080" data-rot="0">Sin pantallas — se asume 1920×1080</option>';
-  }else{
-    ids.forEach(id=>{
-      const vp=screens[id].viewport;
-      const o=document.createElement("option");
-      o.textContent=vp?`${id} — ${vp.w}×${vp.h}`:`${id} — sin datos, se asume 1920×1080`;
-      o.value=id;
-      o.dataset.w=vp?vp.w:1920; o.dataset.h=vp?vp.h:1080;
-      o.dataset.rot=(cfgs[id]&&cfgs[id].rotation)||0;
-      sel.appendChild(o);
-    });
-    if(prev) sel.value=prev;
+// La resolución la escribe el usuario, no se autodetecta. Así se puede preparar
+// el contenido de una pantalla que todavía no existe o está apagada.
+function fxPrevSize(){
+  const cl=(v,d)=>Math.max(240,Math.min(7680,parseInt(v)||d));
+  return {w:cl(document.getElementById("fx-prev-w").value,1920),
+          h:cl(document.getElementById("fx-prev-h").value,1080)};
+}
+
+function applyFxPreset(){
+  const v=document.getElementById("fx-prev-preset").value;
+  if(v!=="custom"){
+    const [w,h]=v.split("x");
+    document.getElementById("fx-prev-w").value=w;
+    document.getElementById("fx-prev-h").value=h;
   }
+  renderFxPreview();
+}
+
+// Si el tamaño escrito a mano coincide con un preset, seleccionarlo; si no,
+// marcar "Personalizada" para que el desplegable no mienta.
+function syncFxPreset(){
+  const {w,h}=fxPrevSize();
+  const sel=document.getElementById("fx-prev-preset");
+  const match=`${w}x${h}`;
+  sel.value=[...sel.options].some(o=>o.value===match)?match:"custom";
+}
+
+function loadFxPreviewSize(){
+  if(!document.getElementById("fx-prev-w")) return;
+  try{
+    const s=JSON.parse(localStorage.getItem(FX_PREV_KEY)||"null");
+    if(s&&s.w&&s.h){
+      document.getElementById("fx-prev-w").value=s.w;
+      document.getElementById("fx-prev-h").value=s.h;
+    }
+  }catch(e){}
+  syncFxPreset();
   renderFxPreview();
 }
 
@@ -1817,13 +1846,10 @@ function fxDraftItem(){
 }
 
 function renderFxPreview(){
-  const sel=document.getElementById("fx-prev-screen");
   const stage=document.getElementById("fx-prev-stage");
-  if(!sel||!stage||!sel.selectedOptions.length) return;
-  const opt=sel.selectedOptions[0];
-  let w=parseInt(opt.dataset.w)||1920, h=parseInt(opt.dataset.h)||1080;
-  const rot=parseInt(opt.dataset.rot)||0;
-  if(rot===90||rot===270){ const t=w; w=h; h=t; }   // la pantalla está girada
+  if(!stage||!document.getElementById("fx-prev-w")) return;
+  const {w,h}=fxPrevSize();
+  try{ localStorage.setItem(FX_PREV_KEY,JSON.stringify({w,h})); }catch(e){}
 
   // Clave de la fidelidad: el iframe mide los píxeles REALES de la pantalla y
   // se encoge visualmente. Así clamp()/vw/vh se resuelven igual que en el TV.
@@ -1870,6 +1896,10 @@ window.addEventListener("message",(e)=>{
 ["fx-title","fx-base","fx-bg","fx-color","fx-note"].forEach(id=>{
   const el=document.getElementById(id);
   if(el) el.addEventListener("input",()=>renderFxPreview());
+});
+["fx-prev-w","fx-prev-h"].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener("input",()=>{ syncFxPreset(); renderFxPreview(); });
 });
 window.addEventListener("resize",()=>renderFxPreview());
 

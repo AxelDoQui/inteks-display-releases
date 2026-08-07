@@ -685,32 +685,6 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"ok": True}).encode())
             return
 
-        # ── API: la pantalla informa de su tamaño real. Lo usa la vista previa
-        #    del admin para dimensionar el iframe con los píxeles de verdad.
-        #    Va ANTES de la puerta de control porque las pantallas no tienen
-        #    sesión. Por eso NO puede crear entradas: solo actualiza pantallas
-        #    ya registradas por el SSE, o cualquiera en la red podría llenar
-        #    screens.json de pantallas inventadas.
-        if path == "/api/screen-info":
-            try:
-                d = json.loads(body or "{}")
-                sid = (d.get("screen") or "").strip()
-                if not sid:
-                    jresp(400, {"ok": False, "error": "falta screen"}); return
-                screens = load_json(SCREENS_FILE)
-                if sid not in screens:
-                    jresp(404, {"ok": False, "error": "pantalla no registrada"}); return
-                w = int(d.get("w") or 0); h = int(d.get("h") or 0)
-                screens[sid]["viewport"] = {
-                    "w": w, "h": h,
-                    "dpr": float(d.get("dpr") or 1),
-                    "orientation": "portrait" if h > w else "landscape",
-                }
-                save_json(SCREENS_FILE, screens)
-                ok()
-            except Exception as e: err(e)
-            return
-
         # ── PUERTA DE CONTROL: todo lo que sigue exige sesión válida (cookie) o api_token.
         #    Excepción: /api/pair es público (las pantallas se enlazan con el PIN).
         if path != "/api/pair" and not self.require_auth():

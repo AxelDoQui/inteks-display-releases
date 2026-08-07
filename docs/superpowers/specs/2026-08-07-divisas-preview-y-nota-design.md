@@ -31,19 +31,29 @@ se toca.** El problema es exclusivamente de autoría: el admin no informa.
 
 ## Diseño
 
-### 1. Reporte de geometría — `POST /api/screen-info`
+### 1. La resolución la escribe el usuario
 
-El player informa de su tamaño al cargar y, con antirrebote de 1 s, en
-`resize` y `orientationchange`.
+**Revisado el 2026-08-07, tras implementar la autodetección y descartarla.**
 
-```json
-{ "screen": "TV-Salon", "w": 1920, "h": 1080, "dpr": 1, "orientation": "landscape" }
-```
+La primera versión detectaba la resolución automáticamente: el player la
+reportaba a `POST /api/screen-info` y se guardaba en `screens.json`. Se ha
+retirado por completo en favor de que el usuario la escriba.
 
-Se guarda en `screens.json` bajo la clave `viewport` de cada pantalla.
+Motivos:
 
-Va en un endpoint propio y no colgando del SSE porque es una unidad con un solo
-propósito, comprobable de forma aislada, y no enreda el canal de eventos.
+- La autodetección solo sabe de pantallas **ya conectadas**. Escribiéndola se
+  puede preparar el contenido de un cliente antes de instalar nada, que es el
+  caso real de uso al vender el producto.
+- El endpoint tenía que ser público, porque las pantallas no tienen sesión
+  (`server.py:690` es una puerta de control). Eso obligaba a defenderlo de
+  escrituras de cualquiera en la red. Al quitarlo desaparece esa superficie.
+- Elimina el caso "pantalla sin datos todavía" y toda la lógica de rotación:
+  el usuario escribe `1080×1920` para una pantalla vertical y ya está.
+
+En el admin: un desplegable de resoluciones habituales (Full HD horizontal,
+4K, HD, Full HD vertical, tablet vertical) más dos campos de ancho y alto para
+cualquier otra. La elección se guarda en `localStorage`, no en el contenido:
+es una preferencia de quien edita, no un dato del módulo.
 
 ### 2. Modo preview del player — `player.html?preview=1`
 
@@ -51,7 +61,6 @@ Sin parámetro `screen`. En este modo el player **no**:
 
 - abre la conexión SSE,
 - se registra en el registro de pantallas,
-- llama a `/api/screen-info`,
 - aplica la comprobación de horario ni muestra el standby.
 
 Sin estas exclusiones, abrir el player dentro del admin marcaría una pantalla
@@ -118,11 +127,12 @@ que ya se está tocando, no una refactorización oportunista.
 
 | Dónde | Campo | Tipo | Por defecto |
 |---|---|---|---|
-| `screens.json` → cada pantalla | `viewport` | `{w,h,dpr,orientation}` | ausente |
 | item `fx` en `content.json` | `footer_note` | string | `""` |
+| `localStorage` del admin | `signalos_fx_preview_size` | `{w,h}` | 1920×1080 |
 
-Ambos son aditivos y opcionales: el contenido existente sigue funcionando sin
-migración.
+`footer_note` es aditivo y opcional: el contenido existente sigue funcionando
+sin migración. La resolución de la previa no toca el contenido en absoluto — es
+una preferencia de quien edita, y por eso vive en `localStorage`.
 
 ## Pruebas
 
@@ -139,18 +149,18 @@ Casos sobre `groupRowsIntoPages`:
    página, sin bucle infinito ni página vacía.
 5. Lista vacía → cero páginas, sin excepción.
 
-El resto (iframe, postMessage, reporte de geometría) se verifica a mano; montar
+El resto (iframe, postMessage, panel del admin) se verifica a mano; montar
 un DOM completo en Node no compensa para este tamaño de proyecto.
 
 ## Casos límite
 
 | Situación | Comportamiento |
 |---|---|
-| Pantalla sin geometría reportada todavía | El selector la marca "sin datos" y cae a 1920×1080, avisando de que es una suposición |
-| Pantalla desconectada | Previsualizable con la última geometría conocida |
+| Resolución vacía o disparatada | Se limita a 240–7680 px y cae a 1920×1080 |
+| Tamaño escrito que no coincide con ningún preset | El desplegable pasa a "Personalizada" para que no mienta |
 | El iframe no carga | Mensaje explícito en lugar de un recuadro en blanco |
 | `footer_note` vacío | No se renderiza el `div`; no roba alto |
-| Pantalla con `config.rotation` de 90 o 270 | El iframe intercambia ancho y alto |
+| Pantalla girada | El usuario escribe la resolución tal y como se ve (1080×1920). No hay lógica de rotación |
 | Mensaje muy largo | El pie se limita a `max-height: 18%` del alto del módulo, con `overflow: hidden`, para que no ahogue a las filas |
 
 ## Fuera de alcance

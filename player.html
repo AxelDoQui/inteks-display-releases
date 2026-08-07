@@ -144,17 +144,6 @@ function applyRotation(deg){
   else if(deg===270) document.body.classList.add("rot-270");
 }
 
-// Informar al servidor del tamaño real de esta pantalla, para que la vista
-// previa del admin dimensione su iframe con los píxeles de verdad. El endpoint
-// solo actualiza pantallas ya registradas, así que se llama cuando el SSE
-// confirma el registro, no antes.
-function reportScreenInfo(){
-  if(!SCREEN_ID) return;
-  fetch("/api/screen-info",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({screen:SCREEN_ID,w:window.innerWidth,h:window.innerHeight,
-                         dpr:window.devicePixelRatio||1})}).catch(()=>{});
-}
-
 if(SCREEN_ID){
   document.getElementById("sid-display").textContent=SCREEN_ID;
   document.getElementById("url-hint").textContent=location.host+"/player.html?screen="+SCREEN_ID;
@@ -236,9 +225,6 @@ function connectSSE(){
     if(!e.data) return;
     // La pantalla fue eliminada desde el admin -> desconectar y volver a emparejar
     if(e.data.indexOf("deleted")===0){ es.close(); try{localStorage.removeItem("signalos_screen_id");}catch(e2){} location.href="/pair"; return; }
-    // "connected" confirma que el servidor ya registró la pantalla: es el
-    // momento seguro para reportar la geometría (el endpoint no crea entradas).
-    if(e.data.indexOf("connected")===0){ reportScreenInfo(); return; }
     // Al recibir contenido nuevo, RECARGAR la página completa (no solo la playlist).
     // El primer mensaje "connected" se ignora para no entrar en bucle de recargas.
     if(e.data.indexOf("update")===0){
@@ -606,7 +592,7 @@ setInterval(()=>{ if(SCREEN_ID && !PREVIEW) loadPlaylist(); },15000);
 let resizeTimer=null;
 window.addEventListener("resize",()=>{
   clearTimeout(resizeTimer);
-  resizeTimer=setTimeout(()=>{ if(playlist.length) showSlide(current); reportScreenInfo(); }, 400);
+  resizeTimer=setTimeout(()=>{ if(playlist.length) showSlide(current); }, 400);
 });
 
 // Actualizar clima en vivo cada 15 min
