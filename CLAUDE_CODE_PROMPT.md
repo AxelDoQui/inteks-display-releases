@@ -71,6 +71,12 @@ videowall en dos pantallas (`wall_mode` + `wall_pos`, que recorta la imagen con
 `object-position` a izquierda o derecha), horario con imagen de standby, barra
 de progreso y refresco del clima cada 15 minutos.
 
+**Modo vista previa** — `player.html?preview=1`, sin `?screen=`. No conecta el
+SSE, no se registra como pantalla y no aplica el horario. Renderiza el item que
+le inyecta el admin por `postMessage` (`preview-item`) y devuelve cuántas
+páginas le salieron (`preview-pages`). Es lo que permite al admin enseñar
+cuántas divisas caben sin duplicar la lógica de maquetación.
+
 ### Extensión de Chrome — `signalos-extension/`
 
 Manifest V3. Detecta tablas de tipos de cambio en cualquier web y las envía a
@@ -102,6 +108,7 @@ POST      /api/pair            enlazar una pantalla con el PIN
 POST      /api/upload  /api/delete
 POST      /api/screens/config  /api/screens/delete
 POST      /api/fx-update       divisas desde la extensión (token)
+POST      /api/screen-info     la pantalla reporta su tamaño   (público)
 POST      /api/restart         reiniciar el servidor
 GET       /pair                atajo a pair.html
 GET       /uploads/*           archivos subidos (soporta Range)
@@ -119,7 +126,7 @@ vacía.
 |---|---|---|
 | `config.json` | puerto, alternativo, nombre mDNS, autoarranque | Sí, es la plantilla por defecto |
 | `content.json` | items, pantallas, paquetes | No — lo crea vacío `init_file` |
-| `screens.json` | registro de pantallas vistas | No — ídem |
+| `screens.json` | registro de pantallas vistas, con su `viewport` | No — ídem |
 | `admin.json` | salt, hash de contraseña, secret de sesión, api_token | **No — secretos** |
 | `pin.json` | PIN activo, intentos fallidos, bloqueo | **No — secreto** |
 | `uploads/` | archivos subidos | No |
@@ -147,7 +154,8 @@ Fuentes: Space Mono (monospace, títulos y datos), DM Sans (cuerpo).
 python server.py                  REM usa el puerto de config.json
 python server.py --port 8080      REM override
 
-npm test                          REM tests (Node stdlib, sin dependencias)
+npm test                          REM tests de lógica del player (Node stdlib)
+python tests\test_screen_info.py  REM test de API (arranca el servidor aislado)
 ```
 
 Admin en `/admin.html`, player en `/player.html?screen=NOMBRE`, emparejar en
