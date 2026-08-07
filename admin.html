@@ -1496,6 +1496,11 @@ const CURRENCY_DB = [
   {code:"XAF",country:"África Central",currency:"Franco CFA",flag:"🌍",aliases:["fcfa","cfa","franco cfa","xaf","africa central"]},
   {code:"CUC",country:"Cuba",currency:"Peso cubano conv.",flag:"🇨🇺",aliases:["peso cubano","cuba","cuc","peso c"]},
   {code:"CRC",country:"Costa Rica",currency:"Colón costarricense",flag:"🇨🇷",aliases:["colon","colón","costa rica"]},
+  {code:"HNL",country:"Honduras",currency:"Lempira hondureño",flag:"🇭🇳",aliases:["lempira","lempiras","honduras"]},
+  {code:"NIO",country:"Nicaragua",currency:"Córdoba nicaragüense",flag:"🇳🇮",aliases:["cordoba","córdoba","nicaragua"]},
+  {code:"PAB",country:"Panamá",currency:"Balboa panameño",flag:"🇵🇦",aliases:["balboa","balboas","panama","panamá"]},
+  {code:"BZD",country:"Belice",currency:"Dólar beliceño",flag:"🇧🇿",aliases:["belice","belize","dolar beliceño"]},
+  {code:"JMD",country:"Jamaica",currency:"Dólar jamaicano",flag:"🇯🇲",aliases:["jamaica","dolar jamaicano"]},
   {code:"Pts",country:"España (Peseta)",currency:"Peseta",flag:"🇪🇸",aliases:["peseta","pesetas","pts"]},
 ];
 
@@ -1707,15 +1712,43 @@ function flagImg(flag, w){
   return `<img src="/vendor/flags/${code}.svg" alt="${code.toUpperCase()}" style="width:${w};aspect-ratio:3/2;object-fit:cover;border-radius:3px;display:inline-block;vertical-align:middle" loading="lazy" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='https://flagcdn.com/${code}.svg'}else{this.outerHTML='<span>'+this.alt+'</span>'}">`;
 }
 
-// Construye una fila de divisas a partir de un código ISO de moneda, usando la
-// base que ya existe arriba. La bandera se convierte de emoji a código de dos
-// letras a propósito: el campo tiene maxlength=2 y un emoji ocupa 4 unidades
-// UTF-16, así que entraría truncado y la bandera saldría rota.
-// Devuelve null si el código no está en la base.
-function fxRowFromCurrency(code){
-  const c=CURRENCY_DB.find(x=>x.code===String(code||"").toUpperCase());
-  if(!c) return null;
-  return {flag:flagCode(c.flag),country:c.country,currency:c.currency,code:c.code,rate:""};
+// Países donde circula el dólar además de (o en lugar de) la moneda local.
+// Vive APARTE de CURRENCY_DB a propósito: CODE_MAP se construye desde esa base
+// indexando por código de moneda con "el último gana", y lo usa el OCR. Un
+// segundo "USD" allí haría que el OCR etiquetara como Venezuela cualquier dólar
+// que detectase en una web. Esta lista la consume solo el selector.
+const FX_EXTRA_PAIRS = [
+  {country:"Ecuador",     flag:"ec", code:"USD", currency:"Dólar estadounidense"},
+  {country:"El Salvador", flag:"sv", code:"USD", currency:"Dólar estadounidense"},
+  {country:"Panamá",      flag:"pa", code:"USD", currency:"Dólar estadounidense"},
+  {country:"Venezuela",   flag:"ve", code:"USD", currency:"Dólar estadounidense"},
+  {country:"Argentina",   flag:"ar", code:"USD", currency:"Dólar estadounidense"},
+  {country:"Cuba",        flag:"cu", code:"USD", currency:"Dólar estadounidense"},
+  {country:"Bolivia",     flag:"bo", code:"USD", currency:"Dólar estadounidense"},
+  {country:"Perú",        flag:"pe", code:"USD", currency:"Dólar estadounidense"},
+  {country:"Paraguay",    flag:"py", code:"USD", currency:"Dólar estadounidense"},
+];
+
+// Identifica una opción del selector. No basta el código de moneda: varios
+// países comparten USD y cada uno es una fila distinta del tablero.
+function fxOptionKey(o){ return `${o.flag}|${o.code}`; }
+
+// Todas las opciones del selector, ordenadas por país. La bandera se convierte
+// de emoji a código de dos letras a propósito: el campo tiene maxlength=2 y un
+// emoji ocupa 4 unidades UTF-16, así que entraría truncado y saldría rota.
+function fxPickerOptions(){
+  const base=CURRENCY_DB.map(c=>({country:c.country,flag:flagCode(c.flag),code:c.code,currency:c.currency,extra:0}));
+  const pares=FX_EXTRA_PAIRS.map(p=>({...p,extra:1}));
+  // Dentro de un mismo país, la moneda local va antes que el dólar añadido.
+  return base.concat(pares)
+             .sort((a,b)=>a.country.localeCompare(b.country,"es")||a.extra-b.extra||a.code.localeCompare(b.code));
+}
+
+// Construye una fila lista para el tablero. Devuelve null si la clave no existe.
+function fxRowFromKey(key){
+  const o=fxPickerOptions().find(x=>fxOptionKey(x)===key);
+  if(!o) return null;
+  return {flag:o.flag,country:o.country,currency:o.currency,code:o.code,rate:""};
 }
 
 // ── FX Module
@@ -1731,28 +1764,28 @@ function renderFxRows(){
 }
 function addFxRow(){fxRows.push({flag:"",country:"",currency:"",code:"",rate:""});renderFxRows();}
 
-// Llena el selector de país/moneda desde CURRENCY_DB, alfabético por país.
+// Llena el selector de país/moneda, alfabético por país.
 function populateFxCountryPicker(){
   const sel=document.getElementById("fx-country-pick");
   if(!sel) return;
   sel.innerHTML='<option value="">Selecciona un país…</option>';
-  CURRENCY_DB.slice()
-    .sort((a,b)=>a.country.localeCompare(b.country,"es"))
-    .forEach(c=>{
-      const o=document.createElement("option");
-      o.value=c.code;
-      o.textContent=`${c.country} — ${c.currency} (${c.code})`;
-      sel.appendChild(o);
-    });
+  fxPickerOptions().forEach(o=>{
+    const op=document.createElement("option");
+    op.value=fxOptionKey(o);
+    op.textContent=`${o.country} — ${o.currency} (${o.code})`;
+    sel.appendChild(op);
+  });
 }
 
 // Añade la fila ya rellena; solo queda escribir la tasa.
 function addFxRowFromPicker(){
   const sel=document.getElementById("fx-country-pick");
-  const row=fxRowFromCurrency(sel.value);
+  const row=fxRowFromKey(sel.value);
   if(!row){ toast("Elige un país de la lista",true); return; }
-  if(fxRows.some(r=>(r.code||"").toUpperCase()===row.code)){
-    toast(`${row.country} ya está en la lista`,true); return;
+  // Duplicado por país Y moneda: un tablero de remesas puede llevar varias
+  // filas en dólares (Ecuador, Venezuela...) con tasas distintas.
+  if(fxRows.some(r=>(r.code||"").toUpperCase()===row.code && (r.country||"")===row.country)){
+    toast(`${row.country} (${row.code}) ya está en la lista`,true); return;
   }
   fxRows.push(row);
   renderFxRows();

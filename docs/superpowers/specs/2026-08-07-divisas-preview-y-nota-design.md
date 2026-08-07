@@ -171,10 +171,36 @@ UTF-16: entraría truncado y la bandera saldría rota. `flagCode()` ya hacía es
 conversión, así que `fxRowFromCurrency()` la reutiliza.
 
 Cubierto por `tests/fx-currency-picker.test.js`, que además valida los datos:
-comprueba que **toda divisa de la base con bandera tiene su SVG en
-`vendor/flags/`**. Hoy pasan las 36; `XAF` (África Central) es la única sin
-bandera porque no tiene emoji de país, y el test fija ese hecho para que se
-note si mañana se añade una divisa nueva sin su SVG.
+comprueba que **toda opción con bandera tiene su SVG en `vendor/flags/`**.
+`XAF` (África Central) es la única sin bandera porque no tiene emoji de país, y
+el test fija ese hecho para que se note si mañana se añade una divisa nueva sin
+su SVG.
+
+#### Países de doble moneda y ampliación de la base
+
+En una casa de cambio o un tablero de remesas hay países donde circulan dos
+monedas: Venezuela cotiza bolívar **y** dólar, y son dos filas con tasas
+distintas. Además faltaban países del corredor de remesas: Ecuador y Honduras
+se estaban tecleando a mano.
+
+**Los pares país+dólar no pueden vivir en `CURRENCY_DB`.** `CODE_MAP` se
+construye desde esa base indexando por código de moneda con «el último gana», y
+lo consume el OCR y el pegado de texto. Una segunda entrada con código `USD`
+haría que el OCR etiquetara como Venezuela cualquier dólar detectado en una web.
+Por eso viven en `FX_EXTRA_PAIRS`, una lista que solo consume el selector.
+
+- **Monedas nuevas en `CURRENCY_DB`** (códigos nuevos, sin colisión): `HNL`
+  Honduras, `NIO` Nicaragua, `PAB` Panamá, `BZD` Belice, `JMD` Jamaica.
+- **Pares en `FX_EXTRA_PAIRS`**: Ecuador, El Salvador y Panamá (dolarizados),
+  más Venezuela, Argentina, Cuba, Bolivia, Perú y Paraguay (doble circulación).
+- Siete banderas SVG nuevas descargadas de flagcdn, la misma fuente a la que
+  ya recurre `flagImg()` como respaldo. `vendor/` pasa de 1,6 a 2,1 MB.
+
+La clave de cada opción es `bandera|código`, no el código solo: varios países
+comparten `USD` y cada uno es una fila distinta. El control de duplicados al
+añadir compara **país y moneda**, para que un tablero pueda llevar varias filas
+en dólares con tasas diferentes. Dentro de un mismo país la moneda local se
+ordena antes que el dólar añadido.
 
 ### 6. Refactor puntual: extraer el agrupamiento
 
