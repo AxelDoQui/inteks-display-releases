@@ -392,7 +392,11 @@ JPY  Yen        162.5"></textarea>
       <span></span>
     </div>
     <div class="fx-editor" id="fx-rows"></div>
-    <button class="fx-add-btn" onclick="addFxRow()">+ Añadir moneda</button>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;max-width:620px">
+      <select class="finput" id="fx-country-pick" style="flex:1;min-width:240px;max-width:400px"></select>
+      <button class="btn btn-accent" onclick="addFxRowFromPicker()"><i class="fa-solid fa-plus"></i> Añadir</button>
+    </div>
+    <button class="fx-add-btn" onclick="addFxRow()" style="margin-top:8px">+ Fila vacía (divisa que no esté en la lista)</button>
 
     <div style="margin-top:14px">
       <div class="card-title">Vista previa</div>
@@ -896,7 +900,7 @@ const WEATHER_ICONS=["☀️","🌤","⛅","🌥","☁️","🌦","🌧","⛈","
 
 async function loadAll(){
   await Promise.all([loadContent(),loadScreens()]);
-  renderScreens();renderLibrary();updateStats();renderFxSaved();renderUrlList();renderPackages();renderPkgPicker();
+  renderScreens();renderLibrary();updateStats();renderFxSaved();renderUrlList();renderPackages();renderPkgPicker();populateFxCountryPicker();
 }
 async function loadContent(){try{const r=await fetch("/api/content");content=await r.json();}catch(e){}}
 async function loadScreens(){
@@ -1703,6 +1707,17 @@ function flagImg(flag, w){
   return `<img src="/vendor/flags/${code}.svg" alt="${code.toUpperCase()}" style="width:${w};aspect-ratio:3/2;object-fit:cover;border-radius:3px;display:inline-block;vertical-align:middle" loading="lazy" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='https://flagcdn.com/${code}.svg'}else{this.outerHTML='<span>'+this.alt+'</span>'}">`;
 }
 
+// Construye una fila de divisas a partir de un código ISO de moneda, usando la
+// base que ya existe arriba. La bandera se convierte de emoji a código de dos
+// letras a propósito: el campo tiene maxlength=2 y un emoji ocupa 4 unidades
+// UTF-16, así que entraría truncado y la bandera saldría rota.
+// Devuelve null si el código no está en la base.
+function fxRowFromCurrency(code){
+  const c=CURRENCY_DB.find(x=>x.code===String(code||"").toUpperCase());
+  if(!c) return null;
+  return {flag:flagCode(c.flag),country:c.country,currency:c.currency,code:c.code,rate:""};
+}
+
 // ── FX Module
 let fxRows=[{flag:"us",country:"Estados Unidos",currency:"Dólar",code:"USD",rate:"1.08"},{flag:"gb",country:"Reino Unido",currency:"Libra",code:"GBP",rate:"0.86"},{flag:"jp",country:"Japón",currency:"Yen",code:"JPY",rate:"162.5"}];
 function renderFxRows(){
@@ -1715,6 +1730,37 @@ function renderFxRows(){
   updateFxPreview();
 }
 function addFxRow(){fxRows.push({flag:"",country:"",currency:"",code:"",rate:""});renderFxRows();}
+
+// Llena el selector de país/moneda desde CURRENCY_DB, alfabético por país.
+function populateFxCountryPicker(){
+  const sel=document.getElementById("fx-country-pick");
+  if(!sel) return;
+  sel.innerHTML='<option value="">Selecciona un país…</option>';
+  CURRENCY_DB.slice()
+    .sort((a,b)=>a.country.localeCompare(b.country,"es"))
+    .forEach(c=>{
+      const o=document.createElement("option");
+      o.value=c.code;
+      o.textContent=`${c.country} — ${c.currency} (${c.code})`;
+      sel.appendChild(o);
+    });
+}
+
+// Añade la fila ya rellena; solo queda escribir la tasa.
+function addFxRowFromPicker(){
+  const sel=document.getElementById("fx-country-pick");
+  const row=fxRowFromCurrency(sel.value);
+  if(!row){ toast("Elige un país de la lista",true); return; }
+  if(fxRows.some(r=>(r.code||"").toUpperCase()===row.code)){
+    toast(`${row.country} ya está en la lista`,true); return;
+  }
+  fxRows.push(row);
+  renderFxRows();
+  sel.value="";
+  // Poner el foco en la tasa de la fila nueva, que es lo único que falta.
+  const inputs=document.querySelectorAll("#fx-rows .fx-row-edit:last-child input");
+  if(inputs.length>=5) inputs[4].focus();
+}
 function rmFxRow(i){fxRows.splice(i,1);renderFxRows();}
 function updateFxPreview(){
   const bg=document.getElementById("fx-bg").value;

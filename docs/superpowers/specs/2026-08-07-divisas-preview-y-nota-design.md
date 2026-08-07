@@ -149,6 +149,33 @@ Efecto medido: en 1920×1080 los tamaños apenas se mueven (33 px frente a 28 px
 en el nombre del país); en 2160×3840 pasan de 28 px a 97 px, y de 52 px a
 151 px en la cotización.
 
+### 5c. Selector de país y moneda en el admin
+
+**Añadido el 2026-08-07.** Objetivo: que un usuario básico no tenga que saberse
+los códigos ISO ni teclear bandera, país y nombre de moneda a mano.
+
+`admin.html` ya tenía `CURRENCY_DB` (36 divisas con país, moneda, código y
+bandera), usada solo para el OCR y el pegado de texto. Se expone como
+desplegable bajo la lista de filas:
+
+- El desplegable se ordena alfabéticamente por país y etiqueta cada entrada
+  como «Argentina — Peso argentino (ARS)».
+- «Añadir» inserta la fila ya rellena y pone el foco en la tasa, que es lo
+  único que falta. Los campos siguen editables.
+- «Fila vacía» es el botón anterior, renombrado, para divisas fuera de la base.
+- No se permiten duplicados: si la divisa ya está, avisa y no la añade.
+
+**La bandera se convierte de emoji a código de dos letras.** `CURRENCY_DB`
+guarda 🇦🇷 pero el campo tiene `maxlength="2"` y un emoji ocupa 4 unidades
+UTF-16: entraría truncado y la bandera saldría rota. `flagCode()` ya hacía esa
+conversión, así que `fxRowFromCurrency()` la reutiliza.
+
+Cubierto por `tests/fx-currency-picker.test.js`, que además valida los datos:
+comprueba que **toda divisa de la base con bandera tiene su SVG en
+`vendor/flags/`**. Hoy pasan las 36; `XAF` (África Central) es la única sin
+bandera porque no tiene emoji de país, y el test fija ese hecho para que se
+note si mañana se añade una divisa nueva sin su SVG.
+
 ### 6. Refactor puntual: extraer el agrupamiento
 
 `setupFxPagination()` mezcla hoy tres cosas: medir el DOM, agrupar filas en
