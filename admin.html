@@ -107,6 +107,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .finput:focus{outline:none;border-color:var(--accent)}
 /* FX module editor */
 .fx-editor{background:var(--s2);border:1px solid var(--b);border-radius:var(--r);overflow:hidden;margin-bottom:10px}
+.fx-combo-item{display:flex;align-items:center;gap:9px;padding:8px 11px;cursor:pointer;font-size:12.5px;border-bottom:1px solid var(--b)}
+.fx-combo-item:last-child{border-bottom:none}
+.fx-combo-item.active{background:var(--s3)}
 .fx-row-edit{display:grid;grid-template-columns:40px 1fr 1fr 80px 80px 32px;gap:6px;padding:8px 10px;border-bottom:1px solid var(--b);align-items:center}
 .fx-row-edit:last-child{border-bottom:none}
 .fx-row-edit input{background:var(--s3);border:1px solid var(--b);border-radius:5px;color:var(--text);padding:5px 7px;font-size:12px;width:100%}
@@ -392,12 +395,10 @@ JPY  Yen        162.5"></textarea>
       <span></span>
     </div>
     <div class="fx-editor" id="fx-rows"></div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;max-width:620px">
-      <input class="finput" id="fx-country-search" placeholder="Buscar país, moneda o código…" style="flex:1;min-width:200px;max-width:280px" autocomplete="off">
-      <select class="finput" id="fx-country-pick" style="flex:1;min-width:240px;max-width:400px"></select>
-      <button class="btn btn-accent" onclick="addFxRowFromPicker()"><i class="fa-solid fa-plus"></i> Añadir</button>
+    <div style="position:relative;max-width:440px;margin-top:8px">
+      <input class="finput" id="fx-country-search" placeholder="Buscar y añadir país o moneda…" autocomplete="off" style="width:100%">
+      <div id="fx-country-list" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:30;max-height:280px;overflow-y:auto;background:var(--s2);border:1px solid var(--b);border-radius:var(--r);margin-top:4px;box-shadow:0 10px 28px rgba(0,0,0,.5)"></div>
     </div>
-    <div id="fx-country-count" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
     <button class="fx-add-btn" onclick="addFxRow()" style="margin-top:8px">+ Fila vacía (divisa que no esté en la lista)</button>
 
     <div style="margin-top:14px">
@@ -902,7 +903,7 @@ const WEATHER_ICONS=["☀️","🌤","⛅","🌥","☁️","🌦","🌧","⛈","
 
 async function loadAll(){
   await Promise.all([loadContent(),loadScreens()]);
-  renderScreens();renderLibrary();updateStats();renderFxSaved();renderUrlList();renderPackages();renderPkgPicker();populateFxCountryPicker();
+  renderScreens();renderLibrary();updateStats();renderFxSaved();renderUrlList();renderPackages();renderPkgPicker();
 }
 async function loadContent(){try{const r=await fetch("/api/content");content=await r.json();}catch(e){}}
 async function loadScreens(){
@@ -1787,36 +1788,59 @@ function addFxRow(){fxRows.push({flag:"",country:"",currency:"",code:"",rate:""}
 // Llena el selector de país/moneda, alfabético por país y filtrado por el
 // buscador. Se reconstruyen las opciones en vez de ocultarlas: es más simple y
 // no depende de que el navegador respete `hidden` en un <option>.
-function populateFxCountryPicker(){
-  const sel=document.getElementById("fx-country-pick");
-  if(!sel) return;
-  const buscador=document.getElementById("fx-country-search");
-  const q=buscador?buscador.value:"";
-  const opts=fxFilterOptions(fxPickerOptions(),q);
-  sel.innerHTML="";
-  if(!opts.length){
-    sel.innerHTML='<option value="">Ningún país coincide</option>';
-  }else{
-    if(opts.length>1) sel.innerHTML='<option value="">Selecciona un país…</option>';
-    opts.forEach(o=>{
-      const op=document.createElement("option");
-      op.value=fxOptionKey(o);
-      op.textContent=`${o.country} — ${o.currency} (${o.code})`;
-      sel.appendChild(op);
-    });
-    // Con una sola coincidencia queda ya elegida: basta pulsar Añadir.
-    if(opts.length===1) sel.value=fxOptionKey(opts[0]);
+// Buscador con sugerencias. Al enfocarlo salen las 51 opciones, y al escribir
+// se filtran. No hay <select>: la lista de sugerencias ES el desplegable.
+let fxComboOpts=[], fxComboIdx=-1;
+
+function renderFxCombo(){
+  const inp=document.getElementById("fx-country-search");
+  const list=document.getElementById("fx-country-list");
+  if(!inp||!list) return;
+  fxComboOpts=fxFilterOptions(fxPickerOptions(), inp.value);
+  if(fxComboIdx>=fxComboOpts.length) fxComboIdx=fxComboOpts.length-1;
+  list.innerHTML="";
+  if(!fxComboOpts.length){
+    list.innerHTML='<div style="padding:10px 12px;font-size:12px;color:var(--muted)">Ningún país coincide</div>';
+    return;
   }
-  const info=document.getElementById("fx-country-count");
-  if(info) info.textContent=q.trim()
-    ? `${opts.length} de ${fxPickerOptions().length} coinciden con "${q.trim()}"`
-    : `${opts.length} países y monedas disponibles`;
+  fxComboOpts.forEach((o,i)=>{
+    const yaEsta=fxRows.some(r=>(r.code||"").toUpperCase()===o.code && (r.country||"")===o.country);
+    const el=document.createElement("div");
+    el.className="fx-combo-item"+(i===fxComboIdx?" active":"");
+    el.dataset.key=fxOptionKey(o);
+    el.innerHTML=`${flagImg(o.flag,"20px")}
+      <span style="flex:1;min-width:0">${o.country} <span style="opacity:.55">— ${o.currency}</span></span>
+      <span style="font-family:monospace;font-size:11px;opacity:.5">${o.code}</span>
+      ${yaEsta?'<i class="fa-solid fa-check" style="color:var(--a2);font-size:11px" title="ya está en la lista"></i>':''}`;
+    el.addEventListener("mousedown",e=>{ e.preventDefault(); addFxRowFromKey(el.dataset.key); });
+    el.addEventListener("mouseenter",()=>{ fxComboIdx=i; marcarFxCombo(); });
+    list.appendChild(el);
+  });
+}
+
+function marcarFxCombo(){
+  const list=document.getElementById("fx-country-list");
+  if(!list) return;
+  [...list.children].forEach((el,i)=>el.classList.toggle("active",i===fxComboIdx));
+  const act=list.children[fxComboIdx];
+  if(act) act.scrollIntoView({block:"nearest"});
+}
+
+function abrirFxCombo(){
+  const list=document.getElementById("fx-country-list");
+  if(!list) return;
+  renderFxCombo();
+  list.style.display="";
+}
+function cerrarFxCombo(){
+  const list=document.getElementById("fx-country-list");
+  if(list) list.style.display="none";
+  fxComboIdx=-1;
 }
 
 // Añade la fila ya rellena; solo queda escribir la tasa.
-function addFxRowFromPicker(){
-  const sel=document.getElementById("fx-country-pick");
-  const row=fxRowFromKey(sel.value);
+function addFxRowFromKey(key){
+  const row=fxRowFromKey(key);
   if(!row){ toast("Elige un país de la lista",true); return; }
   // Duplicado por país Y moneda: un tablero de remesas puede llevar varias
   // filas en dólares (Ecuador, Venezuela...) con tasas distintas.
@@ -1825,9 +1849,9 @@ function addFxRowFromPicker(){
   }
   fxRows.push(row);
   renderFxRows();
-  const buscador=document.getElementById("fx-country-search");
-  if(buscador) buscador.value="";
-  populateFxCountryPicker();     // repuebla la lista completa y resetea el selector
+  const inp=document.getElementById("fx-country-search");
+  if(inp) inp.value="";
+  cerrarFxCombo();
   // Poner el foco en la tasa de la fila nueva, que es lo único que falta.
   const inputs=document.querySelectorAll("#fx-rows .fx-row-edit:last-child input");
   if(inputs.length>=5) inputs[4].focus();
@@ -2051,9 +2075,24 @@ window.addEventListener("message",(e)=>{
 (()=>{
   const b=document.getElementById("fx-country-search");
   if(!b) return;
-  b.addEventListener("input",()=>populateFxCountryPicker());
-  // Enter añade directamente, que es lo natural tras teclear el país.
-  b.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); addFxRowFromPicker(); } });
+  b.addEventListener("focus",abrirFxCombo);
+  b.addEventListener("input",()=>{ fxComboIdx=0; abrirFxCombo(); });
+  b.addEventListener("keydown",e=>{
+    const list=document.getElementById("fx-country-list");
+    const abierto=list && list.style.display!=="none";
+    if(e.key==="ArrowDown"||e.key==="ArrowUp"){
+      e.preventDefault();
+      if(!abierto){ abrirFxCombo(); return; }
+      fxComboIdx=Math.max(0,Math.min(fxComboOpts.length-1,fxComboIdx+(e.key==="ArrowDown"?1:-1)));
+      marcarFxCombo();
+    }else if(e.key==="Enter"){
+      e.preventDefault();
+      const o=fxComboOpts[fxComboIdx>=0?fxComboIdx:0];
+      if(o) addFxRowFromKey(fxOptionKey(o));
+    }else if(e.key==="Escape"){ cerrarFxCombo(); b.blur(); }
+  });
+  // mousedown en los items se adelanta al blur, así que aquí solo hay que cerrar.
+  b.addEventListener("blur",()=>setTimeout(cerrarFxCombo,120));
 })();
 window.addEventListener("resize",()=>renderFxPreview());
 
