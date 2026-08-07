@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>SignalOS</title>
+<link rel="stylesheet" href="sidebar.css">
+</head>
+<body>
+<div class="sidebar">
+  <div class="header">
+    <div class="logo">SIGNAL/OS</div>
+    <div class="status" id="status">
+      <span class="dot" id="status-dot"></span>
+      <span id="status-txt">conectando...</span>
+    </div>
+    <button class="close-btn" id="close-btn" title="Cerrar">&times;</button>
+  </div>
+
+  <div class="section-label">DETECTADO EN ESTA PÁGINA <button id="rescan-btn" class="mini-btn" title="Re-escanear">↻</button></div>
+  <div id="detected-list" class="detected-list">
+    <div class="empty-msg">Escaneando página...</div>
+  </div>
+
+  <div class="section-label">AÑADIR MANUALMENTE</div>
+  <div class="manual-form">
+    <div class="manual-row">
+      <input id="m-flag" type="text" placeholder="🏳" maxlength="4" class="input-flag">
+      <input id="m-code" type="text" placeholder="USD" maxlength="4" class="input-code">
+      <input id="m-rate" type="text" placeholder="1.08" class="input-rate">
+      <button id="m-add" class="btn-add" title="Añadir">+</button>
+    </div>
+  </div>
+
+  <div class="section-label">SELECCIONADOS <span id="selected-count" class="count-badge">0</span></div>
+  <div id="selected-list" class="selected-list">
+    <div class="empty-msg">Selecciona divisas arriba</div>
+  </div>
+
+  <div class="section-label">ENVIAR A PANTALLA</div>
+  <select id="screen-select" class="screen-select">
+    <option value="">Todas las pantallas</option>
+  </select>
+
+  <button id="send-btn" class="send-btn" disabled>Actualizar SignalOS</button>
+  <div id="last-update" class="last-update"></div>
+
+  <div class="config-row">
+    <span class="config-label">Servidor:</span>
+    <input id="server-url" type="text" class="config-input" placeholder="http://localhost">
+  </div>
+  <div class="config-row">
+    <span class="config-label">Token:</span>
+    <input id="api-token" type="password" class="config-input" placeholder="token de API (Ajustes del admin)">
+    <button id="save-config" class="btn-save" title="Guardar">✓</button>
+  </div>
+</div>
+<script src="parser.js"></script>
+<script src="sidebar.js"></script>
+</body>
+</html>

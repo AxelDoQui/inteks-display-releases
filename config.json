@@ -1,0 +1,9 @@
+{
+  "port": 80,
+  "port_fallback": 9000,
+  "installation_name": "SignalOS Pro",
+  "mdns_name": "signage",
+  "autostart": false,
+  "first_run": true,
+  "_tray_notified": true
+}

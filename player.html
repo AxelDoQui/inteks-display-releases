@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>SignalOS Player</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;font-family:sans-serif}
+#player{width:100vw;height:100vh;position:fixed;top:0;left:0;transform-origin:top left;background:#000;overflow:hidden}
+
+/* ── Slides normales */
+.slide{position:absolute;inset:0;opacity:0;transition:opacity 1s ease-in-out;display:flex;align-items:center;justify-content:center;background:#000}
+.slide.active{opacity:1}
+.slide img{width:100%;height:100%;object-fit:contain}
+.slide video{width:100%;height:100%;object-fit:contain;background:#000}
+.slide iframe{width:100%;height:100%;border:none;background:#fff}
+.slide.wall-left img,.slide.wall-left video{object-fit:cover;object-position:left center}
+.slide.wall-right img,.slide.wall-right video{object-fit:cover;object-position:right center}
+
+/* ── Texto */
+.text-slide{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:8vw;text-align:center}
+.text-slide h2{font-size:clamp(28px,6vw,96px);font-weight:700;line-height:1.1;margin-bottom:.3em}
+.text-slide p{font-size:clamp(16px,3vw,48px);opacity:.75;line-height:1.5}
+
+/* ── Módulo divisas */
+.mod-fx{width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden}
+.mod-fx-header{padding:3vh 4vw 2vh;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;--fx-title-size:clamp(18px,3vw,42px)}
+.mod-fx-title{font-size:var(--fx-title-size);font-weight:700;letter-spacing:2px;text-transform:uppercase}
+.mod-fx-date{font-size:clamp(11px,1.5vw,20px);opacity:.4;font-family:monospace;letter-spacing:1px}
+.mod-fx-page{font-size:clamp(11px,1.5vw,20px);opacity:.55;font-family:monospace;letter-spacing:1px;padding:2px 10px;border:1px solid rgba(255,255,255,.2);border-radius:99px}
+.mod-fx-logo{height:var(--fx-title-size);max-width:22vw;object-fit:contain}
+.mod-fx-rows{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:center;padding:0 4vw 3vh;gap:0}
+.fx-row{display:flex;align-items:center;padding:clamp(10px,2vh,28px) 0;border-bottom:1px solid rgba(255,255,255,.07);gap:2vw}
+.fx-row:last-child{border-bottom:none}
+.fx-flag{font-size:clamp(24px,4vw,56px);width:clamp(40px,5vw,72px);text-align:center;flex-shrink:0}
+.fx-country{flex:1;min-width:0}
+.fx-country-name{font-size:clamp(13px,2vw,28px);font-weight:600;letter-spacing:.5px}
+.fx-currency{font-size:clamp(10px,1.3vw,18px);opacity:.45;font-family:monospace;letter-spacing:1px;margin-top:2px}
+.fx-rate{text-align:right;flex-shrink:0}
+.fx-rate-val{font-size:clamp(20px,3.5vw,52px);font-weight:700;font-family:monospace;letter-spacing:-1px}
+.fx-rate-label{font-size:clamp(9px,1vw,14px);opacity:.4;text-align:right;letter-spacing:1px;margin-top:2px}
+
+/* ── Módulo clima */
+.mod-weather{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6vw;text-align:center}
+.weather-city{font-size:clamp(18px,3vw,40px);font-weight:500;opacity:.5;letter-spacing:3px;text-transform:uppercase;margin-bottom:1vh}
+.weather-icon{font-size:clamp(80px,18vw,200px);line-height:1;margin:2vh 0}
+.weather-temp{font-size:clamp(64px,14vw,180px);font-weight:700;font-family:monospace;line-height:1}
+.weather-unit{font-size:clamp(28px,5vw,64px);opacity:.4;vertical-align:super}
+.weather-desc{font-size:clamp(16px,2.5vw,36px);opacity:.55;margin-top:1.5vh;letter-spacing:2px}
+.weather-details{display:flex;gap:4vw;margin-top:3vh;opacity:.4;font-size:clamp(12px,1.8vw,22px);font-family:monospace}
+
+/* ── Módulo noticias ticker */
+.mod-ticker{width:100%;height:100%;display:flex;flex-direction:column}
+.ticker-header{padding:3vh 4vw 2vh;flex-shrink:0}
+.ticker-title{font-size:clamp(14px,2vw,28px);font-weight:700;letter-spacing:3px;text-transform:uppercase;opacity:.5}
+.ticker-items{flex:1;overflow:hidden;display:flex;flex-direction:column;justify-content:center;padding:0 4vw}
+.ticker-item{padding:clamp(12px,2.5vh,32px) 0;border-bottom:1px solid rgba(255,255,255,.06);opacity:0;transform:translateY(20px);transition:opacity .6s,transform .6s}
+.ticker-item.visible{opacity:1;transform:translateY(0)}
+.ticker-item-source{font-size:clamp(10px,1.2vw,16px);opacity:.35;letter-spacing:2px;text-transform:uppercase;font-family:monospace;margin-bottom:.4em}
+.ticker-item-text{font-size:clamp(16px,2.8vw,40px);font-weight:500;line-height:1.35}
+
+/* ── Pantalla de espera */
+#waiting{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:16px;background:#000}
+#waiting .sid{font-size:clamp(48px,12vw,120px);font-weight:700;color:#fff;letter-spacing:4px;font-family:monospace}
+#waiting .slabel{font-size:clamp(12px,2vw,20px);color:rgba(255,255,255,.25);letter-spacing:6px;text-transform:uppercase;font-family:monospace}
+#waiting .shint{font-size:clamp(10px,1.4vw,15px);color:rgba(255,255,255,.14);letter-spacing:2px;font-family:monospace;margin-top:6px}
+
+/* ── Progress bar */
+#pbar{position:absolute;bottom:0;left:0;width:0;height:3px;background:rgba(255,255,255,.45);transition:width linear;z-index:100}
+
+/* ── Módulo QR */
+.mod-qr{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6vw}
+.qr-code-container{margin-bottom:4vh}
+.qr-text{font-size:clamp(16px,2.5vw,32px);margin-top:4vh;text-align:center}
+
+/* ── Ficha de producto */
+.mod-product{width:100%;height:100%;display:grid;grid-template-columns:1fr 1fr;gap:6vw;align-items:center;padding:6vw}
+.product-image{width:100%;aspect-ratio:1;object-fit:contain;border-radius:2vw}
+.product-info{display:flex;flex-direction:column;justify-content:center}
+.product-name{font-size:clamp(32px,5vw,64px);font-weight:700;margin-bottom:1vh;line-height:1.1}
+.product-price{font-size:clamp(28px,4vw,52px);font-weight:700;margin-bottom:2vh}
+.product-old-price{text-decoration:line-through;opacity:.5;font-size:clamp(16px,2.5vw,28px);margin-bottom:1vh}
+.product-specs{font-size:clamp(14px,2vw,24px);line-height:1.8;opacity:.8}
+.product-badge{display:inline-block;padding:.5em 1em;background:rgba(255,255,255,.2);border-radius:1vw;font-size:clamp(12px,1.5vw,18px);margin-bottom:2vh;font-weight:600}
+
+/* ── Comparativa */
+.mod-comparison{width:100%;height:100%;display:grid;grid-template-columns:1fr 1fr;gap:4vw;padding:4vw;align-items:center}
+.comparison-product{display:flex;flex-direction:column;align-items:center;text-align:center}
+.comparison-image{width:90%;aspect-ratio:1;object-fit:contain;margin-bottom:2vh;border-radius:1vw}
+.comparison-name{font-size:clamp(24px,3.5vw,44px);font-weight:700;margin-bottom:1vh}
+.comparison-price{font-size:clamp(20px,3vw,40px);font-weight:700;color:#4ff0c0;margin-bottom:2vh}
+.comparison-features{text-align:left;font-size:clamp(12px,1.8vw,22px);line-height:1.7;opacity:.8}
+.comparison-badge{position:absolute;top:2vw;right:2vw;background:#ff7040;padding:.5em 1.2em;border-radius:1vw;font-weight:700;font-size:clamp(12px,1.5vw,18px)}
+
+/* ── Cuenta atrás */
+.mod-countdown{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6vw;text-align:center}
+.countdown-message{font-size:clamp(20px,3vw,40px);margin-bottom:3vh;opacity:.8}
+.countdown-timer{font-size:clamp(72px,16vw,200px);font-weight:700;font-family:monospace;letter-spacing:-2px}
+.countdown-unit{font-size:clamp(14px,2vw,28px);opacity:.5;margin-left:1vw;display:inline-block;vertical-align:top}
+.countdown-end{font-size:clamp(18px,2.5vw,36px);margin-top:3vh;opacity:.8}
+
+/* ── Rotación de pantalla según instalación física (0/90/180/270) */
+body.rot-90 #player{ width:100vh;height:100vw; transform:rotate(90deg) translateY(-100%); }
+body.rot-180 #player{ transform:rotate(180deg) translate(-100%,-100%); }
+body.rot-270 #player{ width:100vh;height:100vw; transform:rotate(270deg) translateX(-100%); }
+</style>
+</head>
+<body>
+<div id="player">
+  <div id="waiting">
+    <div class="slabel">pantalla conectada</div>
+    <div class="sid" id="sid-display"></div>
+    <div class="shint" id="url-hint"></div>
+  </div>
+  <div id="pbar"></div>
+</div>
+<script>
+// Caché offline (solo en localhost/HTTPS; en http://IP el navegador lo ignora silenciosamente)
+if("serviceWorker" in navigator){ navigator.serviceWorker.register("/sw.js").catch(()=>{}); }
+
+const params=new URLSearchParams(location.search);
+// Identidad de la pantalla: URL (?screen=) → memoria del dispositivo → si no hay, emparejar.
+const _sidParam=params.get("screen");
+let _sidStored=null; try{ _sidStored=localStorage.getItem("signalos_screen_id"); }catch(e){}
+const SCREEN_ID=_sidParam||_sidStored;
+if(!SCREEN_ID){ location.replace("/pair"); }
+else if(_sidParam){ try{ localStorage.setItem("signalos_screen_id", _sidParam); }catch(e){} }  // recordar por dispositivo
+// Rotación forzada por URL: ?rotation=0/90/180/270 (o ?vertical=1 → 90, retrocompat)
+const URL_ROTATION = params.get("rotation")!==null ? parseInt(params.get("rotation"))
+                   : (params.get("vertical")==="1" ? 90 : null);
+
+// Aplica la orientación física de la pantalla (0/90/180/270)
+function applyRotation(deg){
+  deg=(((parseInt(deg)||0)%360)+360)%360;
+  document.body.classList.remove("rot-90","rot-180","rot-270");
+  if(deg===90) document.body.classList.add("rot-90");
+  else if(deg===180) document.body.classList.add("rot-180");
+  else if(deg===270) document.body.classList.add("rot-270");
+}
+
+document.getElementById("sid-display").textContent=SCREEN_ID;
+document.getElementById("url-hint").textContent=location.host+"/player.html?screen="+SCREEN_ID;
+if(URL_ROTATION!==null) applyRotation(URL_ROTATION);
+
+let playlist=[],current=0,timer=null,screenSchedule=null,screenConfig=null;
+
+function getDayName(){
+  const days=["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+  return days[new Date().getDay()];
+}
+
+function isScreenActive(){
+  if(screenConfig&&screenConfig.always_on) return true;          // modo 24/7 explícito
+  if(!screenSchedule||!Object.keys(screenSchedule).length) return true;  // sin horario = siempre activa
+  const today=getDayName();
+  const dayConfig=screenSchedule[today];
+  if(!dayConfig||!dayConfig.enabled) return false;
+  const now=new Date();
+  const currentTime=String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
+  const {start,end}=dayConfig;
+  // Comparar strings "HH:MM" solo sirve para intervalos del mismo día. Si el
+  // horario cruza medianoche (p.ej. 22:00→02:00, típico de bares) start>end y
+  // el intervalo es la unión de [start,23:59] y [00:00,end].
+  if(start<=end) return currentTime>=start && currentTime<=end;
+  return currentTime>=start || currentTime<=end;
+}
+
+function showStandby(){
+  const player=document.getElementById("player");
+  const existing=player.querySelector("#standby-screen");
+  if(existing) return;
+  const standby=document.createElement("div");
+  standby.id="standby-screen";
+  standby.style.cssText="position:absolute;inset:0;background:#000;display:flex;align-items:center;justify-content:center;z-index:50";
+  if(screenConfig?.standby_image){
+    standby.innerHTML=`<img src="${screenConfig.standby_image}" style="width:100%;height:100%;object-fit:contain">`;
+  }else{
+    standby.innerHTML='<div style="text-align:center;color:rgba(255,255,255,.2);font-family:monospace"><div style="font-size:14px;letter-spacing:2px">PANTALLA APAGADA</div><div style="font-size:11px;margin-top:8px">🕐 Fuera de horario</div></div>';
+  }
+  player.appendChild(standby);
+}
+
+function hideStandby(){
+  const standby=document.getElementById("standby-screen");
+  if(standby) standby.remove();
+}
+
+function updateScreenStatus(){
+  const active=isScreenActive();
+  if(active) hideStandby();
+  else showStandby();
+}
+
+async function loadPlaylist(){
+  try{
+    const r=await fetch(`/api/playlist?screen=${encodeURIComponent(SCREEN_ID)}`);
+    const d=await r.json();
+    const changed=JSON.stringify(d.playlist)!==JSON.stringify(playlist);
+    // Rotación desde la config de la pantalla (si la URL no la forzó)
+    if(URL_ROTATION===null){
+      const rot = (d.config && d.config.rotation!==undefined) ? d.config.rotation : (d.config && d.config.vertical ? 90 : 0);
+      applyRotation(rot);
+    }
+    screenSchedule=d.config?.schedule||null;
+    screenConfig=d.config||null;
+    updateScreenStatus();
+    if(changed){playlist=d.playlist;rebuildSlides();if(playlist.length)showSlide(0);}
+  }catch(e){}
+}
+
+let reloadTimer=null;
+function connectSSE(){
+  const es=new EventSource(`/api/events?screen=${encodeURIComponent(SCREEN_ID)}`);
+  es.onmessage=(e)=>{
+    if(!e.data) return;
+    // La pantalla fue eliminada desde el admin -> desconectar y volver a emparejar
+    if(e.data.indexOf("deleted")===0){ es.close(); try{localStorage.removeItem("signalos_screen_id");}catch(e2){} location.href="/pair"; return; }
+    // Al recibir contenido nuevo, RECARGAR la página completa (no solo la playlist).
+    // El primer mensaje "connected" se ignora para no entrar en bucle de recargas.
+    if(e.data.indexOf("update")===0){
+      clearTimeout(reloadTimer);
+      reloadTimer=setTimeout(()=>location.reload(), 500);  // agrupa ráfagas de cambios
+    }
+  };
+  es.onerror=()=>setTimeout(connectSSE,4000);
+}
+
+// Banderas como imágenes (flagcdn) — Windows no renderiza emojis de banderas.
+// Acepta código de país ISO ("ve","us") o un emoji de bandera (datos antiguos).
+function flagCode(flag){
+  if(!flag) return "";
+  flag=String(flag).trim();
+  if(/^[A-Za-z]{2}$/.test(flag)) return flag.toLowerCase();
+  const cp=[...flag].map(c=>c.codePointAt(0));
+  if(cp.length>=2 && cp[0]>=0x1F1E6 && cp[0]<=0x1F1FF && cp[1]>=0x1F1E6 && cp[1]<=0x1F1FF)
+    return String.fromCharCode(cp[0]-0x1F1E6+65, cp[1]-0x1F1E6+65).toLowerCase();
+  return "";
+}
+function flagImg(flag, w){
+  w=w||"100%";
+  const code=flagCode(flag);
+  if(!code) return `<span>${flag||"🏳"}</span>`;
+  // Local primero (offline) → flagcdn (online) → texto
+  return `<img src="/vendor/flags/${code}.svg" alt="${code.toUpperCase()}" style="width:${w};aspect-ratio:3/2;object-fit:cover;border-radius:4px;display:inline-block;vertical-align:middle" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='https://flagcdn.com/${code}.svg'}else{this.outerHTML='<span>'+this.alt+'</span>'}">`;
+}
+
+function buildFxSlide(item){
+  const div=document.createElement("div");
+  div.className="mod-fx";
+  div.style.background=item.bg||"#07182b";
+  div.style.color=item.color||"#ffffff";
+  const rows=(item.rows||[]).map(r=>`
+    <div class="fx-row">
+      <div class="fx-flag">${flagImg(r.flag,"100%")}</div>
+      <div class="fx-country">
+        <div class="fx-country-name">${r.country||""}</div>
+        <div class="fx-currency">${r.currency||""}</div>
+      </div>
+      <div class="fx-rate">
+        <div class="fx-rate-val">${r.rate||"—"}</div>
+        <div class="fx-rate-label">${item.base_currency||"EUR"} → ${r.code||""}</div>
+      </div>
+    </div>`).join("");
+  const _d=new Date();
+  const now=`${String(_d.getDate()).padStart(2,"0")}/${String(_d.getMonth()+1).padStart(2,"0")}/${_d.getFullYear()}`;
+  const logoHtml=item.logo?`<img src="${item.logo}" class="mod-fx-logo">`:"";
+  div.innerHTML=`
+    <div class="mod-fx-header">
+      <div class="mod-fx-title">${item.title||"Tipos de cambio"}</div>
+      <div style="display:flex;align-items:center;gap:2vw">
+        ${logoHtml}
+        <span class="mod-fx-page" style="display:none"></span>
+        <div class="mod-fx-date">${now}</div>
+      </div>
+    </div>
+    <div class="mod-fx-rows">${rows}</div>`;
+  return div;
+}
+
+function buildWeatherSlide(item){
+  const div=document.createElement("div");
+  div.className="mod-weather";
+  div.style.background=item.bg||"#0a1628";
+  div.style.color=item.color||"#ffffff";
+  div.innerHTML=`
+    <div class="weather-city">${item.city||""}</div>
+    <div class="weather-icon">${item.icon||"🌤"}</div>
+    <div class="weather-temp">${item.temp||"—"}<span class="weather-unit">°${item.unit||"C"}</span></div>
+    <div class="weather-desc">${item.description||""}</div>
+    <div class="weather-details">
+      <span>💧 ${item.humidity||"—"}%</span>
+      <span>💨 ${item.wind||"—"} km/h</span>
+      ${item.feels_like?`<span>🌡 Sensación ${item.feels_like}°</span>`:""}
+    </div>`;
+  return div;
+}
+
+function buildTickerSlide(item){
+  const div=document.createElement("div");
+  div.className="mod-ticker";
+  div.style.background=item.bg||"#0d0d0d";
+  div.style.color=item.color||"#ffffff";
+  const news=item.news||[];
+  const itemsHtml=news.map(n=>`
+    <div class="ticker-item">
+      ${n.source?`<div class="ticker-item-source">${n.source}</div>`:""}
+      <div class="ticker-item-text">${n.text}</div>
+    </div>`).join("");
+  div.innerHTML=`
+    <div class="ticker-header"><div class="ticker-title">${item.title||"Noticias"}</div></div>
+    <div class="ticker-items" id="ticker-${Date.now()}">${itemsHtml}</div>`;
+  // Animate items in sequence after render
+  setTimeout(()=>{
+    const items=div.querySelectorAll(".ticker-item");
+    items.forEach((el,i)=>setTimeout(()=>el.classList.add("visible"),i*200));
+  },100);
+  return div;
+}
+
+function buildQrSlide(item){
+  const div=document.createElement("div");
+  div.className="mod-qr";
+  div.style.background=item.bg||"#ffffff";
+  div.style.color=item.color||"#000000";
+  const container=document.createElement("div");
+  container.className="qr-code-container";
+  try{new QRCode(container,{text:item.url||"https://example.com",width:300,height:300,colorDark:item.color||"#000000",colorLight:item.bg||"#ffffff",correctLevel:QRCode.CorrectLevel.H});}catch(e){}
+  div.appendChild(container);
+  if(item.text){const t=document.createElement("div");t.className="qr-text";t.textContent=item.text;div.appendChild(t);}
+  return div;
+}
+
+function buildProductSlide(item){
+  const div=document.createElement("div");
+  div.className="mod-product";
+  div.style.background=item.bg||"#0a0a0a";
+  div.style.color=item.color||"#ffffff";
+  const spec=item.specs||[];
+  const specHtml=spec.map(s=>`<div>✓ ${s}</div>`).join("");
+  div.innerHTML=`
+    ${item.src?`<img class="product-image" src="${item.src}" alt="${item.name||""}">`:"<div style='background:rgba(255,255,255,.1);border-radius:2vw'></div>"}
+    <div class="product-info">
+      ${item.badge?`<div class="product-badge">${item.badge}</div>`:""}
+      <div class="product-name">${item.name||"Producto"}</div>
+      ${item.old_price?`<div class="product-old-price">$${item.old_price}</div>`:""}
+      <div class="product-price">$${item.price||"—"}</div>
+      ${spec.length?`<div class="product-specs">${specHtml}</div>`:""}
+    </div>`;
+  return div;
+}
+
+function buildComparisonSlide(item){
+  const div=document.createElement("div");
+  div.className="mod-comparison";
+  div.style.background=item.bg||"#0a0a0a";
+  div.style.color=item.color||"#ffffff";
+  const p1=item.product1||{};
+  const p2=item.product2||{};
+  const feat1=p1.features||[];
+  const feat2=p2.features||[];
+  div.innerHTML=`
+    <div class="comparison-product">
+      ${p1.src?`<img class="comparison-image" src="${p1.src}" alt="${p1.name||""}">`:""}
+      ${p1.badge?`<div class="comparison-badge">${p1.badge}</div>`:""}
+      <div class="comparison-name">${p1.name||"Producto 1"}</div>
+      <div class="comparison-price">$${p1.price||"—"}</div>
+      <div class="comparison-features">${feat1.map(f=>`✓ ${f}`).join("<br>")}</div>
+    </div>
+    <div class="comparison-product">
+      ${p2.src?`<img class="comparison-image" src="${p2.src}" alt="${p2.name||""}">`:""}
+      ${p2.badge?`<div class="comparison-badge">${p2.badge}</div>`:""}
+      <div class="comparison-name">${p2.name||"Producto 2"}</div>
+      <div class="comparison-price">$${p2.price||"—"}</div>
+      <div class="comparison-features">${feat2.map(f=>`✓ ${f}`).join("<br>")}</div>
+    </div>`;
+  return div;
+}
+
+function buildCountdownSlide(item){
+  const div=document.createElement("div");
+  div.className="mod-countdown";
+  div.style.background=item.bg||"#0a0a0a";
+  div.style.color=item.color||"#ffffff";
+  const timerDiv=document.createElement("div");
+  timerDiv.dataset.endTime=new Date(item.end_time||Date.now()+3600000).getTime();
+  timerDiv.dataset.endMsg=item.end_message||"¡Oferta finalizada!";
+  timerDiv.dataset.startMsg=item.start_message||"Tiempo restante:";
+  div.innerHTML=`<div style="opacity:.8;font-size:clamp(18px,2.5vw,36px);margin-bottom:3vh">${item.start_message||"Tiempo restante:"}</div><div class="countdown-timer" id="countdown-${Date.now()}">—</div>`;
+  const updateTimer=()=>{
+    const now=Date.now();const end=parseInt(timerDiv.dataset.endTime);const diff=Math.max(0,end-now);
+    if(diff<=0){div.innerHTML=`<div style="font-size:clamp(24px,4vw,48px)">${timerDiv.dataset.endMsg}</div>`;return;}
+    const d=Math.floor(diff/86400000);const h=Math.floor((diff%86400000)/3600000);const m=Math.floor((diff%3600000)/60000);const s=Math.floor((diff%60000)/1000);
+    const timer=div.querySelector(".countdown-timer");if(timer){timer.innerHTML=`${d}:<span style="font-size:clamp(48px,11vw,144px)">${String(h).padStart(2,"0")}</span>:<span style="font-size:clamp(48px,11vw,144px)">${String(m).padStart(2,"0")}</span>:<span style="font-size:clamp(48px,11vw,144px)">${String(s).padStart(2,"0")}</span>`;}
+    setTimeout(updateTimer,1000);
+  };
+  setTimeout(updateTimer,100);
+  return div;
+}
+
+function rebuildSlides(){
+  const player=document.getElementById("player");
+  player.querySelectorAll(".slide").forEach(s=>s.remove());
+  const waiting=document.getElementById("waiting");
+  if(!playlist.length){waiting.style.display="flex";return;}
+  waiting.style.display="none";
+  playlist.forEach((item,i)=>{
+    const slide=document.createElement("div");
+    slide.className="slide";
+    if(item.wall_mode&&item.wall_pos) slide.classList.add("wall-"+item.wall_pos);
+    slide.dataset.i=i; slide.dataset.dur=item.duration||8;
+
+    if(item.type==="video"){
+      const v=document.createElement("video");
+      v.src=item.src;v.muted=true;v.playsInline=true;v.preload="auto";
+      slide.appendChild(v);
+    } else if(item.type==="url"){
+      const fr=document.createElement("iframe");
+      fr.src=item.src;fr.sandbox="allow-scripts allow-same-origin";
+      slide.appendChild(fr);
+    } else if(item.type==="text"){
+      const d=document.createElement("div");
+      d.className="text-slide";d.style.background=item.bg||"#0a0a0a";
+      d.innerHTML=`<div><h2 style="color:${item.color||'#fff'}">${item.title||""}</h2><p style="color:${item.color||'#fff'}">${item.subtitle||""}</p></div>`;
+      slide.appendChild(d);
+    } else if(item.type==="fx"){
+      slide.appendChild(buildFxSlide(item));
+    } else if(item.type==="weather"){
+      slide.appendChild(buildWeatherSlide(item));
+      // Si es live, programar actualización cada 15 min
+      if(item.live && item.lat && item.lon) {
+        slide.dataset.live = "weather";
+        slide.dataset.lat = item.lat;
+        slide.dataset.lon = item.lon;
+        slide.dataset.unit = item.unit || "C";
+        slide.dataset.itemid = item.id;
+      }
+    } else if(item.type==="ticker"){
+      slide.appendChild(buildTickerSlide(item));
+    } else if(item.type==="qr"){
+      slide.appendChild(buildQrSlide(item));
+    } else if(item.type==="product"){
+      slide.appendChild(buildProductSlide(item));
+    } else if(item.type==="comparison"){
+      slide.appendChild(buildComparisonSlide(item));
+    } else if(item.type==="countdown"){
+      slide.appendChild(buildCountdownSlide(item));
+    } else {
+      const img=document.createElement("img");img.src=item.src;slide.appendChild(img);
+    }
+    player.appendChild(slide);
+  });
+}
+
+function startProgress(ms){
+  // La barra está dentro de #player y rota con él, así que siempre anima en anchura
+  const bar=document.getElementById("pbar");
+  bar.style.transition="none";bar.style.width="0%";
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    bar.style.transition=`width ${ms}ms linear`;bar.style.width="100%";
+  }));
+}
+
+function showSlide(idx){
+  const slides=document.querySelectorAll(".slide");
+  if(!slides.length)return;
+  slides.forEach(s=>{s.classList.remove("active");const v=s.querySelector("video");if(v){v.pause();v.currentTime=0;}});
+  current=((idx%slides.length)+slides.length)%slides.length;
+  const slide=slides[current];slide.classList.add("active");
+  const isVideo=!!slide.querySelector("video");
+  const fx=slide.querySelector(".mod-fx");
+  const ms=(parseFloat(slide.dataset.dur)||8)*1000;
+  clearTimeout(timer);
+  if(isVideo){
+    const v=slide.querySelector("video");
+    v.currentTime=0; v.play().catch(()=>{});
+    // El vídeo MANDA: avanzamos cuando TERMINA, no por un tiempo fijo
+    v.addEventListener("ended",()=>next(),{once:true});
+    v.addEventListener("error",()=>next(),{once:true});  // si el vídeo falla, no bloquear la rotación
+    // La barra de progreso sigue la duración real del vídeo
+    const startBar=()=>startProgress((isFinite(v.duration)&&v.duration>0)?v.duration*1000:ms);
+    if(isFinite(v.duration)&&v.duration>0) startBar();
+    else v.addEventListener("loadedmetadata",startBar,{once:true});
+  } else if(fx){
+    // Divisas: si no caben todas las filas, las reparte en páginas que rotan
+    setupFxPagination(slide, ms, ()=>next());
+  } else {
+    startProgress(ms);
+    timer=setTimeout(()=>next(),ms);
+  }
+}
+
+// Pagina el módulo de divisas según lo que cabe en pantalla. Muestra una página
+// cada perPageMs y llama onDone() cuando ha mostrado todas (entonces avanza el slide).
+function setupFxPagination(slide, perPageMs, onDone){
+  const container=slide.querySelector(".mod-fx-rows");
+  const indicator=slide.querySelector(".mod-fx-page");
+  const rows=container?Array.from(container.querySelectorAll(".fx-row")):[];
+  rows.forEach(r=>r.style.display="");                 // reset para medir
+  let avail=0;
+  if(container){
+    const cs=getComputedStyle(container);
+    avail=container.clientHeight-(parseFloat(cs.paddingTop)||0)-(parseFloat(cs.paddingBottom)||0);
+  }
+  if(rows.length<=1 || avail<=0){                      // nada que paginar
+    if(indicator) indicator.style.display="none";
+    startProgress(perPageMs); timer=setTimeout(onDone, perPageMs); return;
+  }
+  // Agrupar filas en páginas según la altura disponible (medición real del DOM)
+  const pages=[]; let page=[]; let used=0;
+  rows.forEach(r=>{
+    const h=r.offsetHeight;
+    if(used>0 && used+h>avail){ pages.push(page); page=[]; used=0; }
+    page.push(r); used+=h;
+  });
+  if(page.length) pages.push(page);
+
+  if(pages.length<=1){                                 // caben todas: comportamiento normal
+    if(indicator) indicator.style.display="none";
+    startProgress(perPageMs); timer=setTimeout(onDone, perPageMs); return;
+  }
+  // Varias páginas: rotar entre ellas, y avanzar el slide al terminar la última
+  let pi=0;
+  const show=()=>{
+    rows.forEach(r=>r.style.display="none");
+    pages[pi].forEach(r=>r.style.display="");
+    if(indicator){ indicator.style.display=""; indicator.textContent=`${pi+1} / ${pages.length}`; }
+    startProgress(perPageMs);
+    timer=setTimeout(()=>{ pi++; (pi<pages.length)?show():onDone(); }, perPageMs);
+  };
+  show();
+}
+
+function next(){clearTimeout(timer);showSlide(current+1);}
+
+document.addEventListener("keydown",e=>{
+  if(e.key==="ArrowRight")next();
+  if(e.key==="ArrowLeft"){clearTimeout(timer);showSlide(current-1);}
+  if(e.key==="f"||e.key==="F"){
+    if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{});
+    else document.exitFullscreen();
+  }
+});
+document.body.addEventListener("click",()=>{
+  if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{});
+});
+
+if(SCREEN_ID){ connectSSE();loadPlaylist(); }   // sin identidad ya se redirigió a /pair
+setInterval(()=>{ if(SCREEN_ID) loadPlaylist(); },15000);
+
+// Re-paginar/re-adaptar el slide actual si cambia el tamaño o la orientación de la pantalla
+let resizeTimer=null;
+window.addEventListener("resize",()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer=setTimeout(()=>{ if(playlist.length) showSlide(current); }, 400);
+});
+
+// Actualizar clima en vivo cada 15 min
+const WMO_P={0:"☀️",1:"🌤",2:"⛅",3:"☁️",45:"🌫",48:"🌫",51:"🌦",53:"🌦",55:"🌧",61:"🌧",63:"🌧",65:"🌧",71:"🌨",73:"❄️",75:"❄️",80:"🌦",81:"🌧",82:"⛈",95:"⛈",96:"⛈",99:"⛈"};
+const WMO_D={0:"Cielo despejado",1:"Mayormente despejado",2:"Parcialmente nublado",3:"Nublado",45:"Niebla",51:"Llovizna",61:"Lluvia ligera",63:"Lluvia moderada",65:"Lluvia intensa",71:"Nevada",80:"Chubascos",81:"Chubascos moderados",82:"Chubascos intensos",95:"Tormenta"};
+
+async function refreshLiveWeather(){
+  const slides=document.querySelectorAll(".slide[data-live='weather']");
+  for(const slide of slides){
+    const lat=slide.dataset.lat, lon=slide.dataset.lon, unit=slide.dataset.unit;
+    if(!lat||!lon) continue;
+    try{
+      const tu=unit==="F"?"fahrenheit":"celsius";
+      const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code&temperature_unit=${tu}&wind_speed_unit=kmh&timezone=auto`);
+      const d=await r.json();
+      const c=d.current;
+      const icon=WMO_P[c.weather_code]||"🌡";
+      const desc=WMO_D[c.weather_code]||"";
+      const wmod=slide.querySelector(".mod-weather");
+      if(!wmod) continue;
+      const ti=wmod.querySelector(".weather-icon"); if(ti) ti.textContent=icon;
+      const tt=wmod.querySelector(".weather-temp"); if(tt) tt.firstChild.textContent=`${Math.round(c.temperature_2m)}°`;
+      const td=wmod.querySelector(".weather-desc"); if(td) td.textContent=desc;
+      const spans=wmod.querySelectorAll(".weather-details span");
+      if(spans[0]) spans[0].textContent=`💧${Math.round(c.relative_humidity_2m)}%`;
+      if(spans[1]) spans[1].textContent=`💨${Math.round(c.wind_speed_10m)} km/h`;
+      if(spans[2]) spans[2].textContent=`🌡 Sensación ${Math.round(c.apparent_temperature)}°`;
+    }catch(e){}
+  }
+}
+setInterval(refreshLiveWeather, 15*60*1000);
+setTimeout(refreshLiveWeather, 3000);
+setInterval(updateScreenStatus, 60*1000);
+setTimeout(updateScreenStatus, 500);
+</script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+# ─── SECRETOS — nunca deben entrar al repositorio ──────────────────────────
+# admin.json guarda el salt, el hash de la contraseña de administrador, el
+# secret de firma de sesión y el api_token de la extensión. pin.json contiene
+# el PIN de emparejamiento activo. Son únicos por instalación: server.py los
+# regenera solos, y publicarlos comprometería cualquier despliegue que los use.
+admin.json
+pin.json
+
+# ─── Datos de la instalación (los crea el servidor, no son código) ─────────
+# server.py:200-201 inicializa content.json y screens.json vacíos al arrancar,
+# y os.makedirs crea uploads/. Versionarlos mezclaría el contenido de un
+# cliente con el código y llenaría el historial de binarios.
+content.json
+screens.json
+uploads/
+
+# ─── Artefactos de build ───────────────────────────────────────────────────
+# (.gitignore no admite comentarios en línea: el # solo abre comentario al
+#  principio de una línea, así que van encima de cada patrón.)
+# 355 MB con el .exe empaquetado de Electron.
+dist/
+# 21 MB, se reconstruye con `npm install`.
+node_modules/
+__pycache__/
+*.pyc
+
+# ─── Logs y volcados ───────────────────────────────────────────────────────
+*.log
+server_err.txt
+server_out.txt
+
+# ─── Entorno local ─────────────────────────────────────────────────────────
+.claude/settings.local.json
+.DS_Store
+Thumbs.db
+
+# NOTA sobre config.json: SÍ se versiona a propósito. setup.iss lo instala con
+# la marca onlyifdoesntexist, así que hace de plantilla de valores por defecto
+# y no contiene secretos. Si algún día guarda credenciales, sácalo de aquí.

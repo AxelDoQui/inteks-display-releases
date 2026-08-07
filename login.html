@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Acceso — SignalOS Pro</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100vw;height:100vh;background:#07182b;color:#eaf1f9;font-family:'DM Sans',system-ui,sans-serif;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{width:100%;max-width:380px;background:#0A2540;border:1px solid #1d3a5c;border-radius:14px;padding:34px 30px}
+.logo{font-family:'Space Mono',monospace;font-size:12px;letter-spacing:3px;color:#FF7F00;margin-bottom:24px;font-weight:600;text-align:center}
+h1{font-size:20px;font-weight:500;margin-bottom:6px;letter-spacing:1px}
+.subtitle{font-size:13px;color:#7a8ca3;margin-bottom:26px;line-height:1.6}
+.label{display:block;font-size:11px;color:#7a8ca3;margin-bottom:7px;letter-spacing:1px;text-transform:uppercase;font-family:'Space Mono',monospace}
+.input{width:100%;padding:13px 14px;font-size:15px;border:1px solid #1d3a5c;background:#07182b;color:#eaf1f9;border-radius:8px;margin-bottom:16px}
+.input:focus{outline:none;border-color:#FF7F00}
+.btn{width:100%;padding:13px;font-size:14px;font-weight:600;border:none;border-radius:8px;cursor:pointer;background:#FF7F00;color:#111;transition:background .2s}
+.btn:hover{background:#e67200}
+.btn:disabled{background:#7a8ca3;cursor:not-allowed;color:rgba(17,17,17,.5)}
+.status{margin-top:16px;padding:11px;border-radius:8px;font-size:13px;display:none;text-align:center}
+.status.error{background:rgba(240,80,80,.1);border:1px solid rgba(240,80,80,.3);color:#f05050;display:block}
+.status.success{background:rgba(64,192,128,.1);border:1px solid rgba(64,192,128,.3);color:#40c080;display:block}
+.hint{font-size:11px;color:#7a8ca3;margin-top:14px;line-height:1.6;text-align:center}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid transparent;border-top-color:#111;border-radius:50%;animation:spin .8s linear infinite;margin-right:6px;vertical-align:-1px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">SIGNAL/OS PRO</div>
+  <h1 id="title">Acceso al panel</h1>
+  <p class="subtitle" id="subtitle">Introduce tu contraseña de administrador.</p>
+
+  <form id="form">
+    <label class="label" id="lbl-pwd">Contraseña</label>
+    <input class="input" type="password" id="password" autocomplete="current-password" autofocus>
+    <div id="confirm-group" style="display:none">
+      <label class="label">Repetir contraseña</label>
+      <input class="input" type="password" id="password2" autocomplete="new-password">
+    </div>
+    <button class="btn" id="btn" type="submit">Entrar</button>
+  </form>
+
+  <div class="status" id="status"></div>
+  <p class="hint" id="hint"></p>
+</div>
+
+<script>
+let SETUP = false;  // ¿primer arranque (crear contraseña)?
+
+function showStatus(msg, type){
+  const s = document.getElementById("status");
+  s.innerHTML = msg; s.className = "status " + type;
+}
+
+async function init(){
+  // ¿Ya hay contraseña? Si no, modo "crear contraseña".
+  try{
+    const r = await fetch("/api/auth-status");
+    const d = await r.json();
+    if(d.authed){ location.href = "/admin.html"; return; }  // ya logueado
+    SETUP = !d.has_password;
+  }catch(e){
+    // sin conexión con el servidor: dejar el formulario de login normal
+  }
+  if(SETUP || new URLSearchParams(location.search).has("setup")){
+    SETUP = true;
+    document.getElementById("title").textContent = "Crear contraseña";
+    document.getElementById("subtitle").textContent =
+      "Es la primera vez. Crea una contraseña para proteger el panel de control.";
+    document.getElementById("lbl-pwd").textContent = "Nueva contraseña (mín. 6)";
+    document.getElementById("password").autocomplete = "new-password";
+    document.getElementById("confirm-group").style.display = "block";
+    document.getElementById("btn").textContent = "Crear y entrar";
+    document.getElementById("hint").textContent =
+      "El PIN de emparejamiento de pantallas es aparte; esto solo protege el panel.";
+  }
+}
+
+document.getElementById("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const pwd = document.getElementById("password").value;
+  const btn = document.getElementById("btn");
+
+  if(SETUP){
+    const pwd2 = document.getElementById("password2").value;
+    if(pwd.length < 6){ showStatus("La contraseña debe tener al menos 6 caracteres", "error"); return; }
+    if(pwd !== pwd2){ showStatus("Las contraseñas no coinciden", "error"); return; }
+  }
+
+  btn.disabled = true;
+  showStatus("<span class='spinner'></span>Verificando...", "success");
+  try{
+    const endpoint = SETUP ? "/api/set-password" : "/api/login";
+    const r = await fetch(endpoint, {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ password: pwd })
+    });
+    const d = await r.json();
+    if(r.ok && d.ok){
+      showStatus("✓ Acceso concedido. Entrando...", "success");
+      setTimeout(() => location.href = "/admin.html", 600);
+    }else if(d.setup_required){
+      // el servidor dice que hay que crear contraseña: cambiar a modo setup
+      location.href = "/login.html?setup=1";
+    }else{
+      showStatus("✗ " + (d.error || "No se pudo acceder"), "error");
+      btn.disabled = false;
+    }
+  }catch(err){
+    showStatus("✗ Error de conexión con el servidor", "error");
+    btn.disabled = false;
+  }
+});
+
+init();
+</script>
+</body>
+</html>

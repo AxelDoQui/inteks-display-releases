@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  body{width:280px;padding:16px;background:#07182b;color:#eaf1f9;font-family:'Segoe UI',system-ui,sans-serif;font-size:13px}
+  .logo{font-size:11px;letter-spacing:3px;color:#FF7F00;margin-bottom:14px;font-family:monospace}
+  .status{display:flex;align-items:center;gap:6px;margin-bottom:16px;font-size:12px}
+  .dot{width:8px;height:8px;border-radius:50%;background:#7a8ca3}
+  .dot.online{background:#40c080;box-shadow:0 0 6px #40c080}
+  label{display:block;font-size:10px;color:#7a8ca3;margin-bottom:4px;font-family:monospace;letter-spacing:1px}
+  input{width:100%;background:#0e2d4d;border:1px solid #1d3a5c;border-radius:5px;color:#eaf1f9;padding:8px 10px;font-size:12px;margin-bottom:10px;font-family:monospace}
+  input:focus{outline:none;border-color:#FF7F00}
+  button{width:100%;padding:10px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:8px}
+  .primary{background:#FF7F00;color:#111}
+  .primary:hover{background:#e67200}
+  .ghost{background:#0e2d4d;color:#eaf1f9;border:1px solid #1d3a5c}
+  .ghost:hover{border-color:#FF7F00}
+  .hint{font-size:10px;color:#7a8ca3;margin-top:6px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="logo">SIGNAL/OS PRO</div>
+<div class="status"><div class="dot" id="dot"></div><span id="status-txt">Verificando conexión...</span></div>
+<label>URL DEL SERVIDOR</label>
+<input id="server-url" type="text" placeholder="http://localhost">
+<button class="primary" id="save">Guardar y conectar</button>
+<button class="ghost" id="open-panel">Abrir panel lateral</button>
+<p class="hint">Abre la web de tu casa de cambio, pulsa "Abrir panel lateral" y selecciona las divisas a enviar.</p>
+<script src="popup.js"></script>
+</body>
+</html>
