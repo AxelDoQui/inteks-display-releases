@@ -30,21 +30,25 @@ function slice(src, from, to, what) {
 function loadPicker() {
   const src = fs.readFileSync(ADMIN, "utf8");
   const code = [
-    slice(src, "const CURRENCY_DB = [", "const CODE_MAP", "CURRENCY_DB"),
+    // CURRENCY_DB y su índice CODE_MAP, del que el selector saca los nombres.
+    slice(src, "const CURRENCY_DB = [", "const ISO_REGEX", "CURRENCY_DB y CODE_MAP"),
     slice(src, "function flagCode(", "function flagImg(", "flagCode"),
-    slice(src, "const FX_EXTRA_PAIRS = [", "// ── FX Module", "el selector de divisas"),
+    // La tabla de países y todas las funciones del selector, que son contiguas.
+    slice(src, "const FX_COUNTRIES = [", "// ── FX Module", "el selector de divisas"),
   ].join("\n");
   const ctx = {};
   vm.createContext(ctx);
   // Las declaraciones `function` sí se cuelgan del objeto de contexto, pero
   // `const` no: vive en el ámbito léxico del script. Hay que exportarla a mano.
-  vm.runInContext(code + "\n;__db = CURRENCY_DB;", ctx);
+  vm.runInContext(code + "\n;__db = CURRENCY_DB; __ct = FX_COUNTRIES;", ctx);
   // Todo lo que salga del vm pasa por JSON: los objetos creados dentro
   // pertenecen a otro realm y deepStrictEqual los rechaza por prototipo aunque
   // la estructura sea idéntica.
   const norm = v => (v === undefined || v === null ? v : JSON.parse(JSON.stringify(v)));
   return {
     CURRENCY_DB: norm(ctx.__db),
+    FX_COUNTRIES: norm(ctx.__ct),
+    flagCode: f => ctx.flagCode(f),
     fxPickerOptions: () => norm(ctx.fxPickerOptions()),
     fxRowFromKey: k => norm(ctx.fxRowFromKey(k)),
     fxOptionKey: o => ctx.fxOptionKey(o),
@@ -75,7 +79,7 @@ test("los países que faltaban ya están", () => {
 test("un país de doble moneda aparece con sus dos monedas, la local primero", () => {
   const { fxPickerOptions } = loadPicker();
   const ve = fxPickerOptions().filter(o => o.country === "Venezuela").map(o => o.code);
-  assert.deepStrictEqual(ve, ["VEF", "USD"],
+  assert.deepStrictEqual(ve, ["VES", "USD"],
     "Venezuela debe ofrecer bolívar y dólar, en ese orden");
 });
 
@@ -134,7 +138,7 @@ test("toda opción con bandera tiene su SVG en vendor/flags", () => {
 test("buscar por nombre de país", () => {
   const { fxFilterOptions } = loadPicker();
   const r = fxFilterOptions("vene");
-  assert.deepStrictEqual(r.map(o => o.code), ["VEF", "USD"]);
+  assert.deepStrictEqual(r.map(o => o.code), ["VES", "USD"]);
 });
 
 test("la búsqueda ignora acentos en ambos sentidos", () => {
@@ -178,9 +182,40 @@ test("una búsqueda sin resultados devuelve lista vacía", () => {
   assert.deepStrictEqual(fxFilterOptions("zzzzz"), []);
 });
 
-test("XAF es la única sin bandera, y se queda vacía en vez de rota", () => {
+test("toda opción del selector tiene bandera", () => {
   const { fxPickerOptions } = loadPicker();
-  // África Central no tiene emoji de país, así que no hay código ISO posible.
-  const sinBandera = fxPickerOptions().filter(o => !o.flag).map(o => o.code);
-  assert.deepStrictEqual(sinBandera, ["XAF"]);
+  // Ahora el selector sale de FX_COUNTRIES, y todo país tiene bandera. Las
+  // monedas regionales (XOF, XAF, XCD) sí van sin bandera en CURRENCY_DB,
+  // pero eso es la tabla del OCR y no aparece en el selector.
+  const sinBandera = fxPickerOptions().filter(o => !o.flag).map(o => o.country);
+  assert.deepStrictEqual(sinBandera, []);
+});
+
+test("las monedas regionales no fingen ser un país", () => {
+  const { CURRENCY_DB, flagCode } = loadPicker();
+  // El franco CFA y el dólar del Caribe Oriental no son de ningún país. Pueden
+  // llevar un emoji genérico (XAF usa 🌍), pero no una bandera nacional: de ahí
+  // que lo que se compruebe sea que no sale ningún código ISO de país.
+  for (const code of ["XOF", "XAF", "XCD"]) {
+    const c = CURRENCY_DB.find(x => x.code === code);
+    assert.ok(c, `falta ${code} en CURRENCY_DB`);
+    assert.strictEqual(flagCode(c.flag), "",
+      `${code} no debe resolver a la bandera de un país concreto`);
+  }
+});
+
+test("cada moneda aparece una sola vez en CURRENCY_DB", () => {
+  const { CURRENCY_DB } = loadPicker();
+  // Es la invariante de la que depende CODE_MAP, y con ella el OCR.
+  const codes = CURRENCY_DB.map(c => c.code);
+  const dup = [...new Set(codes.filter((c, i) => codes.indexOf(c) !== i))];
+  assert.deepStrictEqual(dup, [], "códigos duplicados: " + dup.join(", "));
+});
+
+test("el país canónico de las monedas compartidas es el correcto", () => {
+  const { CURRENCY_DB } = loadPicker();
+  // Sin esto, el OCR etiquetaría cada dólar detectado con el primer país de la
+  // lista que use USD, que salió siendo El Salvador al generar la tabla.
+  assert.strictEqual(CURRENCY_DB.find(c => c.code === "USD").country, "Estados Unidos");
+  assert.strictEqual(CURRENCY_DB.find(c => c.code === "EUR").country, "Zona Euro");
 });
