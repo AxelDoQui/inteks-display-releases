@@ -1,8 +1,7 @@
-// Al hacer clic en el icono de la extensión, alterna el panel lateral en la pestaña activa.
-// (El popup de configuración se abre con clic derecho > Opciones, o desde default_popup.)
-chrome.action.onClicked.addListener((tab) => {
-  if (tab && tab.id) chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_SIDEBAR' }).catch(() => {});
-});
+// NOTA: no hay listener de chrome.action.onClicked. El manifiesto declara
+// "default_popup", y con un popup declarado ese evento NUNCA se dispara: al
+// pulsar el icono Chrome abre el popup y no avisa al background. El listener
+// que había aquí era código muerto. La apertura del panel la hace popup.js.
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.type === 'SEND_TO_SIGNALOS') {

@@ -38,7 +38,11 @@ function startAutoScan() { stopAutoScan(); scanInterval = setInterval(scanAndUpd
 function stopAutoScan() { if (scanInterval) { clearInterval(scanInterval); scanInterval = null; } }
 
 // Mensajes desde el background (toggle) / popup
-chrome.runtime.onMessage.addListener((msg) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  // PING deja que el popup compruebe si este script está vivo en la pestaña.
+  // Los content scripts solo se inyectan al CARGAR la página, así que en una
+  // pestaña abierta antes de instalar la extensión no hay nadie escuchando.
+  if (msg && msg.type === 'PING') { sendResponse({ ok: true }); return; }
   if (msg && msg.type === 'TOGGLE_SIDEBAR') toggleSidebar();
   if (msg && msg.type === 'OPEN_SIDEBAR') toggleSidebar(true);
 });
