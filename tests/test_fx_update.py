@@ -92,6 +92,17 @@ def main():
             print(f"  {'ok  ' if ok else 'FALLO'} {label}")
             failed += not ok
 
+        # La copia de la LIBRERIA tiene que quedar sincronizada. Si se queda con
+        # las tasas viejas, en cuanto el usuario edite el módulo en el admin y
+        # guarde, el admin propaga las suyas y deshace lo que hizo la extensión.
+        lib = json.load(open(cpath))["items"][0]
+        ok = [r["rate"] for r in lib["rows"]] == ["1800", "4100"]
+        print(f"  {'ok  ' if ok else 'FALLO'} la copia de la libreria queda sincronizada")
+        failed += not ok
+        ok = lib["title"] == "WESTERN UNION - TIPOS DE CAMBIO" and lib["bg"] == "#ffdd00"
+        print(f"  {'ok  ' if ok else 'FALLO'} y conserva su propia configuracion")
+        failed += not ok
+
         # Si se envía un título explícito, ese sí debe aplicarse.
         post(base + "/api/fx-update",
              {"rows": NUEVAS, "screen_ids": ["TV"], "title": "OTRO TITULO"})
