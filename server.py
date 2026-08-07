@@ -767,8 +767,10 @@ class Handler(BaseHTTPRequestHandler):
                 d = json.loads(body)
                 rows = d.get("rows", [])
                 screen_ids = d.get("screen_ids", [])
-                title = d.get("title", "Tipos de cambio")
-                base_currency = d.get("base_currency", "EUR")
+                # Sin valor por defecto a propósito: None significa "el cliente
+                # no lo envía, no lo toques". La extensión manda solo las filas.
+                title = d.get("title")
+                base_currency = d.get("base_currency")
                 updated_at = time.time()
                 if not rows:
                     err("rows requerido y no puede estar vacío"); return
@@ -776,25 +778,45 @@ class Handler(BaseHTTPRequestHandler):
                 screens = content.get("screens", {})
                 targets = screen_ids if screen_ids else list(screens.keys())
                 updated_screens = []
+                touched_ids = set()
                 for sid in targets:
                     if sid not in screens: continue
                     playlist = screens[sid].get("playlist", [])
                     fx_found = False
                     for item in playlist:
                         if item.get("type") == "fx":
+                            touched_ids.add(item.get("id"))
+                            # Actualizar SOLO las tasas y lo que venga explícito.
+                            # Antes se pisaban siempre título y moneda base, así que
+                            # cada envío desde la extensión borraba lo que el usuario
+                            # había configurado en el admin.
                             item["rows"] = rows
-                            item["title"] = title
-                            item["base_currency"] = base_currency
+                            if title: item["title"] = title
+                            if base_currency: item["base_currency"] = base_currency
                             item["updated_at"] = updated_at
                             fx_found = True
                     if not fx_found:
+                        # Módulo nuevo: aquí sí hacen falta valores por defecto.
+                        new_title = title or "Tipos de cambio"
                         playlist.append({
-                            "id": f"fx_{int(updated_at)}", "name": title, "type": "fx",
-                            "title": title, "base_currency": base_currency, "rows": rows,
+                            "id": f"fx_{int(updated_at)}", "name": new_title, "type": "fx",
+                            "title": new_title, "base_currency": base_currency or "EUR", "rows": rows,
                             "duration": 15, "bg": "#07182b", "color": "#ffffff", "updated_at": updated_at
                         })
                     screens[sid]["playlist"] = playlist
                     updated_screens.append(sid)
+                # Sincronizar la copia de la LIBRERÍA de los módulos tocados.
+                # El contenido vive duplicado: content["items"] es la librería y
+                # cada playlist guarda su propia copia. El admin propaga de la
+                # librería hacia las pantallas al guardar, así que si la librería
+                # se queda con las tasas viejas, la primera edición en el admin
+                # deshace silenciosamente lo que acaba de hacer la extensión.
+                for item in content.get("items", []):
+                    if item.get("type") == "fx" and item.get("id") in touched_ids:
+                        item["rows"] = rows
+                        if title: item["title"] = title
+                        if base_currency: item["base_currency"] = base_currency
+                        item["updated_at"] = updated_at
                 content["screens"] = screens
                 save_json(CONTENT_FILE, content)
                 for sid in updated_screens: notify_screen(sid)
