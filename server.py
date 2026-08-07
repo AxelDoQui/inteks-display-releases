@@ -767,8 +767,10 @@ class Handler(BaseHTTPRequestHandler):
                 d = json.loads(body)
                 rows = d.get("rows", [])
                 screen_ids = d.get("screen_ids", [])
-                title = d.get("title", "Tipos de cambio")
-                base_currency = d.get("base_currency", "EUR")
+                # Sin valor por defecto a propósito: None significa "el cliente
+                # no lo envía, no lo toques". La extensión manda solo las filas.
+                title = d.get("title")
+                base_currency = d.get("base_currency")
                 updated_at = time.time()
                 if not rows:
                     err("rows requerido y no puede estar vacío"); return
@@ -782,15 +784,21 @@ class Handler(BaseHTTPRequestHandler):
                     fx_found = False
                     for item in playlist:
                         if item.get("type") == "fx":
+                            # Actualizar SOLO las tasas y lo que venga explícito.
+                            # Antes se pisaban siempre título y moneda base, así que
+                            # cada envío desde la extensión borraba lo que el usuario
+                            # había configurado en el admin.
                             item["rows"] = rows
-                            item["title"] = title
-                            item["base_currency"] = base_currency
+                            if title: item["title"] = title
+                            if base_currency: item["base_currency"] = base_currency
                             item["updated_at"] = updated_at
                             fx_found = True
                     if not fx_found:
+                        # Módulo nuevo: aquí sí hacen falta valores por defecto.
+                        new_title = title or "Tipos de cambio"
                         playlist.append({
-                            "id": f"fx_{int(updated_at)}", "name": title, "type": "fx",
-                            "title": title, "base_currency": base_currency, "rows": rows,
+                            "id": f"fx_{int(updated_at)}", "name": new_title, "type": "fx",
+                            "title": new_title, "base_currency": base_currency or "EUR", "rows": rows,
                             "duration": 15, "bg": "#07182b", "color": "#ffffff", "updated_at": updated_at
                         })
                     screens[sid]["playlist"] = playlist
