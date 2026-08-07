@@ -35,6 +35,11 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .fx-rate-input:focus{outline:none;border-color:var(--accent)}
 .fx-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px}
 .fx-remove:hover{color:var(--danger)}
+/* Tasa anterior cuando el escaneo de la página la ha cambiado */
+.fx-was{font-size:10px;color:#7a8ca3;text-decoration:line-through;margin-right:5px;font-family:monospace}
+.fx-row.changed{background:rgba(255,127,0,.10)}
+.fx-row.missing .fx-rate-input{opacity:.55}
+.fx-hint{font-size:10px;color:#7a8ca3;padding:6px 2px 2px;line-height:1.5}
 .empty-msg{padding:16px 14px;color:var(--muted);font-size:11px;text-align:center}
 
 .manual-form{padding:6px 14px 10px;flex-shrink:0}
