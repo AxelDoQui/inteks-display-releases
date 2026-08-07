@@ -33,6 +33,16 @@ Name: "startupicon"; Description: "Iniciar SignalOS Pro automáticamente al ence
 ; que es justo lo que se quiere en un PC dedicado a señalización.
 Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "SignalOS Pro"; ValueData: """{app}\start_signalos.bat"""; Tasks: startupicon; Flags: uninsdeletevalue
 
+[Dirs]
+; Los datos NO pueden vivir en {app}: Windows prohíbe escribir en Program Files
+; a los procesos sin elevar, y el servidor moría al arrancar. Se crea aquí desde
+; el instalador (que sí va elevado) y con permiso de modificación para Users,
+; para que funcione con cualquier cuenta y no solo con la que arranque primero.
+; No lleva "uninsalwaysuninstall": al desinstalar se conservan el contenido y
+; las pantallas del cliente.
+Name: "{commonappdata}\SignalOS Pro"; Permissions: users-modify
+Name: "{commonappdata}\SignalOS Pro\uploads"; Permissions: users-modify
+
 [Files]
 Source: "..\server.py"; DestDir: "{app}"; Flags: ignoreversion
 ; index.html es la raíz "/" (router de pantallas) — server.py:613 la sirve por
