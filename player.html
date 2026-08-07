@@ -30,16 +30,32 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 .mod-fx-date{font-size:clamp(11px,1.5vw,20px);opacity:.4;font-family:monospace;letter-spacing:1px}
 .mod-fx-page{font-size:clamp(11px,1.5vw,20px);opacity:.55;font-family:monospace;letter-spacing:1px;padding:2px 10px;border:1px solid rgba(255,255,255,.2);border-radius:99px}
 .mod-fx-logo{height:var(--fx-title-size);max-width:22vw;object-fit:contain}
-.mod-fx-rows{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:center;padding:0 4vw 3vh;gap:0}
-.fx-row{display:flex;align-items:center;padding:clamp(10px,2vh,28px) 0;border-bottom:1px solid rgba(255,255,255,.07);gap:2vw}
+/* Las filas se REPARTEN el alto disponible (flex:1 1 0) en vez de agruparse en
+   el centro, y la tipografía escala con el alto que le toca a cada una
+   (--fx-row-h, que fija el JS). El segundo término en vw evita que en una
+   pantalla muy alta el texto crezca tanto que se salga por los lados. */
+.mod-fx-rows{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:0 4vw 3vh;gap:0;--fx-row-h:80px}
+.mod-fx-note{flex-shrink:0;max-height:18%;overflow:hidden;padding:1.5vh 4vw 2.5vh;border-top:1px solid rgba(255,255,255,.12);font-size:clamp(11px,1.6vw,22px);line-height:1.35;opacity:.75}
+.fx-row{flex:1 1 0;min-height:0;display:flex;align-items:center;border-bottom:1px solid rgba(255,255,255,.07);gap:2vw}
 .fx-row:last-child{border-bottom:none}
-.fx-flag{font-size:clamp(24px,4vw,56px);width:clamp(40px,5vw,72px);text-align:center;flex-shrink:0}
+.fx-flag{font-size:min(calc(var(--fx-row-h)*.42),7vw);width:min(calc(var(--fx-row-h)*.55),9vw);text-align:center;flex-shrink:0}
 .fx-country{flex:1;min-width:0}
-.fx-country-name{font-size:clamp(13px,2vw,28px);font-weight:600;letter-spacing:.5px}
-.fx-currency{font-size:clamp(10px,1.3vw,18px);opacity:.45;font-family:monospace;letter-spacing:1px;margin-top:2px}
+.fx-country-name{font-size:min(calc(var(--fx-row-h)*.26),4.5vw);font-weight:600;letter-spacing:.5px}
+.fx-currency{font-size:min(calc(var(--fx-row-h)*.13),2.2vw);opacity:.45;font-family:monospace;letter-spacing:1px;margin-top:2px}
 .fx-rate{text-align:right;flex-shrink:0}
-.fx-rate-val{font-size:clamp(20px,3.5vw,52px);font-weight:700;font-family:monospace;letter-spacing:-1px}
-.fx-rate-label{font-size:clamp(9px,1vw,14px);opacity:.4;text-align:right;letter-spacing:1px;margin-top:2px}
+.fx-rate-val{font-size:min(calc(var(--fx-row-h)*.42),7vw);font-weight:700;font-family:monospace;letter-spacing:-1px}
+.fx-rate-label{font-size:min(calc(var(--fx-row-h)*.10),1.7vw);opacity:.4;text-align:right;letter-spacing:1px;margin-top:2px}
+
+/* Pase de medición. La paginación necesita el alto NATURAL de cada fila: con
+   flex:1 la suma daría siempre el alto disponible y saldría "todo cabe en una
+   página" pasara lo que pasara. Estos valores son los de antes del reparto, de
+   modo que cuántas filas caben por página se sigue decidiendo igual que antes. */
+.mod-fx-rows.fx-measuring .fx-row{flex:0 0 auto;padding:clamp(10px,2vh,28px) 0}
+.mod-fx-rows.fx-measuring .fx-flag{font-size:clamp(24px,4vw,56px);width:clamp(40px,5vw,72px)}
+.mod-fx-rows.fx-measuring .fx-country-name{font-size:clamp(13px,2vw,28px)}
+.mod-fx-rows.fx-measuring .fx-currency{font-size:clamp(10px,1.3vw,18px)}
+.mod-fx-rows.fx-measuring .fx-rate-val{font-size:clamp(20px,3.5vw,52px)}
+.mod-fx-rows.fx-measuring .fx-rate-label{font-size:clamp(9px,1vw,14px)}
 
 /* ── Módulo clima */
 .mod-weather{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6vw;text-align:center}
@@ -120,11 +136,15 @@ body.rot-270 #player{ width:100vh;height:100vw; transform:rotate(270deg) transla
 if("serviceWorker" in navigator){ navigator.serviceWorker.register("/sw.js").catch(()=>{}); }
 
 const params=new URLSearchParams(location.search);
+// Modo vista previa: el admin incrusta el player en un iframe. No debe
+// conectarse por SSE, ni registrarse como pantalla, ni aplicar el horario, o
+// ensuciaría screens.json marcando pantallas como conectadas.
+const PREVIEW=params.get("preview")==="1";
 // Identidad de la pantalla: URL (?screen=) → memoria del dispositivo → si no hay, emparejar.
 const _sidParam=params.get("screen");
 let _sidStored=null; try{ _sidStored=localStorage.getItem("signalos_screen_id"); }catch(e){}
 const SCREEN_ID=_sidParam||_sidStored;
-if(!SCREEN_ID){ location.replace("/pair"); }
+if(!SCREEN_ID && !PREVIEW){ location.replace("/pair"); }   // en previa no hay ?screen=
 else if(_sidParam){ try{ localStorage.setItem("signalos_screen_id", _sidParam); }catch(e){} }  // recordar por dispositivo
 // Rotación forzada por URL: ?rotation=0/90/180/270 (o ?vertical=1 → 90, retrocompat)
 const URL_ROTATION = params.get("rotation")!==null ? parseInt(params.get("rotation"))
@@ -139,8 +159,11 @@ function applyRotation(deg){
   else if(deg===270) document.body.classList.add("rot-270");
 }
 
-document.getElementById("sid-display").textContent=SCREEN_ID;
-document.getElementById("url-hint").textContent=location.host+"/player.html?screen="+SCREEN_ID;
+if(SCREEN_ID){
+  document.getElementById("sid-display").textContent=SCREEN_ID;
+  document.getElementById("url-hint").textContent=location.host+"/player.html?screen="+SCREEN_ID;
+}
+if(PREVIEW) document.getElementById("waiting").style.display="none";
 if(URL_ROTATION!==null) applyRotation(URL_ROTATION);
 
 let playlist=[],current=0,timer=null,screenSchedule=null,screenConfig=null;
@@ -151,6 +174,7 @@ function getDayName(){
 }
 
 function isScreenActive(){
+  if(PREVIEW) return true;                                       // la previa siempre muestra contenido
   if(screenConfig&&screenConfig.always_on) return true;          // modo 24/7 explícito
   if(!screenSchedule||!Object.keys(screenSchedule).length) return true;  // sin horario = siempre activa
   const today=getDayName();
@@ -265,6 +289,9 @@ function buildFxSlide(item){
   const _d=new Date();
   const now=`${String(_d.getDate()).padStart(2,"0")}/${String(_d.getMonth()+1).padStart(2,"0")}/${_d.getFullYear()}`;
   const logoHtml=item.logo?`<img src="${item.logo}" class="mod-fx-logo">`:"";
+  // Pie fijo, visible en todas las páginas. Al ser hermano de .mod-fx-rows
+  // (flex:1;min-height:0) le resta alto, y setupFxPagination recalcula solo.
+  const noteHtml=item.footer_note?`<div class="mod-fx-note">${item.footer_note}</div>`:"";
   div.innerHTML=`
     <div class="mod-fx-header">
       <div class="mod-fx-title">${item.title||"Tipos de cambio"}</div>
@@ -274,7 +301,8 @@ function buildFxSlide(item){
         <div class="mod-fx-date">${now}</div>
       </div>
     </div>
-    <div class="mod-fx-rows">${rows}</div>`;
+    <div class="mod-fx-rows">${rows}</div>
+    ${noteHtml}`;
   return div;
 }
 
@@ -490,6 +518,27 @@ function showSlide(idx){
   }
 }
 
+// Agrupa filas en páginas según la altura disponible. Pura a propósito: recibe
+// las alturas ya medidas, para poder probarla sin DOM (tests/fx-pagination.test.js).
+// Una fila más alta que `avail` se coloca igualmente en su propia página: el
+// guardo `used>0` evita el bucle infinito y las páginas vacías.
+function groupRowsIntoPages(heights, avail){
+  const pages=[]; let page=[]; let used=0;
+  heights.forEach((h,i)=>{
+    if(used>0 && used+h>avail){ pages.push(page); page=[]; used=0; }
+    page.push(i); used+=h;
+  });
+  if(page.length) pages.push(page);
+  return pages;
+}
+
+// En modo previa, devolver al admin cuántas páginas han salido. Es la respuesta
+// a "¿cuántas divisas caben?", medida por el renderizador real en vez de estimada.
+function reportPreviewPages(pages, rowsFirstPage){
+  if(!PREVIEW) return;
+  parent.postMessage({type:"preview-pages",pages,rowsFirstPage},"*");
+}
+
 // Pagina el módulo de divisas según lo que cabe en pantalla. Muestra una página
 // cada perPageMs y llama onDone() cuando ha mostrado todas (entonces avanza el slide).
 function setupFxPagination(slide, perPageMs, onDone){
@@ -502,28 +551,40 @@ function setupFxPagination(slide, perPageMs, onDone){
     const cs=getComputedStyle(container);
     avail=container.clientHeight-(parseFloat(cs.paddingTop)||0)-(parseFloat(cs.paddingBottom)||0);
   }
+  // Reparte el alto disponible entre las filas visibles de la página actual.
+  // La tipografía cuelga de esta variable, así que 4 divisas en un 4K vertical
+  // salen grandes y sin huecos, en vez de diminutas y agrupadas en el medio.
+  const fitRows=(n)=>{
+    if(container) container.style.setProperty("--fx-row-h", (avail/Math.max(1,n))+"px");
+  };
+
   if(rows.length<=1 || avail<=0){                      // nada que paginar
     if(indicator) indicator.style.display="none";
+    fitRows(rows.length);
+    reportPreviewPages(1, rows.length);
     startProgress(perPageMs); timer=setTimeout(onDone, perPageMs); return;
   }
-  // Agrupar filas en páginas según la altura disponible (medición real del DOM)
-  const pages=[]; let page=[]; let used=0;
-  rows.forEach(r=>{
-    const h=r.offsetHeight;
-    if(used>0 && used+h>avail){ pages.push(page); page=[]; used=0; }
-    page.push(r); used+=h;
-  });
-  if(page.length) pages.push(page);
+  // Medir con las filas a su alto NATURAL. Sin esto la suma daría siempre el
+  // alto disponible (flex:1 1 0) y nunca se paginaría nada.
+  container.classList.add("fx-measuring");
+  const natural=rows.map(r=>r.offsetHeight);
+  container.classList.remove("fx-measuring");
+
+  const pages=groupRowsIntoPages(natural, avail).map(idxs=>idxs.map(i=>rows[i]));
 
   if(pages.length<=1){                                 // caben todas: comportamiento normal
     if(indicator) indicator.style.display="none";
+    fitRows(rows.length);
+    reportPreviewPages(1, rows.length);
     startProgress(perPageMs); timer=setTimeout(onDone, perPageMs); return;
   }
   // Varias páginas: rotar entre ellas, y avanzar el slide al terminar la última
+  reportPreviewPages(pages.length, pages[0].length);
   let pi=0;
   const show=()=>{
     rows.forEach(r=>r.style.display="none");
     pages[pi].forEach(r=>r.style.display="");
+    fitRows(pages[pi].length);                         // cada página llena la pantalla
     if(indicator){ indicator.style.display=""; indicator.textContent=`${pi+1} / ${pages.length}`; }
     startProgress(perPageMs);
     timer=setTimeout(()=>{ pi++; (pi<pages.length)?show():onDone(); }, perPageMs);
@@ -545,8 +606,17 @@ document.body.addEventListener("click",()=>{
   if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{});
 });
 
-if(SCREEN_ID){ connectSSE();loadPlaylist(); }   // sin identidad ya se redirigió a /pair
-setInterval(()=>{ if(SCREEN_ID) loadPlaylist(); },15000);
+if(PREVIEW){
+  // El admin inyecta el módulo que está editando; así se ve antes de guardar.
+  window.addEventListener("message",(e)=>{
+    const m=e.data||{};
+    if(m.type!=="preview-item"||!m.item) return;
+    applyRotation(m.rotation||0);
+    playlist=[m.item]; rebuildSlides(); showSlide(0);
+  });
+  parent.postMessage({type:"preview-ready"},"*");
+} else if(SCREEN_ID){ connectSSE();loadPlaylist(); }   // sin identidad ya se redirigió a /pair
+setInterval(()=>{ if(SCREEN_ID && !PREVIEW) loadPlaylist(); },15000);
 
 // Re-paginar/re-adaptar el slide actual si cambia el tamaño o la orientación de la pantalla
 let resizeTimer=null;

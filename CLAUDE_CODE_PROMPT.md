@@ -71,6 +71,17 @@ videowall en dos pantallas (`wall_mode` + `wall_pos`, que recorta la imagen con
 `object-position` a izquierda o derecha), horario con imagen de standby, barra
 de progreso y refresco del clima cada 15 minutos.
 
+**Modo vista previa** — `player.html?preview=1`, sin `?screen=`. No conecta el
+SSE, no se registra como pantalla y no aplica el horario. Renderiza el item que
+le inyecta el admin por `postMessage` (`preview-item`) y devuelve cuántas
+páginas le salieron (`preview-pages`).
+
+El admin lo incrusta en un iframe dimensionado a los píxeles de la resolución
+que **escribe el usuario** (no se autodetecta) y reducido con `transform:scale`.
+Los `clamp()`/`vw`/`vh` se resuelven así contra el viewport real, de modo que la
+cuenta de "cuántas divisas caben" la da el renderizador de verdad y no hay
+lógica de maquetación duplicada que se desincronice al tocar el CSS.
+
 ### Extensión de Chrome — `signalos-extension/`
 
 Manifest V3. Detecta tablas de tipos de cambio en cualquier web y las envía a
@@ -147,7 +158,7 @@ Fuentes: Space Mono (monospace, títulos y datos), DM Sans (cuerpo).
 python server.py                  REM usa el puerto de config.json
 python server.py --port 8080      REM override
 
-npm test                          REM tests (Node stdlib, sin dependencias)
+npm test                          REM tests de lógica del player (Node stdlib)
 ```
 
 Admin en `/admin.html`, player en `/player.html?screen=NOMBRE`, emparejar en

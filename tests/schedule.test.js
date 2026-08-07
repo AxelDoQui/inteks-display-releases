@@ -35,13 +35,17 @@ function extractScheduleSource() {
  * Evalúa isScreenActive() como si fuera un instante concreto.
  * @param {{day:number, hour:number, minute:number}} at  day: 0=domingo … 6=sábado
  */
-function isActiveAt(at, { schedule = null, config = null } = {}) {
+function isActiveAt(at, { schedule = null, config = null, preview = false } = {}) {
   class FakeDate {
     getDay() { return at.day; }
     getHours() { return at.hour; }
     getMinutes() { return at.minute; }
   }
-  const ctx = { Date: FakeDate, screenSchedule: schedule, screenConfig: config };
+  // PREVIEW es una dependencia real de isScreenActive(): en modo vista previa
+  // la pantalla se muestra siempre, sin mirar el horario.
+  const ctx = {
+    Date: FakeDate, screenSchedule: schedule, screenConfig: config, PREVIEW: preview,
+  };
   vm.createContext(ctx);
   vm.runInContext(extractScheduleSource() + "\n;__r = isScreenActive();", ctx);
   return ctx.__r;
@@ -102,4 +106,11 @@ test("día deshabilitado deja la pantalla inactiva", () => {
 
 test("sin horario configurado la pantalla está siempre activa", () => {
   assert.strictEqual(isActiveAt({ day: LUNES, hour: 4, minute: 0 }, { schedule: null }), true);
+});
+
+test("la vista previa del admin ignora el horario y siempre muestra contenido", () => {
+  // Mismo instante y horario que dejan la pantalla apagada en el test de arriba.
+  const fuera = { day: LUNES, hour: 3, minute: 0 };
+  assert.strictEqual(isActiveAt(fuera, { schedule: diurno }), false);
+  assert.strictEqual(isActiveAt(fuera, { schedule: diurno, preview: true }), true);
 });

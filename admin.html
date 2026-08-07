@@ -302,6 +302,35 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
       <div class="fg"><label class="flabel">Color de texto</label><input class="finput" id="fx-color" type="color" value="#ffffff" style="height:38px;padding:4px"></div>
     </div>
     <div class="fg" style="margin-bottom:14px"><label class="flabel">Duración (seg)</label><input class="finput" id="fx-dur" type="number" value="15" min="5" style="width:90px"></div>
+    <div class="fg" style="margin-bottom:14px"><label class="flabel">Mensaje al pie (opcional)</label><input class="finput" id="fx-note" placeholder="Ej: Tipos sujetos a variación sin previo aviso"></div>
+    <div class="fg" style="margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:500">
+        <input type="checkbox" id="fx-prev-on" onchange="toggleFxPreview()" style="cursor:pointer;width:16px;height:16px">
+        Mostrar vista previa a tamaño de pantalla
+      </label>
+    </div>
+    <div id="fx-prev-wrap" style="display:none;margin-bottom:14px">
+      <div class="fg" style="margin-bottom:10px">
+        <label class="flabel">Resolución de la pantalla</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:580px">
+          <select class="finput" id="fx-prev-preset" onchange="applyFxPreset()" style="flex:1;min-width:210px;max-width:330px">
+            <option value="1920x1080">Full HD horizontal — 1920×1080</option>
+            <option value="3840x2160">4K horizontal — 3840×2160</option>
+            <option value="1366x768">Portátil / TV básico — 1366×768</option>
+            <option value="1280x720">HD horizontal — 1280×720</option>
+            <option value="1080x1920">Full HD vertical — 1080×1920</option>
+            <option value="800x1280">Tablet vertical — 800×1280</option>
+            <option value="custom">Personalizada…</option>
+          </select>
+          <input class="finput" id="fx-prev-w" type="number" min="240" max="7680" value="1920" style="width:92px" title="Ancho en píxeles">
+          <span style="color:var(--muted)">×</span>
+          <input class="finput" id="fx-prev-h" type="number" min="240" max="7680" value="1080" style="width:92px" title="Alto en píxeles">
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">Para una pantalla girada escribe la resolución tal y como se ve, p.ej. 1080×1920 en vertical.</div>
+      </div>
+      <div id="fx-prev-stage" style="position:relative;overflow:hidden;border:1px solid var(--b);border-radius:var(--r);background:#000;max-width:440px"></div>
+      <div id="fx-prev-info" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
+    </div>
     <div class="fg" style="margin-bottom:14px">
       <label class="flabel">Logo de la fuente (opcional)</label>
       <div style="display:flex;align-items:center;gap:10px">
@@ -888,6 +917,7 @@ function showPage(id,btn){
   document.getElementById("page-"+id).classList.add("active");
   if(btn) btn.classList.add("active");
   if(id==="packages"){ renderPkgPicker(); renderPackages(); }  // refrescar con la librería actual
+  if(id==="fx"){ loadFxPreviewSize(); }                        // recuperar la resolución elegida
 }
 function updateStats(){
   const sids=new Set([...Object.keys(regScreens),...Object.keys(content.screens||{})]);
@@ -1696,6 +1726,7 @@ function updateFxPreview(){
   const logoHtml=fxLogo?`<img src="${fxLogo}" style="height:24px;object-fit:contain">`:"";
   c.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div style="font-size:13px;font-weight:700;color:${color};letter-spacing:2px;opacity:.6">${title}</div>${logoHtml}</div>`+
     fxRows.map(r=>`<div class="fx-prev-row" style="color:${color}"><span style="margin-right:8px">${flagImg(r.flag,"24px")}</span><span style="flex:1;font-size:13px;font-weight:600">${r.country||"—"} <span style="opacity:.4;font-size:10px;font-family:monospace">${r.currency}</span></span><span style="font-family:monospace;font-size:15px;font-weight:700">${r.rate||"—"}</span><span style="font-size:9px;opacity:.35;font-family:monospace;margin-left:6px">${base}→${r.code||"?"}</span></div>`).join("");
+  renderFxPreview();   // mantener también la previa a escala real de pantalla
 }
 let editingFxId=null;
 let fxLogo="";   // data URL del logo de la fuente (opcional)
@@ -1716,7 +1747,7 @@ function updateFxLogoPreview(){
 }
 function saveFxModule(){
   const title=document.getElementById("fx-title").value||"Tipos de cambio";
-  const data={name:title,type:"fx",title,base_currency:document.getElementById("fx-base").value||"EUR",rows:[...fxRows],bg:document.getElementById("fx-bg").value,color:document.getElementById("fx-color").value,duration:parseInt(document.getElementById("fx-dur").value)||15,logo:fxLogo||""};
+  const data={name:title,type:"fx",title,base_currency:document.getElementById("fx-base").value||"EUR",rows:[...fxRows],bg:document.getElementById("fx-bg").value,color:document.getElementById("fx-color").value,duration:parseInt(document.getElementById("fx-dur").value)||15,logo:fxLogo||"",footer_note:document.getElementById("fx-note").value.trim()};
   if(!content.items)content.items=[];
   if(editingFxId){
     // Actualizar el módulo existente (conserva su id, así sigue en las playlists)
@@ -1744,6 +1775,7 @@ function editFxModule(id){
   document.getElementById("fx-bg").value=item.bg||"#07182b";
   document.getElementById("fx-color").value=item.color||"#ffffff";
   document.getElementById("fx-dur").value=item.duration||15;
+  document.getElementById("fx-note").value=item.footer_note||"";
   fxRows=(item.rows||[]).map(r=>({...r}));
   fxLogo=item.logo||""; updateFxLogoPreview();
   renderFxRows();
@@ -1757,6 +1789,150 @@ function cancelFxEdit(){
   document.getElementById("fx-save-btn").textContent="+ Añadir a librería";
   document.getElementById("fx-cancel-btn").style.display="none";
 }
+// ── Vista previa de divisas ────────────────────────────────────────────────
+// Incrusta el player REAL en un iframe con los píxeles de la pantalla elegida.
+// Nada de estimar cuántas filas caben: el renderizador de verdad lo calcula y
+// lo devuelve por postMessage, así que no hay lógica de maquetación duplicada
+// que se desincronice al tocar el CSS.
+let fxPrevReady=false;
+const FX_PREV_KEY="signalos_fx_preview_size";
+const FX_PREV_ON_KEY="signalos_fx_preview_on";
+
+function fxPreviewOn(){
+  const el=document.getElementById("fx-prev-on");
+  return !!(el && el.checked);
+}
+
+// La previa es opcional y viene apagada. Al apagarla se DESTRUYE el iframe:
+// no tiene sentido mantener un player entero cargado si no se está mirando.
+function toggleFxPreview(){
+  const on=fxPreviewOn();
+  document.getElementById("fx-prev-wrap").style.display=on?"":"none";
+  try{ localStorage.setItem(FX_PREV_ON_KEY,on?"1":"0"); }catch(e){}
+  if(on){ renderFxPreview(); return; }
+  const fr=document.getElementById("fx-prev-frame");
+  if(fr){ fr.remove(); fxPrevReady=false; }
+  const info=document.getElementById("fx-prev-info");
+  if(info) info.textContent="";
+}
+
+// La resolución la escribe el usuario, no se autodetecta. Así se puede preparar
+// el contenido de una pantalla que todavía no existe o está apagada.
+function fxPrevSize(){
+  const cl=(v,d)=>Math.max(240,Math.min(7680,parseInt(v)||d));
+  return {w:cl(document.getElementById("fx-prev-w").value,1920),
+          h:cl(document.getElementById("fx-prev-h").value,1080)};
+}
+
+function applyFxPreset(){
+  const v=document.getElementById("fx-prev-preset").value;
+  if(v!=="custom"){
+    const [w,h]=v.split("x");
+    document.getElementById("fx-prev-w").value=w;
+    document.getElementById("fx-prev-h").value=h;
+  }
+  renderFxPreview();
+}
+
+// Si el tamaño escrito a mano coincide con un preset, seleccionarlo; si no,
+// marcar "Personalizada" para que el desplegable no mienta.
+function syncFxPreset(){
+  const {w,h}=fxPrevSize();
+  const sel=document.getElementById("fx-prev-preset");
+  const match=`${w}x${h}`;
+  sel.value=[...sel.options].some(o=>o.value===match)?match:"custom";
+}
+
+function loadFxPreviewSize(){
+  if(!document.getElementById("fx-prev-w")) return;
+  try{
+    const s=JSON.parse(localStorage.getItem(FX_PREV_KEY)||"null");
+    if(s&&s.w&&s.h){
+      document.getElementById("fx-prev-w").value=s.w;
+      document.getElementById("fx-prev-h").value=s.h;
+    }
+    document.getElementById("fx-prev-on").checked=localStorage.getItem(FX_PREV_ON_KEY)==="1";
+  }catch(e){}
+  syncFxPreset();
+  document.getElementById("fx-prev-wrap").style.display=fxPreviewOn()?"":"none";
+  renderFxPreview();
+}
+
+// El item tal y como está AHORA en el formulario, sin guardar.
+function fxDraftItem(){
+  return {type:"fx",
+    title:document.getElementById("fx-title").value||"Tipos de cambio",
+    base_currency:document.getElementById("fx-base").value||"EUR",
+    rows:[...fxRows],
+    bg:document.getElementById("fx-bg").value,
+    color:document.getElementById("fx-color").value,
+    logo:fxLogo||"",
+    footer_note:document.getElementById("fx-note").value.trim(),
+    duration:9999};
+  // duration alto A PROPÓSITO: la previa se queda en la página 1 en lugar de
+  // rotar. El contador ya dice cuántas páginas hay, y una previa que se mueve
+  // sola mientras escribes distrae. No lo "arregles" bajándolo.
+}
+
+function renderFxPreview(){
+  if(!fxPreviewOn()) return;                       // apagada: ni se crea el iframe
+  const stage=document.getElementById("fx-prev-stage");
+  if(!stage||!document.getElementById("fx-prev-w")) return;
+  const {w,h}=fxPrevSize();
+  try{ localStorage.setItem(FX_PREV_KEY,JSON.stringify({w,h})); }catch(e){}
+
+  // Clave de la fidelidad: el iframe mide los píxeles REALES de la pantalla y
+  // se encoge visualmente. Así clamp()/vw/vh se resuelven igual que en el TV.
+  // Un iframe pequeño calcularía otras fuentes y la previa mentiría.
+  const f=Math.min(1,(stage.clientWidth||640)/w);
+  stage.style.height=(h*f)+"px";
+  let fr=document.getElementById("fx-prev-frame");
+  if(!fr){
+    fr=document.createElement("iframe");
+    fr.id="fx-prev-frame"; fr.src="/player.html?preview=1";
+    fr.style.cssText="position:absolute;top:0;left:0;border:0;transform-origin:top left";
+    fxPrevReady=false;
+    // Si el player no llega a responder, decirlo en vez de dejar un recuadro
+    // negro que parezca un módulo mal configurado.
+    setTimeout(()=>{
+      if(fxPrevReady) return;
+      const info=document.getElementById("fx-prev-info");
+      if(info) info.textContent="No se pudo cargar la vista previa. ¿Está el servidor sirviendo /player.html?";
+    },5000);
+    fr.addEventListener("error",()=>{
+      const info=document.getElementById("fx-prev-info");
+      if(info) info.textContent="No se pudo cargar la vista previa.";
+    });
+    stage.appendChild(fr);
+  }
+  fr.style.width=w+"px"; fr.style.height=h+"px";
+  fr.style.transform=`scale(${f})`;
+  // rotation:0 a propósito. El iframe YA tiene el ancho y alto intercambiados
+  // arriba, así que rotar además el contenido lo giraría dos veces.
+  if(fxPrevReady) fr.contentWindow.postMessage({type:"preview-item",item:fxDraftItem(),rotation:0},"*");
+}
+
+window.addEventListener("message",(e)=>{
+  const m=e.data||{};
+  if(m.type==="preview-ready"){ fxPrevReady=true; renderFxPreview(); return; }
+  if(m.type==="preview-pages"){
+    const info=document.getElementById("fx-prev-info");
+    if(info) info.textContent=m.pages>1
+      ? `${m.pages} páginas · ${m.rowsFirstPage} filas en la primera`
+      : `Cabe en una sola página (${m.rowsFirstPage} filas)`;
+  }
+});
+
+["fx-title","fx-base","fx-bg","fx-color","fx-note"].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener("input",()=>renderFxPreview());
+});
+["fx-prev-w","fx-prev-h"].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener("input",()=>{ syncFxPreset(); renderFxPreview(); });
+});
+window.addEventListener("resize",()=>renderFxPreview());
+
 function renderFxSaved(){
   const c=document.getElementById("fx-saved-list");
   const items=(content.items||[]).filter(i=>i.type==="fx");

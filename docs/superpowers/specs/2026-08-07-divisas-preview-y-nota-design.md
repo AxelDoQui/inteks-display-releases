@@ -31,19 +31,38 @@ se toca.** El problema es exclusivamente de autoría: el admin no informa.
 
 ## Diseño
 
-### 1. Reporte de geometría — `POST /api/screen-info`
+### 1. La resolución la escribe el usuario
 
-El player informa de su tamaño al cargar y, con antirrebote de 1 s, en
-`resize` y `orientationchange`.
+**Revisado el 2026-08-07, tras implementar la autodetección y descartarla.**
 
-```json
-{ "screen": "TV-Salon", "w": 1920, "h": 1080, "dpr": 1, "orientation": "landscape" }
-```
+La primera versión detectaba la resolución automáticamente: el player la
+reportaba a `POST /api/screen-info` y se guardaba en `screens.json`. Se ha
+retirado por completo en favor de que el usuario la escriba.
 
-Se guarda en `screens.json` bajo la clave `viewport` de cada pantalla.
+Motivos:
 
-Va en un endpoint propio y no colgando del SSE porque es una unidad con un solo
-propósito, comprobable de forma aislada, y no enreda el canal de eventos.
+- La autodetección solo sabe de pantallas **ya conectadas**. Escribiéndola se
+  puede preparar el contenido de un cliente antes de instalar nada, que es el
+  caso real de uso al vender el producto.
+- El endpoint tenía que ser público, porque las pantallas no tienen sesión
+  (`server.py:690` es una puerta de control). Eso obligaba a defenderlo de
+  escrituras de cualquiera en la red. Al quitarlo desaparece esa superficie.
+- Elimina el caso "pantalla sin datos todavía" y toda la lógica de rotación:
+  el usuario escribe `1080×1920` para una pantalla vertical y ya está.
+
+En el admin: un desplegable de resoluciones habituales (Full HD horizontal,
+4K, 1366×768, HD, Full HD vertical, tablet vertical) más dos campos de ancho y
+alto para cualquier otra. La elección se guarda en `localStorage`, no en el
+contenido: es una preferencia de quien edita, no un dato del módulo.
+
+**La previa es opcional y viene apagada.** Una casilla la muestra u oculta, y
+el estado también se recuerda en `localStorage`. Al apagarla se **destruye el
+iframe**, no se limita a ocultarlo: mantener un player entero cargado en
+memoria cuando nadie lo mira no tiene sentido, y así el panel de divisas pesa
+lo mismo que antes para quien no use la previa.
+
+Se muestra pequeña: el contenedor se limita a 440 px de ancho, y el factor de
+escala sale de ahí. Es una miniatura de comprobación, no una segunda pantalla.
 
 ### 2. Modo preview del player — `player.html?preview=1`
 
@@ -51,7 +70,6 @@ Sin parámetro `screen`. En este modo el player **no**:
 
 - abre la conexión SSE,
 - se registra en el registro de pantallas,
-- llama a `/api/screen-info`,
 - aplica la comprobación de horario ni muestra el standby.
 
 Sin estas exclusiones, abrir el player dentro del admin marcaría una pantalla
@@ -99,6 +117,38 @@ recálculo es automático.
 
 Si `footer_note` está vacío, el `div` no se renderiza y no ocupa alto.
 
+### 5b. Reparto del alto y escalado tipográfico
+
+**Añadido el 2026-08-07, a raíz de lo que destapó la propia vista previa.**
+
+En una pantalla 4K vertical (2160×3840) seis divisas ocupaban el 14% del alto y
+quedaban diminutas en el centro. Dos causas:
+
+- `.mod-fx-rows` llevaba `justify-content:center`, que agrupa las filas y
+  reparte el sobrante arriba y abajo.
+- **Todos los techos de los `clamp()` estaban saturados.** Se calibraron para
+  Full HD: a 2160 px de ancho, `2vw` son 43 px pero el tope era 28 px. El
+  contenido dejaba de crecer justo donde más falta hacía.
+
+Solución: las filas pasan a `flex:1 1 0` para repartirse el alto, y la
+tipografía cuelga de una variable `--fx-row-h` que el JS fija a
+`alto disponible / filas de la página`. Cada tamaño se expresa como
+`min(calc(var(--fx-row-h) * k), N vw)`; el término en `vw` impide que en una
+pantalla muy alta el texto crezca hasta salirse por los lados.
+
+**Dos pases, y el orden importa.** `setupFxPagination()` necesita el alto
+*natural* de cada fila para decidir las páginas: si midiera con las filas ya
+repartidas, la suma sería siempre igual al alto disponible y nunca paginaría
+nada. Por eso añade la clase `.fx-measuring`, que restaura temporalmente la
+tipografía y el `padding` anteriores, mide, y la quita. Leer `offsetHeight`
+fuerza un reflujo síncrono, así que la medición es fiable dentro del mismo
+tick. Con esto, **cuántas filas caben por página se sigue decidiendo igual que
+antes**; lo único que cambia es cómo se reparte el espacio una vez decidido.
+
+Efecto medido: en 1920×1080 los tamaños apenas se mueven (33 px frente a 28 px
+en el nombre del país); en 2160×3840 pasan de 28 px a 97 px, y de 52 px a
+151 px en la cotización.
+
 ### 6. Refactor puntual: extraer el agrupamiento
 
 `setupFxPagination()` mezcla hoy tres cosas: medir el DOM, agrupar filas en
@@ -118,11 +168,13 @@ que ya se está tocando, no una refactorización oportunista.
 
 | Dónde | Campo | Tipo | Por defecto |
 |---|---|---|---|
-| `screens.json` → cada pantalla | `viewport` | `{w,h,dpr,orientation}` | ausente |
 | item `fx` en `content.json` | `footer_note` | string | `""` |
+| `localStorage` del admin | `signalos_fx_preview_size` | `{w,h}` | 1920×1080 |
+| `localStorage` del admin | `signalos_fx_preview_on` | `"0"` / `"1"` | apagada |
 
-Ambos son aditivos y opcionales: el contenido existente sigue funcionando sin
-migración.
+`footer_note` es aditivo y opcional: el contenido existente sigue funcionando
+sin migración. La resolución de la previa no toca el contenido en absoluto — es
+una preferencia de quien edita, y por eso vive en `localStorage`.
 
 ## Pruebas
 
@@ -139,18 +191,18 @@ Casos sobre `groupRowsIntoPages`:
    página, sin bucle infinito ni página vacía.
 5. Lista vacía → cero páginas, sin excepción.
 
-El resto (iframe, postMessage, reporte de geometría) se verifica a mano; montar
+El resto (iframe, postMessage, panel del admin) se verifica a mano; montar
 un DOM completo en Node no compensa para este tamaño de proyecto.
 
 ## Casos límite
 
 | Situación | Comportamiento |
 |---|---|
-| Pantalla sin geometría reportada todavía | El selector la marca "sin datos" y cae a 1920×1080, avisando de que es una suposición |
-| Pantalla desconectada | Previsualizable con la última geometría conocida |
+| Resolución vacía o disparatada | Se limita a 240–7680 px y cae a 1920×1080 |
+| Tamaño escrito que no coincide con ningún preset | El desplegable pasa a "Personalizada" para que no mienta |
 | El iframe no carga | Mensaje explícito en lugar de un recuadro en blanco |
 | `footer_note` vacío | No se renderiza el `div`; no roba alto |
-| Pantalla con `config.rotation` de 90 o 270 | El iframe intercambia ancho y alto |
+| Pantalla girada | El usuario escribe la resolución tal y como se ve (1080×1920). No hay lógica de rotación |
 | Mensaje muy largo | El pie se limita a `max-height: 18%` del alto del módulo, con `overflow: hidden`, para que no ahogue a las filas |
 
 ## Fuera de alcance
