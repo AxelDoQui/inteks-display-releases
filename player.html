@@ -77,6 +77,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 .ticker-item-text{font-size:clamp(16px,2.8vw,40px);font-weight:500;line-height:1.35}
 
 /* ── Pantalla de espera */
+#offline-dot{position:absolute;right:10px;bottom:10px;width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.22);z-index:60;pointer-events:none}
 #waiting{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:16px;background:#000}
 #waiting .sid{font-size:clamp(48px,12vw,120px);font-weight:700;color:#fff;letter-spacing:4px;font-family:monospace}
 #waiting .slabel{font-size:clamp(12px,2vw,20px);color:rgba(255,255,255,.25);letter-spacing:6px;text-transform:uppercase;font-family:monospace}
@@ -168,6 +169,37 @@ if(URL_ROTATION!==null) applyRotation(URL_ROTATION);
 
 let playlist=[],current=0,timer=null,screenSchedule=null,screenConfig=null;
 
+// ── Resiliencia sin servidor ───────────────────────────────────────────────
+// Una pantalla de señalización no puede quedarse en negro porque el servidor se
+// reinicie. Tres reglas: la página nunca se recarga sola, lo último reproducido
+// queda guardado en el dispositivo, y un corte solo se señala si es prolongado.
+const OFFLINE_AFTER_MS=120000;                     // 2 min sin contacto = corte
+const CACHE_KEY="signalos_cache_"+SCREEN_ID;
+let lastContact=Date.now();
+
+function isOffline(desde, ahora){ return (ahora-desde)>OFFLINE_AFTER_MS; }
+
+// Guarda lo que se está reproduciendo, para poder arrancar sin servidor.
+function saveCache(){
+  if(!playlist.length) return;                     // no pisar la caché con vacío
+  try{
+    localStorage.setItem(CACHE_KEY, JSON.stringify({playlist, config:screenConfig, at:Date.now()}));
+  }catch(e){}
+}
+
+// Recupera lo último reproducido. Devuelve true si había algo que mostrar.
+function restoreFromCache(){
+  let d=null;
+  try{ d=JSON.parse(localStorage.getItem(CACHE_KEY)||"null"); }catch(e){ return false; }
+  if(!d||!Array.isArray(d.playlist)||!d.playlist.length) return false;
+  screenConfig=d.config||null;
+  screenSchedule=(d.config&&d.config.schedule)||null;   // sin esto se encendería fuera de horario
+  playlist=d.playlist;
+  rebuildSlides();
+  showSlide(0);
+  return true;
+}
+
 function getDayName(){
   const days=["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
   return days[new Date().getDay()];
@@ -228,9 +260,30 @@ async function loadPlaylist(){
     }
     screenSchedule=d.config?.schedule||null;
     screenConfig=d.config||null;
+    lastContact=Date.now();
     updateScreenStatus();
     if(changed){playlist=d.playlist;rebuildSlides();if(playlist.length)showSlide(0);}
-  }catch(e){}
+    saveCache();
+  }catch(e){
+    // Servidor caído. Lo que ya está en pantalla se queda; solo si arrancamos
+    // sin nada que mostrar se tira de lo guardado en el dispositivo.
+    if(!playlist.length) restoreFromCache();
+  }
+  updateOfflineDot();
+}
+
+// Punto tenue en una esquina tras un corte prolongado. No molesta al cliente,
+// pero permite ver de un vistazo que esa pantalla lleva rato sin actualizarse.
+function updateOfflineDot(){
+  const hay=isOffline(lastContact, Date.now());
+  let d=document.getElementById("offline-dot");
+  if(!hay){ if(d) d.remove(); return; }
+  if(!d){
+    d=document.createElement("div");
+    d.id="offline-dot";
+    d.title="Sin contacto con el servidor";
+    document.getElementById("player").appendChild(d);
+  }
 }
 
 let reloadTimer=null;
@@ -240,11 +293,13 @@ function connectSSE(){
     if(!e.data) return;
     // La pantalla fue eliminada desde el admin -> desconectar y volver a emparejar
     if(e.data.indexOf("deleted")===0){ es.close(); try{localStorage.removeItem("signalos_screen_id");}catch(e2){} location.href="/pair"; return; }
-    // Al recibir contenido nuevo, RECARGAR la página completa (no solo la playlist).
-    // El primer mensaje "connected" se ignora para no entrar en bucle de recargas.
+    // Contenido nuevo: se recarga la PLAYLIST, nunca la página. Recargar la
+    // página la hacía depender de que el servidor estuviese vivo en ese preciso
+    // instante; si no lo estaba, la pantalla moría y no volvía sola.
+    // loadPlaylist() ya actualiza rotación, horario, configuración y slides.
     if(e.data.indexOf("update")===0){
       clearTimeout(reloadTimer);
-      reloadTimer=setTimeout(()=>location.reload(), 500);  // agrupa ráfagas de cambios
+      reloadTimer=setTimeout(loadPlaylist, 500);   // agrupa ráfagas de cambios
     }
   };
   es.onerror=()=>setTimeout(connectSSE,4000);
@@ -615,7 +670,12 @@ if(PREVIEW){
     playlist=[m.item]; rebuildSlides(); showSlide(0);
   });
   parent.postMessage({type:"preview-ready"},"*");
-} else if(SCREEN_ID){ connectSSE();loadPlaylist(); }   // sin identidad ya se redirigió a /pair
+} else if(SCREEN_ID){
+  // Pintar YA lo último reproducido. Si el servidor está caído al encender la
+  // pantalla, esto es la diferencia entre mostrar contenido o quedarse en negro.
+  restoreFromCache();
+  connectSSE(); loadPlaylist();
+}
 setInterval(()=>{ if(SCREEN_ID && !PREVIEW) loadPlaylist(); },15000);
 
 // Re-paginar/re-adaptar el slide actual si cambia el tamaño o la orientación de la pantalla

@@ -621,10 +621,13 @@ class Handler(BaseHTTPRequestHandler):
             with open(target,"rb") as f: data=f.read()
             self.send_response(200); self.send_header("Content-Type", mime or "text/html")
             self.send_header("Content-Length", str(len(data)))
-            # No cachear HTML/JS/CSS: que la tablet cargue siempre la última versión
+            # HTML/JS/CSS: revalidar SIEMPRE contra el servidor, pero permitir
+            # que el navegador conserve una copia. Antes iba con "no-store", que
+            # no significa "revalida" sino "prohibido guardar": con el servidor
+            # caído la pantalla no tenía ni la página anterior que mostrar.
+            # "no-cache" da lo mismo en caliente y salva la pantalla en frío.
             if fp.lower().endswith((".html",".js",".css")):
-                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-                self.send_header("Pragma", "no-cache"); self.send_header("Expires", "0")
+                self.send_header("Cache-Control", "no-cache")
             self.cors(); self.end_headers(); self.wfile.write(data)
         else: self.send_response(404); self.end_headers(); self.wfile.write(b"404")
 
