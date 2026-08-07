@@ -31,6 +31,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 .mod-fx-page{font-size:clamp(11px,1.5vw,20px);opacity:.55;font-family:monospace;letter-spacing:1px;padding:2px 10px;border:1px solid rgba(255,255,255,.2);border-radius:99px}
 .mod-fx-logo{height:var(--fx-title-size);max-width:22vw;object-fit:contain}
 .mod-fx-rows{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:center;padding:0 4vw 3vh;gap:0}
+.mod-fx-note{flex-shrink:0;max-height:18%;overflow:hidden;padding:1.5vh 4vw 2.5vh;border-top:1px solid rgba(255,255,255,.12);font-size:clamp(11px,1.6vw,22px);line-height:1.35;opacity:.75}
 .fx-row{display:flex;align-items:center;padding:clamp(10px,2vh,28px) 0;border-bottom:1px solid rgba(255,255,255,.07);gap:2vw}
 .fx-row:last-child{border-bottom:none}
 .fx-flag{font-size:clamp(24px,4vw,56px);width:clamp(40px,5vw,72px);text-align:center;flex-shrink:0}
@@ -265,6 +266,9 @@ function buildFxSlide(item){
   const _d=new Date();
   const now=`${String(_d.getDate()).padStart(2,"0")}/${String(_d.getMonth()+1).padStart(2,"0")}/${_d.getFullYear()}`;
   const logoHtml=item.logo?`<img src="${item.logo}" class="mod-fx-logo">`:"";
+  // Pie fijo, visible en todas las páginas. Al ser hermano de .mod-fx-rows
+  // (flex:1;min-height:0) le resta alto, y setupFxPagination recalcula solo.
+  const noteHtml=item.footer_note?`<div class="mod-fx-note">${item.footer_note}</div>`:"";
   div.innerHTML=`
     <div class="mod-fx-header">
       <div class="mod-fx-title">${item.title||"Tipos de cambio"}</div>
@@ -274,7 +278,8 @@ function buildFxSlide(item){
         <div class="mod-fx-date">${now}</div>
       </div>
     </div>
-    <div class="mod-fx-rows">${rows}</div>`;
+    <div class="mod-fx-rows">${rows}</div>
+    ${noteHtml}`;
   return div;
 }
 

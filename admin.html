@@ -302,6 +302,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
       <div class="fg"><label class="flabel">Color de texto</label><input class="finput" id="fx-color" type="color" value="#ffffff" style="height:38px;padding:4px"></div>
     </div>
     <div class="fg" style="margin-bottom:14px"><label class="flabel">Duración (seg)</label><input class="finput" id="fx-dur" type="number" value="15" min="5" style="width:90px"></div>
+    <div class="fg" style="margin-bottom:14px"><label class="flabel">Mensaje al pie (opcional)</label><input class="finput" id="fx-note" placeholder="Ej: Tipos sujetos a variación sin previo aviso"></div>
     <div class="fg" style="margin-bottom:14px">
       <label class="flabel">Logo de la fuente (opcional)</label>
       <div style="display:flex;align-items:center;gap:10px">
@@ -1716,7 +1717,7 @@ function updateFxLogoPreview(){
 }
 function saveFxModule(){
   const title=document.getElementById("fx-title").value||"Tipos de cambio";
-  const data={name:title,type:"fx",title,base_currency:document.getElementById("fx-base").value||"EUR",rows:[...fxRows],bg:document.getElementById("fx-bg").value,color:document.getElementById("fx-color").value,duration:parseInt(document.getElementById("fx-dur").value)||15,logo:fxLogo||""};
+  const data={name:title,type:"fx",title,base_currency:document.getElementById("fx-base").value||"EUR",rows:[...fxRows],bg:document.getElementById("fx-bg").value,color:document.getElementById("fx-color").value,duration:parseInt(document.getElementById("fx-dur").value)||15,logo:fxLogo||"",footer_note:document.getElementById("fx-note").value.trim()};
   if(!content.items)content.items=[];
   if(editingFxId){
     // Actualizar el módulo existente (conserva su id, así sigue en las playlists)
@@ -1744,6 +1745,7 @@ function editFxModule(id){
   document.getElementById("fx-bg").value=item.bg||"#07182b";
   document.getElementById("fx-color").value=item.color||"#ffffff";
   document.getElementById("fx-dur").value=item.duration||15;
+  document.getElementById("fx-note").value=item.footer_note||"";
   fxRows=(item.rows||[]).map(r=>({...r}));
   fxLogo=item.logo||""; updateFxLogoPreview();
   renderFxRows();
