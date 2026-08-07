@@ -118,16 +118,54 @@ window.SignalosParser = (function () {
     return null;
   }
 
-  // Extrae la tasa (primer número decimal plausible). Normaliza coma->punto.
+  // Convierte un número escrito en una web al formato que se publica en pantalla:
+  // COMA para decimales, sin separador de millares, máximo 2 decimales.
+  //
+  // Antes esto hacía raw.replace(',', '.') y devolvía eso, así que "1.716,50"
+  // se publicaba como "1.716": mil setecientos dieciséis pasaba a uno coma siete.
+  //
+  // Reglas para decidir qué separador es el decimal:
+  //  - Si aparecen los dos, manda el último ("1.716,54" español, "1,716.54" inglés).
+  //  - Si solo hay coma, es decimal.
+  //  - Si solo hay punto, es de millares cuando le siguen exactamente 3 cifras
+  //    ("1.716"), y decimal en otro caso ("1.08"). Es ambiguo por naturaleza:
+  //    "1.085" se lee como mil ochenta y cinco. Se asume que una cotización con
+  //    tres decimales es menos frecuente que un millar.
+  function normalizeRate(raw) {
+    const s = String(raw == null ? '' : raw).trim();
+    if (!/^\d[\d.,]*$/.test(s)) return null;          // solo dígitos y separadores
+    const ultimaComa = s.lastIndexOf(',');
+    const ultimoPunto = s.lastIndexOf('.');
+    let dec = -1;
+    if (ultimaComa >= 0 && ultimoPunto >= 0) dec = Math.max(ultimaComa, ultimoPunto);
+    else if (ultimaComa >= 0) dec = ultimaComa;
+    else if (ultimoPunto >= 0 && s.length - ultimoPunto - 1 !== 3) dec = ultimoPunto;
+
+    const entero = (dec >= 0 ? s.slice(0, dec) : s).replace(/[.,]/g, '');
+    const decimales = dec >= 0 ? s.slice(dec + 1).replace(/[.,]/g, '') : '';
+    const v = parseFloat(entero + (decimales ? '.' + decimales : ''));
+    if (isNaN(v) || v <= 0) return null;
+
+    const red = Math.round(v * 100) / 100;
+    return Number.isInteger(red)
+      ? String(red)
+      : red.toFixed(2).replace('.', ',');
+  }
+
+  // Extrae la tasa: el primer número plausible de la línea, ya normalizado.
   function extractRate(text, cur) {
     const t = text.replace(new RegExp('\\b' + cur.code + '\\b', 'gi'), ' ');
-    const nums = t.match(/\d{1,3}(?:[.,]\d{1,6})|\d+[.,]\d+|\d{1,6}/g);
+    // Se captura el número COMPLETO con sus separadores. La regex anterior
+    // cortaba "1.716,50" en "1.716" y ahí nacía el error.
+    const nums = t.match(/\d[\d.,]*\d|\d/g);
     if (!nums) return null;
     for (const raw of nums) {
-      const v = parseFloat(raw.replace(',', '.'));
-      if (isNaN(v) || v <= 0 || v > 100000) continue;     // descarta 0, negativos y enteros enormes (años, IDs)
+      const val = normalizeRate(raw);
+      if (val === null) continue;
+      const v = parseFloat(val.replace(',', '.'));
+      if (v > 100000) continue;                                  // enteros enormes: IDs
       if (/^\d{4}$/.test(raw) && v > 1900 && v < 2100) continue; // descarta años
-      return raw.replace(',', '.');
+      return val;
     }
     return null;
   }
