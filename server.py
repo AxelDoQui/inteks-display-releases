@@ -193,7 +193,8 @@ PORT = int(sys.argv[sys.argv.index("--port")+1]) if "--port" in sys.argv else co
 # Detectar puerto libre automáticamente
 port_to_use = find_free_port(PORT, config.get("port_fallback", PORT + 1))
 if not port_to_use:
-    print(f"ERROR: No hay puertos disponibles (intentado desde {PORT} hasta {PORT+20})")
+    _fb = config.get("port_fallback", PORT + 1)
+    print(f"ERROR: No hay puertos disponibles (intentados: {PORT}, {_fb}, y {_fb+1}-{_fb+19})")
     sys.exit(1)
 PORT = port_to_use
 
