@@ -304,25 +304,33 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     <div class="fg" style="margin-bottom:14px"><label class="flabel">Duración (seg)</label><input class="finput" id="fx-dur" type="number" value="15" min="5" style="width:90px"></div>
     <div class="fg" style="margin-bottom:14px"><label class="flabel">Mensaje al pie (opcional)</label><input class="finput" id="fx-note" placeholder="Ej: Tipos sujetos a variación sin previo aviso"></div>
     <div class="fg" style="margin-bottom:10px">
-      <label class="flabel">Vista previa — resolución de la pantalla</label>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <select class="finput" id="fx-prev-preset" onchange="applyFxPreset()" style="flex:1;min-width:210px">
-          <option value="1920x1080">Full HD horizontal — 1920×1080</option>
-          <option value="3840x2160">4K horizontal — 3840×2160</option>
-          <option value="1366x768">Portátil / TV básico — 1366×768</option>
-          <option value="1280x720">HD horizontal — 1280×720</option>
-          <option value="1080x1920">Full HD vertical — 1080×1920</option>
-          <option value="800x1280">Tablet vertical — 800×1280</option>
-          <option value="custom">Personalizada…</option>
-        </select>
-        <input class="finput" id="fx-prev-w" type="number" min="240" max="7680" value="1920" style="width:92px" title="Ancho en píxeles">
-        <span style="color:var(--muted)">×</span>
-        <input class="finput" id="fx-prev-h" type="number" min="240" max="7680" value="1080" style="width:92px" title="Alto en píxeles">
-      </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px">Para una pantalla girada escribe la resolución tal y como se ve, p.ej. 1080×1920 en vertical.</div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:500">
+        <input type="checkbox" id="fx-prev-on" onchange="toggleFxPreview()" style="cursor:pointer;width:16px;height:16px">
+        Mostrar vista previa a tamaño de pantalla
+      </label>
     </div>
-    <div id="fx-prev-stage" style="position:relative;overflow:hidden;border:1px solid var(--b);border-radius:var(--r);background:#000"></div>
-    <div id="fx-prev-info" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
+    <div id="fx-prev-wrap" style="display:none;margin-bottom:14px">
+      <div class="fg" style="margin-bottom:10px">
+        <label class="flabel">Resolución de la pantalla</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select class="finput" id="fx-prev-preset" onchange="applyFxPreset()" style="flex:1;min-width:210px">
+            <option value="1920x1080">Full HD horizontal — 1920×1080</option>
+            <option value="3840x2160">4K horizontal — 3840×2160</option>
+            <option value="1366x768">Portátil / TV básico — 1366×768</option>
+            <option value="1280x720">HD horizontal — 1280×720</option>
+            <option value="1080x1920">Full HD vertical — 1080×1920</option>
+            <option value="800x1280">Tablet vertical — 800×1280</option>
+            <option value="custom">Personalizada…</option>
+          </select>
+          <input class="finput" id="fx-prev-w" type="number" min="240" max="7680" value="1920" style="width:92px" title="Ancho en píxeles">
+          <span style="color:var(--muted)">×</span>
+          <input class="finput" id="fx-prev-h" type="number" min="240" max="7680" value="1080" style="width:92px" title="Alto en píxeles">
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">Para una pantalla girada escribe la resolución tal y como se ve, p.ej. 1080×1920 en vertical.</div>
+      </div>
+      <div id="fx-prev-stage" style="position:relative;overflow:hidden;border:1px solid var(--b);border-radius:var(--r);background:#000;max-width:440px"></div>
+      <div id="fx-prev-info" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
+    </div>
     <div class="fg" style="margin-bottom:14px">
       <label class="flabel">Logo de la fuente (opcional)</label>
       <div style="display:flex;align-items:center;gap:10px">
@@ -1788,6 +1796,25 @@ function cancelFxEdit(){
 // que se desincronice al tocar el CSS.
 let fxPrevReady=false;
 const FX_PREV_KEY="signalos_fx_preview_size";
+const FX_PREV_ON_KEY="signalos_fx_preview_on";
+
+function fxPreviewOn(){
+  const el=document.getElementById("fx-prev-on");
+  return !!(el && el.checked);
+}
+
+// La previa es opcional y viene apagada. Al apagarla se DESTRUYE el iframe:
+// no tiene sentido mantener un player entero cargado si no se está mirando.
+function toggleFxPreview(){
+  const on=fxPreviewOn();
+  document.getElementById("fx-prev-wrap").style.display=on?"":"none";
+  try{ localStorage.setItem(FX_PREV_ON_KEY,on?"1":"0"); }catch(e){}
+  if(on){ renderFxPreview(); return; }
+  const fr=document.getElementById("fx-prev-frame");
+  if(fr){ fr.remove(); fxPrevReady=false; }
+  const info=document.getElementById("fx-prev-info");
+  if(info) info.textContent="";
+}
 
 // La resolución la escribe el usuario, no se autodetecta. Así se puede preparar
 // el contenido de una pantalla que todavía no existe o está apagada.
@@ -1824,8 +1851,10 @@ function loadFxPreviewSize(){
       document.getElementById("fx-prev-w").value=s.w;
       document.getElementById("fx-prev-h").value=s.h;
     }
+    document.getElementById("fx-prev-on").checked=localStorage.getItem(FX_PREV_ON_KEY)==="1";
   }catch(e){}
   syncFxPreset();
+  document.getElementById("fx-prev-wrap").style.display=fxPreviewOn()?"":"none";
   renderFxPreview();
 }
 
@@ -1846,6 +1875,7 @@ function fxDraftItem(){
 }
 
 function renderFxPreview(){
+  if(!fxPreviewOn()) return;                       // apagada: ni se crea el iframe
   const stage=document.getElementById("fx-prev-stage");
   if(!stage||!document.getElementById("fx-prev-w")) return;
   const {w,h}=fxPrevSize();

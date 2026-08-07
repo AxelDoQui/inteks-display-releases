@@ -51,9 +51,18 @@ Motivos:
   el usuario escribe `1080×1920` para una pantalla vertical y ya está.
 
 En el admin: un desplegable de resoluciones habituales (Full HD horizontal,
-4K, HD, Full HD vertical, tablet vertical) más dos campos de ancho y alto para
-cualquier otra. La elección se guarda en `localStorage`, no en el contenido:
-es una preferencia de quien edita, no un dato del módulo.
+4K, 1366×768, HD, Full HD vertical, tablet vertical) más dos campos de ancho y
+alto para cualquier otra. La elección se guarda en `localStorage`, no en el
+contenido: es una preferencia de quien edita, no un dato del módulo.
+
+**La previa es opcional y viene apagada.** Una casilla la muestra u oculta, y
+el estado también se recuerda en `localStorage`. Al apagarla se **destruye el
+iframe**, no se limita a ocultarlo: mantener un player entero cargado en
+memoria cuando nadie lo mira no tiene sentido, y así el panel de divisas pesa
+lo mismo que antes para quien no use la previa.
+
+Se muestra pequeña: el contenedor se limita a 440 px de ancho, y el factor de
+escala sale de ahí. Es una miniatura de comprobación, no una segunda pantalla.
 
 ### 2. Modo preview del player — `player.html?preview=1`
 
@@ -129,6 +138,7 @@ que ya se está tocando, no una refactorización oportunista.
 |---|---|---|---|
 | item `fx` en `content.json` | `footer_note` | string | `""` |
 | `localStorage` del admin | `signalos_fx_preview_size` | `{w,h}` | 1920×1080 |
+| `localStorage` del admin | `signalos_fx_preview_on` | `"0"` / `"1"` | apagada |
 
 `footer_note` es aditivo y opcional: el contenido existente sigue funcionando
 sin migración. La resolución de la previa no toca el contenido en absoluto — es
