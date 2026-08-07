@@ -117,6 +117,38 @@ recálculo es automático.
 
 Si `footer_note` está vacío, el `div` no se renderiza y no ocupa alto.
 
+### 5b. Reparto del alto y escalado tipográfico
+
+**Añadido el 2026-08-07, a raíz de lo que destapó la propia vista previa.**
+
+En una pantalla 4K vertical (2160×3840) seis divisas ocupaban el 14% del alto y
+quedaban diminutas en el centro. Dos causas:
+
+- `.mod-fx-rows` llevaba `justify-content:center`, que agrupa las filas y
+  reparte el sobrante arriba y abajo.
+- **Todos los techos de los `clamp()` estaban saturados.** Se calibraron para
+  Full HD: a 2160 px de ancho, `2vw` son 43 px pero el tope era 28 px. El
+  contenido dejaba de crecer justo donde más falta hacía.
+
+Solución: las filas pasan a `flex:1 1 0` para repartirse el alto, y la
+tipografía cuelga de una variable `--fx-row-h` que el JS fija a
+`alto disponible / filas de la página`. Cada tamaño se expresa como
+`min(calc(var(--fx-row-h) * k), N vw)`; el término en `vw` impide que en una
+pantalla muy alta el texto crezca hasta salirse por los lados.
+
+**Dos pases, y el orden importa.** `setupFxPagination()` necesita el alto
+*natural* de cada fila para decidir las páginas: si midiera con las filas ya
+repartidas, la suma sería siempre igual al alto disponible y nunca paginaría
+nada. Por eso añade la clase `.fx-measuring`, que restaura temporalmente la
+tipografía y el `padding` anteriores, mide, y la quita. Leer `offsetHeight`
+fuerza un reflujo síncrono, así que la medición es fiable dentro del mismo
+tick. Con esto, **cuántas filas caben por página se sigue decidiendo igual que
+antes**; lo único que cambia es cómo se reparte el espacio una vez decidido.
+
+Efecto medido: en 1920×1080 los tamaños apenas se mueven (33 px frente a 28 px
+en el nombre del país); en 2160×3840 pasan de 28 px a 97 px, y de 52 px a
+151 px en la cotización.
+
 ### 6. Refactor puntual: extraer el agrupamiento
 
 `setupFxPagination()` mezcla hoy tres cosas: medir el DOM, agrupar filas en

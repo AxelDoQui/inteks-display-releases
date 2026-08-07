@@ -30,17 +30,32 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 .mod-fx-date{font-size:clamp(11px,1.5vw,20px);opacity:.4;font-family:monospace;letter-spacing:1px}
 .mod-fx-page{font-size:clamp(11px,1.5vw,20px);opacity:.55;font-family:monospace;letter-spacing:1px;padding:2px 10px;border:1px solid rgba(255,255,255,.2);border-radius:99px}
 .mod-fx-logo{height:var(--fx-title-size);max-width:22vw;object-fit:contain}
-.mod-fx-rows{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:center;padding:0 4vw 3vh;gap:0}
+/* Las filas se REPARTEN el alto disponible (flex:1 1 0) en vez de agruparse en
+   el centro, y la tipografía escala con el alto que le toca a cada una
+   (--fx-row-h, que fija el JS). El segundo término en vw evita que en una
+   pantalla muy alta el texto crezca tanto que se salga por los lados. */
+.mod-fx-rows{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:0 4vw 3vh;gap:0;--fx-row-h:80px}
 .mod-fx-note{flex-shrink:0;max-height:18%;overflow:hidden;padding:1.5vh 4vw 2.5vh;border-top:1px solid rgba(255,255,255,.12);font-size:clamp(11px,1.6vw,22px);line-height:1.35;opacity:.75}
-.fx-row{display:flex;align-items:center;padding:clamp(10px,2vh,28px) 0;border-bottom:1px solid rgba(255,255,255,.07);gap:2vw}
+.fx-row{flex:1 1 0;min-height:0;display:flex;align-items:center;border-bottom:1px solid rgba(255,255,255,.07);gap:2vw}
 .fx-row:last-child{border-bottom:none}
-.fx-flag{font-size:clamp(24px,4vw,56px);width:clamp(40px,5vw,72px);text-align:center;flex-shrink:0}
+.fx-flag{font-size:min(calc(var(--fx-row-h)*.42),7vw);width:min(calc(var(--fx-row-h)*.55),9vw);text-align:center;flex-shrink:0}
 .fx-country{flex:1;min-width:0}
-.fx-country-name{font-size:clamp(13px,2vw,28px);font-weight:600;letter-spacing:.5px}
-.fx-currency{font-size:clamp(10px,1.3vw,18px);opacity:.45;font-family:monospace;letter-spacing:1px;margin-top:2px}
+.fx-country-name{font-size:min(calc(var(--fx-row-h)*.26),4.5vw);font-weight:600;letter-spacing:.5px}
+.fx-currency{font-size:min(calc(var(--fx-row-h)*.13),2.2vw);opacity:.45;font-family:monospace;letter-spacing:1px;margin-top:2px}
 .fx-rate{text-align:right;flex-shrink:0}
-.fx-rate-val{font-size:clamp(20px,3.5vw,52px);font-weight:700;font-family:monospace;letter-spacing:-1px}
-.fx-rate-label{font-size:clamp(9px,1vw,14px);opacity:.4;text-align:right;letter-spacing:1px;margin-top:2px}
+.fx-rate-val{font-size:min(calc(var(--fx-row-h)*.42),7vw);font-weight:700;font-family:monospace;letter-spacing:-1px}
+.fx-rate-label{font-size:min(calc(var(--fx-row-h)*.10),1.7vw);opacity:.4;text-align:right;letter-spacing:1px;margin-top:2px}
+
+/* Pase de medición. La paginación necesita el alto NATURAL de cada fila: con
+   flex:1 la suma daría siempre el alto disponible y saldría "todo cabe en una
+   página" pasara lo que pasara. Estos valores son los de antes del reparto, de
+   modo que cuántas filas caben por página se sigue decidiendo igual que antes. */
+.mod-fx-rows.fx-measuring .fx-row{flex:0 0 auto;padding:clamp(10px,2vh,28px) 0}
+.mod-fx-rows.fx-measuring .fx-flag{font-size:clamp(24px,4vw,56px);width:clamp(40px,5vw,72px)}
+.mod-fx-rows.fx-measuring .fx-country-name{font-size:clamp(13px,2vw,28px)}
+.mod-fx-rows.fx-measuring .fx-currency{font-size:clamp(10px,1.3vw,18px)}
+.mod-fx-rows.fx-measuring .fx-rate-val{font-size:clamp(20px,3.5vw,52px)}
+.mod-fx-rows.fx-measuring .fx-rate-label{font-size:clamp(9px,1vw,14px)}
 
 /* ── Módulo clima */
 .mod-weather{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6vw;text-align:center}
@@ -536,16 +551,30 @@ function setupFxPagination(slide, perPageMs, onDone){
     const cs=getComputedStyle(container);
     avail=container.clientHeight-(parseFloat(cs.paddingTop)||0)-(parseFloat(cs.paddingBottom)||0);
   }
+  // Reparte el alto disponible entre las filas visibles de la página actual.
+  // La tipografía cuelga de esta variable, así que 4 divisas en un 4K vertical
+  // salen grandes y sin huecos, en vez de diminutas y agrupadas en el medio.
+  const fitRows=(n)=>{
+    if(container) container.style.setProperty("--fx-row-h", (avail/Math.max(1,n))+"px");
+  };
+
   if(rows.length<=1 || avail<=0){                      // nada que paginar
     if(indicator) indicator.style.display="none";
+    fitRows(rows.length);
     reportPreviewPages(1, rows.length);
     startProgress(perPageMs); timer=setTimeout(onDone, perPageMs); return;
   }
-  // Agrupar filas en páginas según la altura disponible (medición real del DOM)
-  const pages=groupRowsIntoPages(rows.map(r=>r.offsetHeight), avail).map(idxs=>idxs.map(i=>rows[i]));
+  // Medir con las filas a su alto NATURAL. Sin esto la suma daría siempre el
+  // alto disponible (flex:1 1 0) y nunca se paginaría nada.
+  container.classList.add("fx-measuring");
+  const natural=rows.map(r=>r.offsetHeight);
+  container.classList.remove("fx-measuring");
+
+  const pages=groupRowsIntoPages(natural, avail).map(idxs=>idxs.map(i=>rows[i]));
 
   if(pages.length<=1){                                 // caben todas: comportamiento normal
     if(indicator) indicator.style.display="none";
+    fitRows(rows.length);
     reportPreviewPages(1, rows.length);
     startProgress(perPageMs); timer=setTimeout(onDone, perPageMs); return;
   }
@@ -555,6 +584,7 @@ function setupFxPagination(slide, perPageMs, onDone){
   const show=()=>{
     rows.forEach(r=>r.style.display="none");
     pages[pi].forEach(r=>r.style.display="");
+    fitRows(pages[pi].length);                         // cada página llena la pantalla
     if(indicator){ indicator.style.display=""; indicator.textContent=`${pi+1} / ${pages.length}`; }
     startProgress(perPageMs);
     timer=setTimeout(()=>{ pi++; (pi<pages.length)?show():onDone(); }, perPageMs);
