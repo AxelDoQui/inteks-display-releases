@@ -121,11 +121,15 @@ body.rot-270 #player{ width:100vh;height:100vw; transform:rotate(270deg) transla
 if("serviceWorker" in navigator){ navigator.serviceWorker.register("/sw.js").catch(()=>{}); }
 
 const params=new URLSearchParams(location.search);
+// Modo vista previa: el admin incrusta el player en un iframe. No debe
+// conectarse por SSE, ni registrarse como pantalla, ni aplicar el horario, o
+// ensuciaría screens.json marcando pantallas como conectadas.
+const PREVIEW=params.get("preview")==="1";
 // Identidad de la pantalla: URL (?screen=) → memoria del dispositivo → si no hay, emparejar.
 const _sidParam=params.get("screen");
 let _sidStored=null; try{ _sidStored=localStorage.getItem("signalos_screen_id"); }catch(e){}
 const SCREEN_ID=_sidParam||_sidStored;
-if(!SCREEN_ID){ location.replace("/pair"); }
+if(!SCREEN_ID && !PREVIEW){ location.replace("/pair"); }   // en previa no hay ?screen=
 else if(_sidParam){ try{ localStorage.setItem("signalos_screen_id", _sidParam); }catch(e){} }  // recordar por dispositivo
 // Rotación forzada por URL: ?rotation=0/90/180/270 (o ?vertical=1 → 90, retrocompat)
 const URL_ROTATION = params.get("rotation")!==null ? parseInt(params.get("rotation"))
@@ -151,8 +155,11 @@ function reportScreenInfo(){
                          dpr:window.devicePixelRatio||1})}).catch(()=>{});
 }
 
-document.getElementById("sid-display").textContent=SCREEN_ID;
-document.getElementById("url-hint").textContent=location.host+"/player.html?screen="+SCREEN_ID;
+if(SCREEN_ID){
+  document.getElementById("sid-display").textContent=SCREEN_ID;
+  document.getElementById("url-hint").textContent=location.host+"/player.html?screen="+SCREEN_ID;
+}
+if(PREVIEW) document.getElementById("waiting").style.display="none";
 if(URL_ROTATION!==null) applyRotation(URL_ROTATION);
 
 let playlist=[],current=0,timer=null,screenSchedule=null,screenConfig=null;
@@ -163,6 +170,7 @@ function getDayName(){
 }
 
 function isScreenActive(){
+  if(PREVIEW) return true;                                       // la previa siempre muestra contenido
   if(screenConfig&&screenConfig.always_on) return true;          // modo 24/7 explícito
   if(!screenSchedule||!Object.keys(screenSchedule).length) return true;  // sin horario = siempre activa
   const today=getDayName();
@@ -523,6 +531,13 @@ function groupRowsIntoPages(heights, avail){
   return pages;
 }
 
+// En modo previa, devolver al admin cuántas páginas han salido. Es la respuesta
+// a "¿cuántas divisas caben?", medida por el renderizador real en vez de estimada.
+function reportPreviewPages(pages, rowsFirstPage){
+  if(!PREVIEW) return;
+  parent.postMessage({type:"preview-pages",pages,rowsFirstPage},"*");
+}
+
 // Pagina el módulo de divisas según lo que cabe en pantalla. Muestra una página
 // cada perPageMs y llama onDone() cuando ha mostrado todas (entonces avanza el slide).
 function setupFxPagination(slide, perPageMs, onDone){
@@ -537,6 +552,7 @@ function setupFxPagination(slide, perPageMs, onDone){
   }
   if(rows.length<=1 || avail<=0){                      // nada que paginar
     if(indicator) indicator.style.display="none";
+    reportPreviewPages(1, rows.length);
     startProgress(perPageMs); timer=setTimeout(onDone, perPageMs); return;
   }
   // Agrupar filas en páginas según la altura disponible (medición real del DOM)
@@ -544,9 +560,11 @@ function setupFxPagination(slide, perPageMs, onDone){
 
   if(pages.length<=1){                                 // caben todas: comportamiento normal
     if(indicator) indicator.style.display="none";
+    reportPreviewPages(1, rows.length);
     startProgress(perPageMs); timer=setTimeout(onDone, perPageMs); return;
   }
   // Varias páginas: rotar entre ellas, y avanzar el slide al terminar la última
+  reportPreviewPages(pages.length, pages[0].length);
   let pi=0;
   const show=()=>{
     rows.forEach(r=>r.style.display="none");
@@ -572,8 +590,17 @@ document.body.addEventListener("click",()=>{
   if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{});
 });
 
-if(SCREEN_ID){ connectSSE();loadPlaylist(); }   // sin identidad ya se redirigió a /pair
-setInterval(()=>{ if(SCREEN_ID) loadPlaylist(); },15000);
+if(PREVIEW){
+  // El admin inyecta el módulo que está editando; así se ve antes de guardar.
+  window.addEventListener("message",(e)=>{
+    const m=e.data||{};
+    if(m.type!=="preview-item"||!m.item) return;
+    applyRotation(m.rotation||0);
+    playlist=[m.item]; rebuildSlides(); showSlide(0);
+  });
+  parent.postMessage({type:"preview-ready"},"*");
+} else if(SCREEN_ID){ connectSSE();loadPlaylist(); }   // sin identidad ya se redirigió a /pair
+setInterval(()=>{ if(SCREEN_ID && !PREVIEW) loadPlaylist(); },15000);
 
 // Re-paginar/re-adaptar el slide actual si cambia el tamaño o la orientación de la pantalla
 let resizeTimer=null;
