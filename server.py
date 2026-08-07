@@ -7,20 +7,50 @@ Player:   http://TU_IP/player.html?screen=NOMBRE
 Enlazar:  http://signage.local/pair     (nombre mDNS, configurable en config.json)
 """
 import json, os, base64, mimetypes, threading, time, socket, sys, random, struct
-import hmac, hashlib, secrets
+import hmac, hashlib, secrets, shutil
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
-UPLOAD_DIR = "uploads"
-SCREENS_FILE = "screens.json"
-CONTENT_FILE = "content.json"
-CONFIG_FILE = "config.json"
+# ── Programa y datos van SEPARADOS ─────────────────────────────────────────
+# Instalado en C:\Program Files, Windows prohíbe escribir junto al ejecutable:
+# el servidor moría al arrancar con PermissionError al crear 'uploads'. Los
+# estáticos (html, vendor, assets) se leen de APP_DIR y todo lo que cambia se
+# guarda en DATA_DIR. En desarrollo ambos son la carpeta del proyecto, así que
+# nada cambia al trabajar desde el código.
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def pick_data_dir():
+    """Carpeta donde guardar lo que cambia. Junto al programa si se puede
+    escribir ahí; si no —caso Program Files— en ProgramData."""
+    override = os.environ.get("SIGNALOS_DATA")
+    if override:
+        os.makedirs(override, exist_ok=True)
+        return os.path.abspath(override)
+    # Comprobar escritura de verdad: los permisos de Windows no se deducen
+    # fiablemente con os.access(), hay que intentarlo.
+    try:
+        probe = os.path.join(APP_DIR, ".signalos-escritura")
+        with open(probe, "w") as f: f.write("")
+        os.remove(probe)
+        return APP_DIR
+    except OSError:
+        base = os.environ.get("PROGRAMDATA") or os.path.expanduser("~")
+        d = os.path.join(base, "SignalOS Pro")
+        os.makedirs(d, exist_ok=True)
+        return d
+
+DATA_DIR = pick_data_dir()
+
+UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
+SCREENS_FILE = os.path.join(DATA_DIR, "screens.json")
+CONTENT_FILE = os.path.join(DATA_DIR, "content.json")
+CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
 
 # Sistema de PIN para enlace
 # El PIN se persiste en disco (PIN_FILE) para que sea el MISMO sin importar quién
 # lo sirva: el admin (/api/pin), la validación de la tablet (/api/pair) y cualquier
 # reinicio o instancia del servidor comparten una única fuente de verdad.
-PIN_FILE = "pin.json"
+PIN_FILE = os.path.join(DATA_DIR, "pin.json")
 pin_state = {
     "pin": None,
     "expires_at": 0,
@@ -29,6 +59,13 @@ pin_state = {
 }
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# El instalador deja una config.json junto al programa. La primera vez sirve de
+# plantilla para la de datos, así se respetan el puerto y el nombre elegidos.
+_plantilla = os.path.join(APP_DIR, "config.json")
+if DATA_DIR != APP_DIR and not os.path.exists(CONFIG_FILE) and os.path.exists(_plantilla):
+    try: shutil.copy2(_plantilla, CONFIG_FILE)
+    except OSError: pass
 
 def init_file(path, default):
     if not os.path.exists(path):
@@ -114,7 +151,7 @@ def validate_pin(pin_input):
 #  El PIN de emparejamiento (arriba) es independiente: PIN = enlazar pantallas,
 #  contraseña = entrar al panel de control.
 # ─────────────────────────────────────────────────────────────
-ADMIN_FILE = "admin.json"
+ADMIN_FILE = os.path.join(DATA_DIR, "admin.json")
 SESSION_COOKIE = "signalos_session"
 SESSION_TTL = 7 * 24 * 3600  # 7 días
 
@@ -533,7 +570,8 @@ class Handler(BaseHTTPRequestHandler):
 
         # ── Servir uploads (con soporte de HTTP Range -> vídeo en streaming + seeking)
         if path.startswith("/uploads/"):
-            fp = path.lstrip("/")
+            # Los subidos viven en DATA_DIR, no junto al programa.
+            fp = os.path.join(DATA_DIR, *path.lstrip("/").split("/"))
             # Seguridad: la ruta resuelta debe quedar dentro de uploads/ (evita ../ traversal)
             uploads_base = os.path.realpath(UPLOAD_DIR)
             if not os.path.realpath(fp).startswith(uploads_base + os.sep) or not os.path.isfile(fp):
@@ -613,8 +651,10 @@ class Handler(BaseHTTPRequestHandler):
         #    Raíz "/" → index.html (router de pantallas), NO el panel admin.
         fp = path.lstrip("/") or "index.html"
         ALLOWED_EXT = (".html",".css",".js",".png",".jpg",".jpeg",".gif",".webp",".svg",".ico",".woff",".woff2",".ttf",".map")
-        base = os.path.realpath(os.getcwd())
-        target = os.path.realpath(fp)
+        # Anclado a APP_DIR y no al directorio de trabajo: así los estáticos se
+        # sirven igual arranque quien arranque el servidor y desde donde sea.
+        base = os.path.realpath(APP_DIR)
+        target = os.path.realpath(os.path.join(APP_DIR, *fp.split("/")))
         inside = (target == base or target.startswith(base + os.sep))
         if inside and fp.lower().endswith(ALLOWED_EXT) and os.path.isfile(target):
             mime,_ = mimetypes.guess_type(target)

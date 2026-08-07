@@ -101,6 +101,28 @@ Quedan dos vías legítimas si algún día hace falta la instalación automátic
 Mientras tanto, cargarla en modo desarrollador funciona exactamente igual y son
 tres clics una sola vez.
 
+## Dónde viven los datos
+
+El programa se instala en `C:\Program Files\SignalOS Pro\` y **los datos van
+aparte**, en `C:\ProgramData\SignalOS Pro\`:
+
+| Carpeta | Contenido | Al desinstalar |
+|---|---|---|
+| `{app}` | server.py, los .html, vendor, assets, extension | se borra |
+| `{commonappdata}\SignalOS Pro` | config.json, content.json, screens.json, admin.json, pin.json, uploads/ | **se conserva** |
+
+Windows prohíbe escribir en `Program Files` a los procesos sin elevar, así que
+guardar ahí el estado hacía que el servidor muriera al arrancar con
+`PermissionError: [WinError 5] Acceso denegado: 'uploads'`. El instalador crea
+la carpeta de datos con permiso de modificación para *Users*.
+
+En **desarrollo** no cambia nada: si se puede escribir junto a `server.py`, los
+datos se quedan ahí como siempre. La variable de entorno `SIGNALOS_DATA` fuerza
+una carpeta concreta, lo que usan las pruebas.
+
+El `config.json` que instala el instalador sirve de **plantilla**: la primera
+vez se copia a la carpeta de datos, respetando el puerto y el nombre elegidos.
+
 ## Qué hace el instalador
 
 - Instala en `C:\Program Files\SignalOS Pro\`
