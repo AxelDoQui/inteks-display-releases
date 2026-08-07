@@ -303,6 +303,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     </div>
     <div class="fg" style="margin-bottom:14px"><label class="flabel">Duración (seg)</label><input class="finput" id="fx-dur" type="number" value="15" min="5" style="width:90px"></div>
     <div class="fg" style="margin-bottom:14px"><label class="flabel">Mensaje al pie (opcional)</label><input class="finput" id="fx-note" placeholder="Ej: Tipos sujetos a variación sin previo aviso"></div>
+    <div class="fg" style="margin-bottom:10px">
+      <label class="flabel">Vista previa en pantalla</label>
+      <select class="finput" id="fx-prev-screen" onchange="renderFxPreview()"></select>
+    </div>
+    <div id="fx-prev-stage" style="position:relative;overflow:hidden;border:1px solid var(--b);border-radius:var(--r);background:#000"></div>
+    <div id="fx-prev-info" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
     <div class="fg" style="margin-bottom:14px">
       <label class="flabel">Logo de la fuente (opcional)</label>
       <div style="display:flex;align-items:center;gap:10px">
@@ -889,6 +895,7 @@ function showPage(id,btn){
   document.getElementById("page-"+id).classList.add("active");
   if(btn) btn.classList.add("active");
   if(id==="packages"){ renderPkgPicker(); renderPackages(); }  // refrescar con la librería actual
+  if(id==="fx"){ loadFxPreviewScreens(); }                     // geometrías al día
 }
 function updateStats(){
   const sids=new Set([...Object.keys(regScreens),...Object.keys(content.screens||{})]);
@@ -1697,6 +1704,7 @@ function updateFxPreview(){
   const logoHtml=fxLogo?`<img src="${fxLogo}" style="height:24px;object-fit:contain">`:"";
   c.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div style="font-size:13px;font-weight:700;color:${color};letter-spacing:2px;opacity:.6">${title}</div>${logoHtml}</div>`+
     fxRows.map(r=>`<div class="fx-prev-row" style="color:${color}"><span style="margin-right:8px">${flagImg(r.flag,"24px")}</span><span style="flex:1;font-size:13px;font-weight:600">${r.country||"—"} <span style="opacity:.4;font-size:10px;font-family:monospace">${r.currency}</span></span><span style="font-family:monospace;font-size:15px;font-weight:700">${r.rate||"—"}</span><span style="font-size:9px;opacity:.35;font-family:monospace;margin-left:6px">${base}→${r.code||"?"}</span></div>`).join("");
+  renderFxPreview();   // mantener también la previa a escala real de pantalla
 }
 let editingFxId=null;
 let fxLogo="";   // data URL del logo de la fuente (opcional)
@@ -1759,6 +1767,112 @@ function cancelFxEdit(){
   document.getElementById("fx-save-btn").textContent="+ Añadir a librería";
   document.getElementById("fx-cancel-btn").style.display="none";
 }
+// ── Vista previa de divisas ────────────────────────────────────────────────
+// Incrusta el player REAL en un iframe con los píxeles de la pantalla elegida.
+// Nada de estimar cuántas filas caben: el renderizador de verdad lo calcula y
+// lo devuelve por postMessage, así que no hay lógica de maquetación duplicada
+// que se desincronice al tocar el CSS.
+let fxPrevReady=false;
+
+async function loadFxPreviewScreens(){
+  const sel=document.getElementById("fx-prev-screen");
+  if(!sel) return;
+  let screens={};
+  try{ screens=await (await fetch("/api/screens")).json(); }catch(e){}
+  const cfgs=content.screens||{};
+  const prev=sel.value;
+  sel.innerHTML="";
+  const ids=Object.keys(screens);
+  if(!ids.length){
+    sel.innerHTML='<option data-w="1920" data-h="1080" data-rot="0">Sin pantallas — se asume 1920×1080</option>';
+  }else{
+    ids.forEach(id=>{
+      const vp=screens[id].viewport;
+      const o=document.createElement("option");
+      o.textContent=vp?`${id} — ${vp.w}×${vp.h}`:`${id} — sin datos, se asume 1920×1080`;
+      o.value=id;
+      o.dataset.w=vp?vp.w:1920; o.dataset.h=vp?vp.h:1080;
+      o.dataset.rot=(cfgs[id]&&cfgs[id].rotation)||0;
+      sel.appendChild(o);
+    });
+    if(prev) sel.value=prev;
+  }
+  renderFxPreview();
+}
+
+// El item tal y como está AHORA en el formulario, sin guardar.
+function fxDraftItem(){
+  return {type:"fx",
+    title:document.getElementById("fx-title").value||"Tipos de cambio",
+    base_currency:document.getElementById("fx-base").value||"EUR",
+    rows:[...fxRows],
+    bg:document.getElementById("fx-bg").value,
+    color:document.getElementById("fx-color").value,
+    logo:fxLogo||"",
+    footer_note:document.getElementById("fx-note").value.trim(),
+    duration:9999};
+  // duration alto A PROPÓSITO: la previa se queda en la página 1 en lugar de
+  // rotar. El contador ya dice cuántas páginas hay, y una previa que se mueve
+  // sola mientras escribes distrae. No lo "arregles" bajándolo.
+}
+
+function renderFxPreview(){
+  const sel=document.getElementById("fx-prev-screen");
+  const stage=document.getElementById("fx-prev-stage");
+  if(!sel||!stage||!sel.selectedOptions.length) return;
+  const opt=sel.selectedOptions[0];
+  let w=parseInt(opt.dataset.w)||1920, h=parseInt(opt.dataset.h)||1080;
+  const rot=parseInt(opt.dataset.rot)||0;
+  if(rot===90||rot===270){ const t=w; w=h; h=t; }   // la pantalla está girada
+
+  // Clave de la fidelidad: el iframe mide los píxeles REALES de la pantalla y
+  // se encoge visualmente. Así clamp()/vw/vh se resuelven igual que en el TV.
+  // Un iframe pequeño calcularía otras fuentes y la previa mentiría.
+  const f=Math.min(1,(stage.clientWidth||640)/w);
+  stage.style.height=(h*f)+"px";
+  let fr=document.getElementById("fx-prev-frame");
+  if(!fr){
+    fr=document.createElement("iframe");
+    fr.id="fx-prev-frame"; fr.src="/player.html?preview=1";
+    fr.style.cssText="position:absolute;top:0;left:0;border:0;transform-origin:top left";
+    fxPrevReady=false;
+    // Si el player no llega a responder, decirlo en vez de dejar un recuadro
+    // negro que parezca un módulo mal configurado.
+    setTimeout(()=>{
+      if(fxPrevReady) return;
+      const info=document.getElementById("fx-prev-info");
+      if(info) info.textContent="No se pudo cargar la vista previa. ¿Está el servidor sirviendo /player.html?";
+    },5000);
+    fr.addEventListener("error",()=>{
+      const info=document.getElementById("fx-prev-info");
+      if(info) info.textContent="No se pudo cargar la vista previa.";
+    });
+    stage.appendChild(fr);
+  }
+  fr.style.width=w+"px"; fr.style.height=h+"px";
+  fr.style.transform=`scale(${f})`;
+  // rotation:0 a propósito. El iframe YA tiene el ancho y alto intercambiados
+  // arriba, así que rotar además el contenido lo giraría dos veces.
+  if(fxPrevReady) fr.contentWindow.postMessage({type:"preview-item",item:fxDraftItem(),rotation:0},"*");
+}
+
+window.addEventListener("message",(e)=>{
+  const m=e.data||{};
+  if(m.type==="preview-ready"){ fxPrevReady=true; renderFxPreview(); return; }
+  if(m.type==="preview-pages"){
+    const info=document.getElementById("fx-prev-info");
+    if(info) info.textContent=m.pages>1
+      ? `${m.pages} páginas · ${m.rowsFirstPage} filas en la primera`
+      : `Cabe en una sola página (${m.rowsFirstPage} filas)`;
+  }
+});
+
+["fx-title","fx-base","fx-bg","fx-color","fx-note"].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener("input",()=>renderFxPreview());
+});
+window.addEventListener("resize",()=>renderFxPreview());
+
 function renderFxSaved(){
   const c=document.getElementById("fx-saved-list");
   const items=(content.items||[]).filter(i=>i.type==="fx");
