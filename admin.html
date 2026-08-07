@@ -393,9 +393,11 @@ JPY  Yen        162.5"></textarea>
     </div>
     <div class="fx-editor" id="fx-rows"></div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;max-width:620px">
+      <input class="finput" id="fx-country-search" placeholder="Buscar país, moneda o código…" style="flex:1;min-width:200px;max-width:280px" autocomplete="off">
       <select class="finput" id="fx-country-pick" style="flex:1;min-width:240px;max-width:400px"></select>
       <button class="btn btn-accent" onclick="addFxRowFromPicker()"><i class="fa-solid fa-plus"></i> Añadir</button>
     </div>
+    <div id="fx-country-count" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
     <button class="fx-add-btn" onclick="addFxRow()" style="margin-top:8px">+ Fila vacía (divisa que no esté en la lista)</button>
 
     <div style="margin-top:14px">
@@ -1744,6 +1746,24 @@ function fxPickerOptions(){
              .sort((a,b)=>a.country.localeCompare(b.country,"es")||a.extra-b.extra||a.code.localeCompare(b.code));
 }
 
+// Quita acentos y pasa a minúsculas, para que "panama" encuentre "Panamá".
+// NFD separa cada letra de su tilde, y ̀-ͯ es el bloque de marcas
+// diacríticas combinantes. Se escriben escapadas y no literales para que el
+// patrón sobreviva a cualquier cambio de codificación del archivo.
+function fxNormalize(s){
+  return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
+}
+
+// Filtra las opciones por país, moneda o código. Sin texto, las devuelve todas.
+function fxFilterOptions(options, query){
+  const q=fxNormalize(query);
+  if(!q) return options;
+  return options.filter(o=>
+    fxNormalize(o.country).includes(q) ||
+    fxNormalize(o.currency).includes(q) ||
+    fxNormalize(o.code).includes(q));
+}
+
 // Construye una fila lista para el tablero. Devuelve null si la clave no existe.
 function fxRowFromKey(key){
   const o=fxPickerOptions().find(x=>fxOptionKey(x)===key);
@@ -1764,17 +1784,33 @@ function renderFxRows(){
 }
 function addFxRow(){fxRows.push({flag:"",country:"",currency:"",code:"",rate:""});renderFxRows();}
 
-// Llena el selector de país/moneda, alfabético por país.
+// Llena el selector de país/moneda, alfabético por país y filtrado por el
+// buscador. Se reconstruyen las opciones en vez de ocultarlas: es más simple y
+// no depende de que el navegador respete `hidden` en un <option>.
 function populateFxCountryPicker(){
   const sel=document.getElementById("fx-country-pick");
   if(!sel) return;
-  sel.innerHTML='<option value="">Selecciona un país…</option>';
-  fxPickerOptions().forEach(o=>{
-    const op=document.createElement("option");
-    op.value=fxOptionKey(o);
-    op.textContent=`${o.country} — ${o.currency} (${o.code})`;
-    sel.appendChild(op);
-  });
+  const buscador=document.getElementById("fx-country-search");
+  const q=buscador?buscador.value:"";
+  const opts=fxFilterOptions(fxPickerOptions(),q);
+  sel.innerHTML="";
+  if(!opts.length){
+    sel.innerHTML='<option value="">Ningún país coincide</option>';
+  }else{
+    if(opts.length>1) sel.innerHTML='<option value="">Selecciona un país…</option>';
+    opts.forEach(o=>{
+      const op=document.createElement("option");
+      op.value=fxOptionKey(o);
+      op.textContent=`${o.country} — ${o.currency} (${o.code})`;
+      sel.appendChild(op);
+    });
+    // Con una sola coincidencia queda ya elegida: basta pulsar Añadir.
+    if(opts.length===1) sel.value=fxOptionKey(opts[0]);
+  }
+  const info=document.getElementById("fx-country-count");
+  if(info) info.textContent=q.trim()
+    ? `${opts.length} de ${fxPickerOptions().length} coinciden con "${q.trim()}"`
+    : `${opts.length} países y monedas disponibles`;
 }
 
 // Añade la fila ya rellena; solo queda escribir la tasa.
@@ -1789,7 +1825,9 @@ function addFxRowFromPicker(){
   }
   fxRows.push(row);
   renderFxRows();
-  sel.value="";
+  const buscador=document.getElementById("fx-country-search");
+  if(buscador) buscador.value="";
+  populateFxCountryPicker();     // repuebla la lista completa y resetea el selector
   // Poner el foco en la tasa de la fila nueva, que es lo único que falta.
   const inputs=document.querySelectorAll("#fx-rows .fx-row-edit:last-child input");
   if(inputs.length>=5) inputs[4].focus();
@@ -2010,6 +2048,13 @@ window.addEventListener("message",(e)=>{
   const el=document.getElementById(id);
   if(el) el.addEventListener("input",()=>{ syncFxPreset(); renderFxPreview(); });
 });
+(()=>{
+  const b=document.getElementById("fx-country-search");
+  if(!b) return;
+  b.addEventListener("input",()=>populateFxCountryPicker());
+  // Enter añade directamente, que es lo natural tras teclear el país.
+  b.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); addFxRowFromPicker(); } });
+})();
 window.addEventListener("resize",()=>renderFxPreview());
 
 function renderFxSaved(){

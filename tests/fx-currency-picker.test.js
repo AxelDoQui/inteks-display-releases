@@ -48,6 +48,7 @@ function loadPicker() {
     fxPickerOptions: () => norm(ctx.fxPickerOptions()),
     fxRowFromKey: k => norm(ctx.fxRowFromKey(k)),
     fxOptionKey: o => ctx.fxOptionKey(o),
+    fxFilterOptions: q => norm(ctx.fxFilterOptions(ctx.fxPickerOptions(), q)),
   };
 }
 
@@ -126,6 +127,55 @@ test("toda opción con bandera tiene su SVG en vendor/flags", () => {
     .map(o => `${o.country}/${o.code} (${o.flag})`);
   assert.deepStrictEqual(rotas, [],
     "Apuntan a una bandera que no existe en vendor/flags: " + rotas.join(", "));
+});
+
+// ── Buscador ───────────────────────────────────────────────────────────────
+
+test("buscar por nombre de país", () => {
+  const { fxFilterOptions } = loadPicker();
+  const r = fxFilterOptions("vene");
+  assert.deepStrictEqual(r.map(o => o.code), ["VEF", "USD"]);
+});
+
+test("la búsqueda ignora acentos en ambos sentidos", () => {
+  const { fxFilterOptions } = loadPicker();
+  // Escribir sin acento debe encontrar el país acentuado...
+  assert.ok(fxFilterOptions("panama").some(o => o.country === "Panamá"),
+    "'panama' deberia encontrar Panamá");
+  assert.ok(fxFilterOptions("peru").some(o => o.country === "Perú"),
+    "'peru' deberia encontrar Perú");
+  // ...y escribirlo con acento también.
+  assert.ok(fxFilterOptions("Perú").some(o => o.country === "Perú"),
+    "'Perú' deberia encontrarse a si mismo");
+});
+
+test("la búsqueda no distingue mayúsculas", () => {
+  const { fxFilterOptions } = loadPicker();
+  assert.ok(fxFilterOptions("HONDURAS").some(o => o.country === "Honduras"));
+});
+
+test("se puede buscar por código de moneda", () => {
+  const { fxFilterOptions, fxPickerOptions } = loadPicker();
+  const esperados = fxPickerOptions().filter(o => o.code === "USD").length;
+  assert.strictEqual(fxFilterOptions("usd").length, esperados);
+  assert.ok(esperados > 1, "deberia haber varias opciones en dolares");
+});
+
+test("se puede buscar por nombre de moneda", () => {
+  const { fxFilterOptions } = loadPicker();
+  const r = fxFilterOptions("lempira");
+  assert.deepStrictEqual(r.map(o => o.country), ["Honduras"]);
+});
+
+test("sin texto devuelve todas las opciones", () => {
+  const { fxFilterOptions, fxPickerOptions } = loadPicker();
+  assert.strictEqual(fxFilterOptions("").length, fxPickerOptions().length);
+  assert.strictEqual(fxFilterOptions("   ").length, fxPickerOptions().length);
+});
+
+test("una búsqueda sin resultados devuelve lista vacía", () => {
+  const { fxFilterOptions } = loadPicker();
+  assert.deepStrictEqual(fxFilterOptions("zzzzz"), []);
 });
 
 test("XAF es la única sin bandera, y se queda vacía en vez de rota", () => {
