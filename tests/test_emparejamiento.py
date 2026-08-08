@@ -7,7 +7,7 @@ mando, que es justo lo incomodo.
 
 Ejecutar:  python tests/test_emparejamiento.py
 """
-import json, os, shutil, subprocess, sys, tempfile, time, urllib.request, urllib.error
+import json, os, shutil, subprocess, sys, tempfile, threading, time, urllib.request, urllib.error
 
 SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PORT = 8086
@@ -167,8 +167,33 @@ def main():
         # Es lo contrario de eliminar. La pantalla sigue ahi con todo lo suyo;
         # solo el televisor olvida quien era, para poder reenlazarlo desde el
         # panel sin levantarse a tocarlo.
+        # El aviso tiene que LLEGAR al televisor. Si no, desenlazar desde el
+        # panel no haria nada visible y habria que ir a tocar la pantalla con
+        # el mando, que es justo lo que este boton evita.
+        recibido = []
+
+        def escuchar():
+            try:
+                r = urllib.request.urlopen(
+                    base + "/api/events?screen=TV-Escaparate", timeout=15)
+                for linea in r:
+                    txt = linea.decode(errors="replace").strip()
+                    if txt.startswith("data:"):
+                        recibido.append(txt)
+                        if "unlink" in txt:
+                            break
+            except Exception:
+                pass
+
+        hilo = threading.Thread(target=escuchar, daemon=True)
+        hilo.start()
+        time.sleep(1.0)          # que al SSE le de tiempo a registrarse
+
         r7 = req("/api/screen-unlink", {"screen": "TV-Escaparate"}, tok=TOKEN)
         check(r7.get("ok"), "se puede desenlazar una pantalla")
+        hilo.join(timeout=5)
+        check(any("unlink:TV-Escaparate" in x for x in recibido),
+              f"el aviso llega al televisor por SSE -> {recibido}")
 
         cont = json.load(open(cpath))["screens"].get("TV-Escaparate", {})
         check(len(cont.get("playlist", [])) == 1,
