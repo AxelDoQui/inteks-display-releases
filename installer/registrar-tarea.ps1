@@ -67,8 +67,23 @@ try {
     Register-ScheduledTask -TaskName $TAREA -Action $accion -Trigger $disparador `
         -Principal $principal -Settings $ajustes -Force -ErrorAction Stop | Out-Null
 
+    # IMPRESCINDIBLE al actualizar: Python carga el .py en memoria al arrancar,
+    # así que copiar archivos nuevos NO cambia un proceso que ya está corriendo.
+    # Sin este reinicio, tras actualizar se quedaba sirviendo el HTML nuevo
+    # (que se lee del disco en cada peticion) con el codigo viejo en memoria:
+    # endpoints inexistentes, 401 raros y ningun mensaje que lo explicara.
+    # Start-ScheduledTask no hace nada si la tarea ya corre: hay que pararla.
+    Stop-ScheduledTask -TaskName $TAREA -ErrorAction SilentlyContinue
+    Get-Process pythonw -ErrorAction SilentlyContinue |
+        Where-Object { $_.Path -and $_.Path -like "*python*" } |
+        ForEach-Object {
+            # Solo los que estén sirviendo ESTE server.py, no otros pythonw
+            try { if ((Get-CimInstance Win32_Process -Filter "ProcessId=$($_.Id)").CommandLine -like "*$($AppDir.Replace('\','\\'))*") { Stop-Process -Id $_.Id -Force } } catch {}
+        }
+    Start-Sleep -Milliseconds 800
     Start-ScheduledTask -TaskName $TAREA -ErrorAction SilentlyContinue
-    Write-Host "Tarea '$TAREA' registrada y arrancada." -ForegroundColor Green
+
+    Write-Host "Tarea '$TAREA' registrada y (re)arrancada." -ForegroundColor Green
     exit 0
 } catch {
     Write-Host "ERROR registrando la tarea: $_" -ForegroundColor Red
