@@ -6,210 +6,120 @@
 <title>Enlazar pantalla — SignalOS Pro</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100vw;height:100vh;background:#07182b;color:#eaf1f9;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;padding:20px}
-.container{width:100%;max-width:500px;text-align:center}
-.logo{font-family:'Space Mono',monospace;font-size:12px;letter-spacing:3px;color:#FF7F00;margin-bottom:30px;font-weight:600}
-h1{font-size:24px;font-weight:500;margin-bottom:10px;letter-spacing:2px}
-.subtitle{font-size:14px;color:#7a8ca3;margin-bottom:40px;line-height:1.6}
+html,body{width:100vw;height:100vh;background:#07182b;color:#eaf1f9;
+  font-family:'DM Sans',system-ui,sans-serif;display:flex;align-items:center;
+  justify-content:center;padding:4vmin;overflow:hidden;cursor:none}
+.container{text-align:center;max-width:92vw}
+.logo{font-family:'Space Mono',ui-monospace,monospace;font-size:clamp(11px,1.6vmin,16px);
+  letter-spacing:4px;color:#FF7F00;margin-bottom:5vmin;font-weight:600}
+h1{font-size:clamp(18px,3.4vmin,34px);font-weight:500;margin-bottom:1.5vmin;letter-spacing:2px}
+.subtitle{font-size:clamp(13px,2.1vmin,20px);color:#7a8ca3;margin-bottom:6vmin;line-height:1.6}
 
-.otp-inputs{display:flex;gap:8px;justify-content:center;margin-bottom:40px;flex-wrap:wrap}
-.otp-input{width:50px;height:50px;font-size:24px;font-weight:700;text-align:center;border:2px solid #1d3a5c;background:#0A2540;color:#FF7F00;border-radius:8px;font-family:monospace;cursor:text}
-.otp-input:focus{outline:none;border-color:#FF7F00;box-shadow:0 0 10px rgba(255,127,0,.2)}
+/* El código es lo único que hay que leer desde lejos, a veces desde la otra
+   punta del local, así que manda sobre todo lo demás. */
+.code{font-family:'Space Mono',ui-monospace,monospace;font-weight:700;
+  font-size:clamp(64px,22vmin,240px);letter-spacing:clamp(8px,2.5vmin,28px);
+  color:#FF7F00;line-height:1;margin:0 0 5vmin;
+  text-shadow:0 0 clamp(20px,4vmin,60px) rgba(255,127,0,.25)}
+.code.cargando{color:#1d3a5c;text-shadow:none}
 
-.form-group{margin-bottom:24px}
-.label{display:block;font-size:12px;color:#7a8ca3;margin-bottom:8px;text-align:left;letter-spacing:1px;text-transform:uppercase;font-family:'Space Mono',monospace}
-.text-input{width:100%;padding:14px;font-size:16px;border:1px solid #1d3a5c;background:#0A2540;color:#eaf1f9;border-radius:8px;font-family:'DM Sans',sans-serif}
-.text-input:focus{outline:none;border-color:#FF7F00}
-.text-input::placeholder{color:#7a8ca3}
+.hint{font-size:clamp(12px,1.9vmin,18px);color:#7a8ca3;line-height:1.7}
+.hint strong{color:#eaf1f9;font-weight:600}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#FF7F00;
+  margin-right:8px;animation:latido 1.4s ease-in-out infinite}
+@keyframes latido{0%,100%{opacity:.25}50%{opacity:1}}
 
-.buttons{display:flex;gap:10px}
-.btn{flex:1;padding:14px;font-size:14px;font-weight:500;border:none;border-radius:8px;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif}
-.btn-primary{background:#FF7F00;color:#111;border:none}
-.btn-primary:hover{background:#e67200}
-.btn-primary:disabled{background:#7a8ca3;cursor:not-allowed;color:rgba(17,17,17,.5)}
-.btn-secondary{background:transparent;border:1px solid #1d3a5c;color:#eaf1f9}
-.btn-secondary:hover{border-color:#FF7F00;color:#FF7F00}
-
-.status{margin-top:20px;padding:12px;border-radius:8px;font-size:13px;display:none}
-.status.loading{background:rgba(255,127,0,.1);border:1px solid rgba(255,127,0,.3);color:#FF7F00;display:block}
-.status.error{background:rgba(240,80,80,.1);border:1px solid rgba(240,80,80,.3);color:#f05050;display:block}
-.status.success{background:rgba(64,192,128,.1);border:1px solid rgba(64,192,128,.3);color:#40c080;display:block}
-
-.spinner{display:inline-block;width:12px;height:12px;border:2px solid transparent;border-top-color:#FF7F00;border-radius:50%;animation:spin .8s linear infinite;margin-right:6px}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-.hint{font-size:11px;color:#7a8ca3;margin-top:10px;line-height:1.5}
+.error{margin-top:4vmin;font-size:clamp(12px,1.9vmin,18px);color:#f05050;display:none}
+.pie{position:fixed;bottom:3vmin;left:0;right:0;text-align:center;
+  font-size:clamp(10px,1.5vmin,14px);color:#3a5170;font-family:'Space Mono',ui-monospace,monospace;
+  letter-spacing:1px}
 </style>
 </head>
 <body>
 <div class="container">
   <div class="logo">SIGNAL/OS PRO</div>
   <h1>Enlazar pantalla</h1>
-  <p class="subtitle">Introduce el código PIN que te proporcione el administrador</p>
+  <div class="subtitle">Escribe este código en el panel de administración</div>
 
-  <div class="form-group">
-    <label class="label">Código PIN (6 dígitos)</label>
-    <div class="otp-inputs" id="otpContainer"></div>
+  <div class="code cargando" id="code">····</div>
+
+  <div class="hint">
+    <span class="dot"></span>Esperando a que le pongas nombre desde el ordenador<br>
+    Panel de administración → <strong>Pantallas</strong> → <strong>Esperando para enlazar</strong>
   </div>
 
-  <div class="form-group">
-    <label class="label">Nombre de la pantalla</label>
-    <input type="text" class="text-input" id="screenName" placeholder="ej: caja-1, videowall-entrada..." maxlength="30">
-    <p class="hint">Usa un nombre descriptivo para identificar esta pantalla</p>
-  </div>
-
-  <div class="buttons">
-    <button class="btn btn-secondary" onclick="resetForm()">Limpiar</button>
-    <button class="btn btn-primary" id="connectBtn" onclick="connectScreen()">Conectar pantalla</button>
-  </div>
-
-  <div class="status" id="status"></div>
+  <div class="error" id="error"></div>
 </div>
+<div class="pie" id="pie"></div>
 
 <script>
-const OTP_LENGTH = 6;
-let otpValues = new Array(OTP_LENGTH).fill("");
+// Emparejamiento inverso: es la PANTALLA la que pide un código y lo muestra, y
+// el nombre se le pone desde el ordenador. Antes era al revés —el admin
+// generaba un PIN y había que teclearlo aquí con el mando del televisor—, que
+// es justo lo incómodo. Leer un número en la pantalla y escribirlo con un
+// teclado de verdad es mucho más fácil.
+const elCode = document.getElementById("code");
+const elError = document.getElementById("error");
+let token = null, sondeo = null;
 
-function initOTP() {
-  const container = document.getElementById("otpContainer");
-  container.innerHTML = "";
-  for (let i = 0; i < OTP_LENGTH; i++) {
-    const input = document.createElement("input");
-    input.type = "text";
-    input.inputMode = "numeric";
-    input.maxLength = "1";
-    input.className = "otp-input";
-    input.id = `otp-${i}`;
-    input.addEventListener("input", (e) => handleOtpInput(e, i));
-    input.addEventListener("keydown", (e) => handleOtpKeydown(e, i));
-    input.addEventListener("paste", handleOtpPaste);
-    container.appendChild(input);
-  }
-  document.getElementById("otp-0").focus();
+function fallo(msg){
+  elError.textContent = msg;
+  elError.style.display = "block";
 }
 
-function handleOtpInput(e, index) {
-  const value = e.target.value;
-  if (!/^\d*$/.test(value)) {
-    e.target.value = "";
-    return;
-  }
-  otpValues[index] = value;
-  if (value && index < OTP_LENGTH - 1) {
-    document.getElementById(`otp-${index + 1}`).focus();
-  }
-}
-
-function handleOtpKeydown(e, index) {
-  if (e.key === "Backspace" && !e.target.value && index > 0) {
-    document.getElementById(`otp-${index - 1}`).focus();
-  } else if (e.key === "ArrowLeft" && index > 0) {
-    document.getElementById(`otp-${index - 1}`).focus();
-  } else if (e.key === "ArrowRight" && index < OTP_LENGTH - 1) {
-    document.getElementById(`otp-${index + 1}`).focus();
+async function pedirCodigo(){
+  elError.style.display = "none";
+  elCode.classList.add("cargando");
+  elCode.textContent = "····";
+  try{
+    const r = await fetch("/api/pair-request", {method:"POST"});
+    const d = await r.json();
+    if(!d.ok || !d.code) throw new Error("respuesta inesperada");
+    token = d.token;
+    elCode.textContent = d.code;
+    elCode.classList.remove("cargando");
+    arrancarSondeo();
+  }catch(e){
+    // Sin servidor no hay código posible. Se reintenta solo: la pantalla puede
+    // encenderse antes que el PC, y nadie va a estar delante para recargar.
+    fallo("Sin conexión con el servidor. Reintentando…");
+    setTimeout(pedirCodigo, 5000);
   }
 }
 
-function handleOtpPaste(e) {
-  e.preventDefault();
-  const pastedText = (e.clipboardData || window.clipboardData).getData("text");
-  const digits = pastedText.replace(/\D/g, "").split("").slice(0, OTP_LENGTH);
-  digits.forEach((digit, i) => {
-    otpValues[i] = digit;
-    document.getElementById(`otp-${i}`).value = digit;
-  });
-  if (digits.length === OTP_LENGTH) {
-    document.getElementById("connectBtn").focus();
-  }
+function arrancarSondeo(){
+  clearInterval(sondeo);
+  sondeo = setInterval(comprobar, 2000);
 }
 
-function resetForm() {
-  otpValues = new Array(OTP_LENGTH).fill("");
-  document.getElementById("screenName").value = "";
-  document.querySelectorAll(".otp-input").forEach(input => input.value = "");
-  hideStatus();
-  document.getElementById("otp-0").focus();
-}
-
-function getOTP() {
-  return otpValues.join("");
-}
-
-// Si se llegó por el QR (con ?pin=XXXXXX), rellenar el PIN automáticamente
-function prefillPinFromURL() {
-  const pin = (new URLSearchParams(location.search).get("pin") || "").replace(/\D/g, "").slice(0, OTP_LENGTH);
-  if (!pin.length) return;
-  pin.split("").forEach((d, i) => {
-    otpValues[i] = d;
-    const el = document.getElementById(`otp-${i}`);
-    if (el) el.value = d;
-  });
-  const nameEl = document.getElementById("screenName");
-  if (nameEl) nameEl.focus();  // solo falta escribir el nombre
-}
-
-function showStatus(message, type) {
-  const status = document.getElementById("status");
-  status.textContent = message;
-  status.className = `status ${type}`;
-}
-
-function hideStatus() {
-  document.getElementById("status").className = "status";
-}
-
-async function connectScreen() {
-  const pin = getOTP();
-  const screenName = document.getElementById("screenName").value.trim();
-
-  if (pin.length !== OTP_LENGTH) {
-    showStatus("Por favor, completa el código PIN", "error");
-    return;
-  }
-  if (!screenName) {
-    showStatus("Por favor, proporciona un nombre para la pantalla", "error");
-    return;
-  }
-
-  const btn = document.getElementById("connectBtn");
-  btn.disabled = true;
-  showStatus("<span class='spinner'></span>Conectando...", "loading");
-
-  try {
-    const response = await fetch("/api/pair", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pin, screen_name: screenName })
+async function comprobar(){
+  if(!token) return;
+  try{
+    const r = await fetch("/api/pair-status", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({token})
     });
-
-    const data = await response.json();
-
-    if (response.ok && data.ok) {
-      // Recordar esta identidad en el dispositivo: así, tras un reinicio, el TV
-      // abre la URL pelada y reanuda solo, sin volver a pedir el código.
-      try { localStorage.setItem("signalos_screen_id", screenName); } catch (e) {}
-      showStatus("✓ ¡Pantalla conectada! Redirigiendo...", "success");
-      setTimeout(() => {
-        // Redirigir manteniendo el MISMO host por el que entró la tablet (IP o nombre),
-        // en vez de la IP que adivine el servidor (más fiable en Android)
-        window.location.href = `/player.html?screen=${encodeURIComponent(screenName)}`;
-      }, 1500);
-    } else {
-      showStatus(`✗ Error: ${data.error || "No se pudo conectar"}`, "error");
-      btn.disabled = false;
+    const d = await r.json();
+    if(d.expired){                       // el servidor se reinició y olvidó el token
+      clearInterval(sondeo); token = null;
+      pedirCodigo();
+      return;
     }
-  } catch (error) {
-    showStatus("✗ Error de conexión. Intenta de nuevo.", "error");
-    btn.disabled = false;
-  }
+    if(d.claimed && d.screen){
+      clearInterval(sondeo);
+      try{ localStorage.setItem("signalos_screen_id", d.screen); }catch(e){}
+      elCode.textContent = "✓";
+      document.querySelector(".subtitle").textContent = "Enlazada como «" + d.screen + "»";
+      document.querySelector(".hint").innerHTML = "Iniciando…";
+      setTimeout(()=>{ location.replace("/player.html?screen=" + encodeURIComponent(d.screen)); }, 1200);
+    }
+  }catch(e){ /* corte pasajero: el siguiente sondeo lo resuelve */ }
 }
 
-// Inicializar
-initOTP();
-prefillPinFromURL();
-document.getElementById("screenName").focus = function() {
-  setTimeout(() => document.getElementById("screenName").focus(), 100);
-};
+// Pie con la dirección, útil para saber a qué servidor está mirando la pantalla
+document.getElementById("pie").textContent = location.host;
+
+pedirCodigo();
 </script>
 </body>
 </html>

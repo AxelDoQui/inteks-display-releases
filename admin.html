@@ -193,24 +193,20 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     </div>
   </div>
 
-  <!-- Panel de enlace por PIN -->
-  <div class="card" style="background:rgba(255,127,0,.08);border-color:rgba(255,127,0,.3);margin-bottom:20px">
-    <div class="card-title" style="color:var(--accent)">Enlazar nueva pantalla por PIN</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:center">
-      <div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;letter-spacing:1px">CÓDIGO PIN (válido 10 min)</div>
-        <div style="background:var(--s2);border:2px solid rgba(255,127,0,.5);border-radius:var(--r);padding:20px;text-align:center;margin-bottom:12px">
-          <div id="pin-display" style="font-size:42px;font-weight:700;font-family:monospace;color:var(--accent);letter-spacing:6px;margin-bottom:10px">——</div>
-          <div id="pin-countdown" style="font-size:12px;color:var(--muted)">—</div>
-        </div>
-        <button class="btn btn-a2" onclick="regeneratePin()" style="width:100%;margin-bottom:10px"><i class="fa-solid fa-arrows-rotate"></i> Nuevo PIN</button>
-      </div>
-      <div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:10px">ESCANEAR DESDE TABLET</div>
-        <div id="pin-qr" style="background:#fff;border-radius:var(--r);padding:10px;display:flex;align-items:center;justify-content:center;min-height:150px"></div>
-        <p style="font-size:11px;color:var(--muted);margin-top:10px;text-align:center">O abre en la tablet:<br><strong id="pair-url-text">http://signage.local/pair</strong><br><span id="pair-url-ip" style="opacity:.65"></span></p>
-      </div>
+  <!-- Pantallas esperando a que se les ponga nombre.
+       El codigo lo genera y lo muestra la PANTALLA; aqui solo se le pone
+       nombre. Antes era al reves y habia que teclear el PIN con el mando. -->
+  <div class="card" id="pair-card" style="background:rgba(255,127,0,.08);border-color:rgba(255,127,0,.3);margin-bottom:20px">
+    <div class="card-title" style="color:var(--accent)">
+      <i class="fa-solid fa-tv"></i> Esperando para enlazar
+      <span id="pair-count" class="pill" style="margin-left:8px"></span>
     </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">
+      Enciende la pantalla y abre en ella <strong id="pair-url-text" style="color:var(--text)">http://signage.local/pair</strong>
+      <span id="pair-url-ip" style="opacity:.7"></span>.
+      Mostrará un código; búscalo aquí abajo y ponle nombre.
+    </p>
+    <div id="pair-pending-list"></div>
   </div>
 
   <!-- Tarjeta de conexión de pantallas -->
@@ -2525,96 +2521,81 @@ function toast(msg,isErr){
   clearTimeout(toastT);toastT=setTimeout(()=>t.className="",2500);
 }
 
-// ── PIN Linking System
-let pinRefreshInterval=null;
-
+// ── Pantallas esperando a que se les ponga nombre
+// El codigo lo genera y lo muestra la PANTALLA. Aqui solo se le asigna nombre.
+// Antes el admin generaba un PIN y habia que teclearlo en el televisor con el
+// mando: leer un numero en la pantalla y escribirlo con teclado es mas facil.
 let serverInfo=null;
-async function loadPin(){
+
+async function loadPairPending(){
+  const cont=document.getElementById("pair-pending-list");
+  if(!cont) return;
+  let pend=[];
   try{
-    const res=await fetch("/api/pin");
-    if(res.ok){
-      const data=await res.json();
-      displayPin(data.pin, data.expires_in);
+    const r=await fetch("/api/pair-pending");
+    if(!r.ok) return;                       // sesion caducada: no ensuciar la vista
+    pend=(await r.json()).pending||[];
+  }catch(e){ return; }
 
-      // Info del servidor: nombre mDNS (signage.local) + IP de respaldo
-      try{
-        const infoRes=await fetch("/api/info");
-        if(infoRes.ok) serverInfo=await infoRes.json();
-      }catch(e){}
+  const badge=document.getElementById("pair-count");
+  if(badge) badge.textContent=pend.length?pend.length:"";
 
-      if(serverInfo){
-        const tEl=document.getElementById("pair-url-text");
-        const ipEl=document.getElementById("pair-url-ip");
-        if(tEl) tEl.textContent=serverInfo.pair_url;             // http://signage.local/pair
-        if(ipEl) ipEl.textContent="(o "+serverInfo.pair_url_ip+")"; // respaldo por IP
-      }
-
-      generatePinQR(data.pin);
-    }
-  }catch(e){console.error("Error loading PIN", e);}
-}
-
-function displayPin(pin, expiresIn){
-  const pinEl=document.getElementById("pin-display");
-  const countdownEl=document.getElementById("pin-countdown");
-
-  if(!pinEl) return;
-
-  // Mostrar PIN formateado (ej: 12 34 56)
-  const formatted=pin.match(/.{1,2}/g)?.join(" ")||pin;
-  pinEl.textContent=formatted;
-
-  // Contar hacia atrás
-  let remaining=expiresIn;
-  const updateCountdown=()=>{
-    const mins=Math.floor(remaining/60);
-    const secs=remaining%60;
-    countdownEl.textContent=`⏱ Expira en ${mins}:${String(secs).padStart(2,"0")}`;
-    remaining--;
-    if(remaining<0) loadPin();
-  };
-
-  updateCountdown();
-  clearInterval(pinRefreshInterval);
-  pinRefreshInterval=setInterval(updateCountdown, 1000);
-}
-
-function generatePinQR(pin){
-  const qrContainer=document.getElementById("pin-qr");
-  if(!qrContainer) return;
-
-  qrContainer.innerHTML="";
-  try{
-    // El QR usa la IP (no el nombre mDNS) para que el escaneo funcione en cualquier tablet.
-    // Incluye el PIN para que la tablet lo rellene sola (solo hay que poner el nombre).
-    const base=(serverInfo&&serverInfo.pair_url_ip)||(location.origin+"/pair");
-    const pairUrl=base+"?pin="+encodeURIComponent(pin);
-    new QRCode(qrContainer, {
-      text: pairUrl,
-      width: 150,
-      height: 150,
-      colorDark: "#000",
-      colorLight: "#fff",
-      correctLevel: QRCode.CorrectLevel.H
-    });
-  }catch(e){
-    console.error("Error generating PIN QR", e);
+  if(!pend.length){
+    cont.innerHTML='<div style="font-size:12px;color:var(--muted);padding:10px 0">'+
+      'Ninguna pantalla esperando ahora mismo.</div>';
+    return;
   }
+  // Solo se repinta si cambian los codigos, para no borrar lo que se esta
+  // escribiendo en el campo de nombre mientras se sondea cada 3 segundos.
+  const firma=pend.map(p=>p.code).join(",");
+  if(cont.dataset.firma===firma) return;
+  cont.dataset.firma=firma;
+
+  cont.innerHTML="";
+  pend.forEach(p=>{
+    const el=document.createElement("div");
+    el.style.cssText="display:flex;align-items:center;gap:12px;background:var(--s2);"+
+      "border:1px solid var(--b);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;flex-wrap:wrap";
+    el.innerHTML='<div style="font-family:monospace;font-size:30px;font-weight:700;'+
+      'color:var(--accent);letter-spacing:4px;min-width:120px">'+p.code+'</div>'+
+      '<input class="finput" placeholder="Nombre: caja-1, escaparate..." '+
+      'style="flex:1;min-width:200px" data-code="'+p.code+'">'+
+      '<button class="btn btn-accent"><i class="fa-solid fa-link"></i> Enlazar</button>'+
+      '<div style="font-size:11px;color:var(--muted);width:100%">esperando desde hace '+p.waiting_for+' s</div>';
+    const inp=el.querySelector("input"), btn=el.querySelector("button");
+    const enlazar=()=>claimPairing(p.code, inp.value, cont);
+    btn.addEventListener("click", enlazar);
+    inp.addEventListener("keydown", e=>{ if(e.key==="Enter") enlazar(); });
+    cont.appendChild(el);
+  });
 }
 
-async function regeneratePin(){
+async function claimPairing(code, nombre, cont){
+  nombre=(nombre||"").trim();
+  if(!nombre){ toast("Ponle un nombre a la pantalla",true); return; }
   try{
-    const res=await fetch("/api/pin?regenerate=1");
-    if(res.ok){
-      const data=await res.json();
-      displayPin(data.pin, data.expires_in);
-      generatePinQR(data.pin);
-      toast("Nuevo PIN generado ✓");
-    }
-  }catch(e){
-    console.error("Error regenerating PIN", e);
-    toast("Error al generar nuevo PIN", true);
-  }
+    const r=await fetch("/api/pair-claim",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({code, screen_name:nombre})});
+    const d=await r.json();
+    if(!d.ok){ toast(d.error||"No se pudo enlazar",true); return; }
+    toast("Pantalla «"+nombre+"» enlazada ✓");
+    if(cont) cont.dataset.firma="";        // forzar repintado
+    await loadPairPending();
+    await loadScreens();
+  }catch(e){ toast("Error al enlazar",true); }
+}
+
+async function loadPairInfo(){
+  try{
+    const r=await fetch("/api/info");
+    if(!r.ok) return;
+    serverInfo=await r.json();
+    const t=document.getElementById("pair-url-text");
+    const ip=document.getElementById("pair-url-ip");
+    if(t) t.textContent=serverInfo.pair_url;
+    if(ip) ip.textContent="(o "+serverInfo.pair_url_ip+")";
+  }catch(e){}
 }
 
 // ── QR Module
@@ -2975,11 +2956,12 @@ renderComparisonSaved();
 renderCountdownSaved();
 loadServerInfo();
 loadSettings();
-loadPin();
+loadPairInfo();
+loadPairPending();
 connectSSE();
 loadAll();
 setInterval(loadScreens,8000);
-setInterval(loadPin,1000);
+setInterval(loadPairPending,3000);
 </script>
 </body>
 </html>
