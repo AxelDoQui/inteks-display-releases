@@ -738,6 +738,7 @@ JPY  Yen        162.5"></textarea>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <span style="font-weight:500">Estado actual</span>
       </div>
+      <div>Versión instalada: <strong id="set-version" style="color:var(--text)">—</strong></div>
       <div>Puerto en uso: <strong id="set-current-port" style="color:var(--text)">—</strong></div>
       <div>IP del portátil: <strong id="set-current-ip" style="color:var(--text)">—</strong></div>
     </div>
@@ -3172,6 +3173,10 @@ async function loadServerInfo(){
       document.getElementById("player-url").textContent=url;
       document.getElementById("set-current-ip").textContent=info.ip;
       document.getElementById("set-current-port").textContent=info.port;
+      // Saber que version corre cada tienda: sin esto, dar soporte a varias
+      // instalaciones es adivinar que codigo tiene delante cada una.
+      const elV=document.getElementById("set-version");
+      if(elV) elV.textContent=info.version||"desconocida";
     }
   }catch(e){console.error("Error loading server info",e);}
 }

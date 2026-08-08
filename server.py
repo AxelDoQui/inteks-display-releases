@@ -17,6 +17,12 @@ from urllib.parse import urlparse, parse_qs
 # estáticos (html, vendor, assets) se leen de APP_DIR y todo lo que cambia se
 # guarda en DATA_DIR. En desarrollo ambos son la carpeta del proyecto, así que
 # nada cambia al trabajar desde el código.
+# Versión del programa. Está también en installer/setup.iss y package.json, y
+# tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
+# de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
+# adivinanza sobre qué código corre realmente ese equipo.
+APP_VERSION = "1.0.0"
+
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def pick_data_dir():
@@ -773,6 +779,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/info":
             ip = get_ip()
             info = {
+                "version": APP_VERSION,
                 "port": PORT,
                 "ip": ip,
                 "mdns_host": mdns_host(),
