@@ -41,6 +41,29 @@ def pick_data_dir():
 
 DATA_DIR = pick_data_dir()
 LOG_FILE = os.path.join(DATA_DIR, "server.log")
+MAX_LOG_BYTES = 2 * 1024 * 1024     # y se guarda una vuelta: 4 MB de techo
+_log_lock = threading.Lock()
+
+def _rotar_log():
+    """Aparta el registro cuando se hace grande y empieza otro.
+
+    Se abría en modo «añadir» y no se recortaba nunca. En el PC de una tienda,
+    encendido a diario durante años, eso solo crece: con un error que se repita
+    en bucle puede comerse el disco, y justo entonces el servidor se queda sin
+    poder escribir la pista de lo que está fallando.
+
+    Se guarda UNA sola vuelta anterior. Acumular .1, .2, .3... sería el mismo
+    problema repartido en más archivos.
+    """
+    try:
+        if os.path.getsize(LOG_FILE) < MAX_LOG_BYTES:
+            return
+    except OSError:
+        return                       # todavía no existe: nada que apartar
+    try:
+        os.replace(LOG_FILE, LOG_FILE + ".1")
+    except OSError:
+        pass                         # otro proceso lo tiene abierto: ya rotará
 
 def log(msg=""):
     """Escribe en la consola si la hay, y SIEMPRE en el log.
@@ -56,8 +79,13 @@ def log(msg=""):
     except Exception:
         pass
     try:
-        with open(LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}  {msg}\n")
+        # El candado importa: con ThreadingHTTPServer hay varios hilos
+        # escribiendo, y en Windows renombrar un archivo que otro tiene abierto
+        # falla.
+        with _log_lock:
+            _rotar_log()
+            with open(LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}  {msg}\n")
     except OSError:
         pass
 
