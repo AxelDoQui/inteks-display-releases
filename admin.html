@@ -324,7 +324,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
       <div class="fg"><label class="flabel">Color de fondo</label><input class="finput" id="fx-bg" type="color" value="#07182b" style="height:38px;padding:4px"></div>
       <div class="fg"><label class="flabel">Color de texto</label><input class="finput" id="fx-color" type="color" value="#ffffff" style="height:38px;padding:4px"></div>
     </div>
-    <div class="fg" style="margin-bottom:14px"><label class="flabel">Duración (seg)</label><input class="finput" id="fx-dur" type="number" value="15" min="5" style="width:90px"></div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+      <div class="fg"><label class="flabel">Duración (seg)</label><input class="finput" id="fx-dur" type="number" value="15" min="5" style="width:90px"></div>
+      <div class="fg">
+        <label class="flabel">Avisar si no se actualiza en (horas)</label>
+        <input class="finput" id="fx-stale" type="number" value="24" min="0" max="720" style="width:110px"
+               title="Pasado ese plazo, la fecha del tablero parpadea y la pantalla sale marcada en el panel. 0 desactiva el aviso.">
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin:-8px 0 14px;line-height:1.5">
+      El tablero muestra la fecha de <strong>las tasas</strong>, no la de hoy. Pasado el plazo,
+      esa fecha parpadea despacio para que lo veáis al pasar. Pon <strong>0</strong> para desactivarlo.
+    </div>
     <div class="fg" style="margin-bottom:14px"><label class="flabel">Mensaje al pie (opcional)</label><input class="finput" id="fx-note" placeholder="Ej: Tipos sujetos a variación sin previo aviso"></div>
     <div class="fg" style="margin-bottom:10px">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:500">
@@ -2222,7 +2233,13 @@ function updateFxLogoPreview(){
 }
 function saveFxModule(){
   const title=document.getElementById("fx-title").value||"Tipos de cambio";
-  const data={name:title,type:"fx",title,base_currency:document.getElementById("fx-base").value||"EUR",rows:[...fxRows],bg:document.getElementById("fx-bg").value,color:document.getElementById("fx-color").value,duration:parseInt(document.getElementById("fx-dur").value)||15,logo:fxLogo||"",footer_note:document.getElementById("fx-note").value.trim()};
+  // El sello de hora se pone SIEMPRE al guardar: guardar es confirmar que esas
+  // tasas valen ahora. Sin el, el tablero enseñaria la fecha de hoy aunque las
+  // tasas fueran de la semana pasada, que es justo lo que hacia antes.
+  const _stale=document.getElementById("fx-stale").value;
+  const data={name:title,type:"fx",title,base_currency:document.getElementById("fx-base").value||"EUR",rows:[...fxRows],bg:document.getElementById("fx-bg").value,color:document.getElementById("fx-color").value,duration:parseInt(document.getElementById("fx-dur").value)||15,logo:fxLogo||"",footer_note:document.getElementById("fx-note").value.trim(),
+    stale_hours:_stale===""?24:(parseFloat(_stale)||0),
+    updated_at:Date.now()/1000};
   if(!content.items)content.items=[];
   if(editingFxId){
     // Actualizar el módulo existente (conserva su id, así sigue en las playlists)
@@ -2251,6 +2268,8 @@ function editFxModule(id){
   document.getElementById("fx-color").value=item.color||"#ffffff";
   document.getElementById("fx-dur").value=item.duration||15;
   document.getElementById("fx-note").value=item.footer_note||"";
+  document.getElementById("fx-stale").value=
+    (item.stale_hours===undefined||item.stale_hours===null)?24:item.stale_hours;
   fxRows=(item.rows||[]).map(r=>({...r}));
   fxLogo=item.logo||""; updateFxLogoPreview();
   renderFxRows();
@@ -2261,6 +2280,7 @@ function editFxModule(id){
 }
 function cancelFxEdit(){
   editingFxId=null;
+  document.getElementById("fx-stale").value=24;
   document.getElementById("fx-save-btn").textContent="+ Añadir a librería";
   document.getElementById("fx-cancel-btn").style.display="none";
 }
@@ -2430,6 +2450,23 @@ window.addEventListener("message",(e)=>{
 })();
 window.addEventListener("resize",()=>renderFxPreview());
 
+// Cuanto hace que se confirmaron estas tasas, y si ya pasaron de plazo.
+// El sello lo pone tanto la extension al actualizar como el admin al guardar:
+// guardar es confirmar que esas tasas valen ahora.
+function frescuraFx(item){
+  const horas=(item.stale_hours===undefined||item.stale_hours===null||item.stale_hours==="")
+    ?24:parseFloat(item.stale_hours);
+  const ts=parseFloat(item.updated_at);
+  if(!ts||isNaN(ts)) return {caducado:false, texto:"sin fecha de actualización"};
+  const mins=Math.floor((Date.now()/1000-ts)/60);
+  const texto = mins<1 ? "actualizado ahora mismo"
+              : mins<60 ? `actualizado hace ${mins} min`
+              : mins<2880 ? `actualizado hace ${Math.floor(mins/60)} h`
+              : `actualizado hace ${Math.floor(mins/1440)} días`;
+  const caducado = horas>0 && (Date.now()/1000-ts) > horas*3600;
+  return {caducado, texto: caducado ? texto+" ⚠" : texto};
+}
+
 function renderFxSaved(){
   const c=document.getElementById("fx-saved-list");
   const items=(content.items||[]).filter(i=>i.type==="fx");
@@ -2438,7 +2475,8 @@ function renderFxSaved(){
   items.forEach(item=>{
     const el=document.createElement("div");
     el.style.cssText="background:var(--s1);border:1px solid var(--b);border-radius:var(--r);padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px";
-    el.innerHTML=`<i class="fa-solid fa-money-bill-trend-up" style="font-size:18px;color:var(--muted);width:22px;text-align:center"></i><div style="flex:1"><div style="font-size:13px;font-weight:500">${item.name}</div><div style="font-size:11px;color:var(--muted)">${(item.rows||[]).length} monedas · ${item.duration}s</div></div><button class="btn btn-a2 btn-sm" onclick="editFxModule('${item.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button><button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}',event)"><i class="fa-solid fa-xmark"></i></button>`;
+    const fresc=frescuraFx(item);
+    el.innerHTML=`<i class="fa-solid fa-money-bill-trend-up" style="font-size:18px;color:${fresc.caducado?"var(--danger, #f05050)":"var(--muted)"};width:22px;text-align:center"></i><div style="flex:1"><div style="font-size:13px;font-weight:500">${item.name}</div><div style="font-size:11px;color:var(--muted)">${(item.rows||[]).length} monedas · ${item.duration}s · <span style="color:${fresc.caducado?"#f05050":"var(--muted)"}">${fresc.texto}</span></div></div><button class="btn btn-a2 btn-sm" onclick="editFxModule('${item.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button><button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}',event)"><i class="fa-solid fa-xmark"></i></button>`;
     c.appendChild(el);
   });
 }

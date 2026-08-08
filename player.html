@@ -33,6 +33,10 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 .mod-fx-header{padding:3vh 4% 2vh;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:3%;--fx-title-size:clamp(16px,3.4vmin,40px)}
 .mod-fx-title{font-size:var(--fx-title-size);font-weight:700;letter-spacing:2px;text-transform:uppercase;min-width:0;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.15}
 .mod-fx-date{font-size:clamp(11px,1.7vmin,20px);opacity:.4;font-family:monospace;letter-spacing:1px;white-space:nowrap}
+/* Tasas pasadas de plazo. Parpadeo lento y discreto: lo ve el personal al
+   pasar, pero no monta un cartel delante del cliente. */
+.mod-fx-date.caducada{opacity:.85;animation:fxCaducada 2.4s ease-in-out infinite}
+@keyframes fxCaducada{0%,100%{opacity:.85}50%{opacity:.3}}
 .mod-fx-page{font-size:clamp(11px,1.7vmin,20px);opacity:.55;font-family:monospace;letter-spacing:1px;padding:2px 10px;border:1px solid rgba(255,255,255,.2);border-radius:99px;white-space:nowrap}
 .mod-fx-logo{height:var(--fx-title-size);max-width:26%;object-fit:contain;flex-shrink:0}
 /* Las filas se REPARTEN el alto disponible y la tipografía escala con el alto
@@ -200,6 +204,40 @@ if(PREVIEW) document.getElementById("waiting").style.display="none";
 if(URL_ROTATION!==null) applyRotation(URL_ROTATION);
 
 let playlist=[],current=0,timer=null,screenSchedule=null,screenConfig=null;
+
+// ── Frescura de las tasas ──────────────────────────────────────────────────
+// El tablero mostraba SIEMPRE la fecha de hoy, sacada del reloj del navegador.
+// Unas tasas de hace tres días salían con la fecha de hoy al lado: el propio
+// tablero certificaba que estaban recién puestas, y si un cliente reclama esa
+// fecha juega en contra de la casa de cambio.
+//
+// Ahora se enseña la fecha de LAS TASAS —el sello updated_at, que ya escribía
+// el servidor y no leía nadie— y, pasado un plazo, se atenúa para que el
+// personal lo note al pasar sin montar un cartel delante del cliente.
+var STALE_HORAS_POR_DEFECTO = 24;
+
+function horasDeCaducidad(item){
+  var h = (item||{}).stale_hours;
+  if(h === undefined || h === null || h === "") return STALE_HORAS_POR_DEFECTO;
+  h = parseFloat(h);
+  return isNaN(h) ? STALE_HORAS_POR_DEFECTO : h;
+}
+
+function tasasCaducadas(item, ahoraMs){
+  var horas = horasDeCaducidad(item);
+  if(!(horas > 0)) return false;                    // 0 = aviso desactivado
+  var ts = parseFloat((item||{}).updated_at);
+  if(!ts || isNaN(ts)) return false;                // sin sello no se acusa a nadie
+  return (ahoraMs/1000 - ts) > horas*3600;
+}
+
+function fechaTasas(item, ahoraMs){
+  var ts = parseFloat((item||{}).updated_at);
+  var d = (ts && !isNaN(ts)) ? new Date(ts*1000) : new Date(ahoraMs);
+  return String(d.getDate()).padStart(2,"0") + "/" +
+         String(d.getMonth()+1).padStart(2,"0") + "/" + d.getFullYear();
+}
+// ── fin de la frescura ─────────────────────────────────────────────────────
 
 // ── Resiliencia sin servidor ───────────────────────────────────────────────
 // Una pantalla de señalización no puede quedarse en negro porque el servidor se
@@ -386,8 +424,8 @@ function buildFxSlide(item){
         <div class="fx-rate-label">${item.base_currency||"EUR"} → ${r.code||""}</div>
       </div>
     </div>`).join("");
-  const _d=new Date();
-  const now=`${String(_d.getDate()).padStart(2,"0")}/${String(_d.getMonth()+1).padStart(2,"0")}/${_d.getFullYear()}`;
+  const now=fechaTasas(item, Date.now());
+  const caducadas=tasasCaducadas(item, Date.now());
   const logoHtml=item.logo?`<img src="${item.logo}" class="mod-fx-logo">`:"";
   // Pie fijo, visible en todas las páginas. Al ser hermano de .mod-fx-rows
   // (flex:1;min-height:0) le resta alto, y setupFxPagination recalcula solo.
@@ -398,7 +436,7 @@ function buildFxSlide(item){
       <div style="display:flex;align-items:center;gap:2vw">
         ${logoHtml}
         <span class="mod-fx-page" style="display:none"></span>
-        <div class="mod-fx-date">${now}</div>
+        <div class="mod-fx-date${caducadas?" caducada":""}">${now}</div>
       </div>
     </div>
     <div class="mod-fx-rows">${rows}</div>
