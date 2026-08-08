@@ -738,13 +738,19 @@ class Handler(BaseHTTPRequestHandler):
 
         # ── Página de emparejamiento
         if path == "/pair":
-            fp = "pair.html"
+            # Anclado a APP_DIR, no al directorio de trabajo. Este handler se
+            # quedó con la ruta relativa cuando se anclaron los demás estáticos:
+            # arrancado desde otra carpeta devolvía 404 y la pantalla no podía
+            # ni pedir su código.
+            fp = os.path.join(APP_DIR, "pair.html")
             if os.path.exists(fp):
                 mime,_ = mimetypes.guess_type(fp)
                 with open(fp,"rb") as f: data=f.read()
                 self.send_response(200); self.send_header("Content-Type", mime or "text/html")
                 self.send_header("Content-Length", str(len(data)))
-                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                # no-cache y no no-store, igual que el resto: "revalida" en vez
+                # de "prohibido guardar copia". Ver la resiliencia del player.
+                self.send_header("Cache-Control", "no-cache")
                 self.cors(); self.end_headers(); self.wfile.write(data)
             else:
                 self.send_response(404); self.end_headers(); self.wfile.write(b"404 - pair.html no encontrado")
