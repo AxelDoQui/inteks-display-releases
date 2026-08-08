@@ -40,6 +40,12 @@ function isActiveAt(at, { schedule = null, config = null, preview = false } = {}
     getDay() { return at.day; }
     getHours() { return at.hour; }
     getMinutes() { return at.minute; }
+    // Los festivos son fechas concretas, así que el reloj falso también tiene
+    // que saber en qué día del calendario estamos. Por defecto, un lunes
+    // cualquiera que no es festivo en ninguna parte.
+    getFullYear() { return at.year === undefined ? 2026 : at.year; }
+    getMonth() { return at.month === undefined ? 5 : at.month; }   // 0 = enero
+    getDate() { return at.date === undefined ? 15 : at.date; }
   }
   // PREVIEW es una dependencia real de isScreenActive(): en modo vista previa
   // la pantalla se muestra siempre, sin mirar el horario.
@@ -113,4 +119,73 @@ test("la vista previa del admin ignora el horario y siempre muestra contenido", 
   const fuera = { day: LUNES, hour: 3, minute: 0 };
   assert.strictEqual(isActiveAt(fuera, { schedule: diurno }), false);
   assert.strictEqual(isActiveAt(fuera, { schedule: diurno, preview: true }), true);
+});
+
+// ── Festivos ───────────────────────────────────────────────────────────────
+// El horario semanal no sabe de fiestas: el 25 de diciembre cae en un día
+// laborable cualquiera y la tienda está cerrada igual. Un festivo es una fecha
+// concreta que manda sobre la regla del día de la semana.
+
+// Un lunes 25 de diciembre de 2026, a mediodía: dentro del horario diurno.
+const NAVIDAD = { day: LUNES, hour: 12, minute: 0, year: 2026, month: 11, date: 25 };
+
+test("un festivo cerrado apaga la pantalla aunque el día de la semana esté abierto", () => {
+  const s = { ...diurno, holidays: [{ date: "2026-12-25", enabled: false }] };
+  assert.strictEqual(isActiveAt(NAVIDAD, { schedule: diurno }), true, "control: sin festivo, encendida");
+  assert.strictEqual(isActiveAt(NAVIDAD, { schedule: s }), false);
+});
+
+test("un festivo solo afecta a SU fecha", () => {
+  const s = { ...diurno, holidays: [{ date: "2026-12-25", enabled: false }] };
+  const otroDia = { day: LUNES, hour: 12, minute: 0, year: 2026, month: 11, date: 24 };
+  assert.strictEqual(isActiveAt(otroDia, { schedule: s }), true);
+});
+
+test("un festivo con horario reducido manda sobre el del día de la semana", () => {
+  // Nochebuena: se abre, pero solo por la mañana.
+  const s = { ...diurno, holidays: [{ date: "2026-12-24", enabled: true, start: "09:00", end: "14:00" }] };
+  const manana = { day: LUNES, hour: 11, minute: 0, year: 2026, month: 11, date: 24 };
+  const tarde  = { day: LUNES, hour: 17, minute: 0, year: 2026, month: 11, date: 24 };
+  assert.strictEqual(isActiveAt(manana, { schedule: s }), true);
+  assert.strictEqual(isActiveAt(tarde, { schedule: s }), false,
+    "a las 17:00 el horario normal abriria, pero el festivo manda");
+});
+
+test("un festivo abierto sin horas vale para todo el día", () => {
+  const s = { ...diurno, holidays: [{ date: "2026-12-25", enabled: true }] };
+  const madrugada = { day: LUNES, hour: 3, minute: 0, year: 2026, month: 11, date: 25 };
+  assert.strictEqual(isActiveAt(madrugada, { schedule: s }), true);
+});
+
+test("un festivo puede abrir un día que normalmente está cerrado", () => {
+  // Domingo de rebajas: el domingo no está ni configurado, y aun así se abre.
+  const s = { ...diurno, holidays: [{ date: "2026-12-27", enabled: true, start: "10:00", end: "14:00" }] };
+  const domingo = { day: 0, hour: 11, minute: 0, year: 2026, month: 11, date: 27 };
+  assert.strictEqual(isActiveAt(domingo, { schedule: diurno }), false, "control: domingo cerrado");
+  assert.strictEqual(isActiveAt(domingo, { schedule: s }), true);
+});
+
+test("con SOLO festivos configurados, el resto de días sigue encendido", () => {
+  // Si al configurar unos festivos se apagaran todas las pantallas el resto del
+  // año, el modo festivos sería una trampa.
+  const s = { holidays: [{ date: "2026-12-25", enabled: false }] };
+  assert.strictEqual(isActiveAt({ day: LUNES, hour: 4, minute: 0, date: 15 }, { schedule: s }), true);
+  assert.strictEqual(isActiveAt(NAVIDAD, { schedule: s }), false, "y el festivo sigue apagando");
+});
+
+test("always_on manda incluso sobre un festivo cerrado", () => {
+  const s = { ...diurno, holidays: [{ date: "2026-12-25", enabled: false }] };
+  assert.strictEqual(isActiveAt(NAVIDAD, { schedule: s, config: { always_on: true } }), true);
+});
+
+test("una lista de festivos vacía o con basura no rompe nada", () => {
+  assert.strictEqual(isActiveAt(NAVIDAD, { schedule: { ...diurno, holidays: [] } }), true);
+  assert.strictEqual(isActiveAt(NAVIDAD, { schedule: { ...diurno, holidays: [null, {}] } }), true);
+});
+
+test("un día de la semana abierto sin horas vale para todo el día", () => {
+  // Antes, enabled:true sin start/end dejaba la pantalla APAGADA las 24 horas,
+  // porque comparaba contra undefined. Silencioso y desconcertante.
+  const s = { lunes: { enabled: true } };
+  assert.strictEqual(isActiveAt({ day: LUNES, hour: 3, minute: 0 }, { schedule: s }), true);
 });

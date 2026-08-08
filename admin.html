@@ -853,6 +853,19 @@ JPY  Yen        162.5"></textarea>
     <div id="schedule-days-wrap">
       <div style="font-size:11px;color:var(--muted);margin-bottom:8px">HORARIO POR DÍAS</div>
       <div id="schedule-editor" style="display:grid;gap:10px;margin-bottom:14px"></div>
+
+      <div style="border-top:1px solid var(--b);padding-top:12px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px">
+          <div style="font-size:11px;color:var(--muted)">FESTIVOS Y DÍAS ESPECIALES</div>
+          <button class="btn btn-ghost btn-sm" onclick="anadirFestivo()"><i class="fa-solid fa-plus"></i> Añadir fecha</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">
+          Una fecha concreta manda sobre el horario del día de la semana. Deja las horas
+          vacías para todo el día. Sirve igual para cerrar en Navidad que para abrir un
+          domingo de rebajas.
+        </div>
+        <div id="sched-festivos"></div>
+      </div>
     </div>
 
     <div style="background:var(--s2);border:1px solid var(--b);border-radius:var(--r);padding:12px;margin-bottom:14px">
@@ -1177,8 +1190,64 @@ function openScheduleModal(sid){
     editor.appendChild(el);
   });
 
+  // Festivos: fechas concretas que mandan sobre el dia de la semana.
+  festivosEdit=(schedule.holidays||[]).filter(h=>h&&h.date).map(h=>({...h}));
+  renderFestivos();
+
   toggleAlwaysOn();  // mostrar/ocultar el editor de días según el modo 24/7
   document.getElementById("schedule-modal").classList.add("show");
+}
+
+// ── Festivos ───────────────────────────────────────────────────────────────
+// El horario semanal no sabe de fiestas: el 25 de diciembre cae en un dia
+// laborable cualquiera y la tienda esta cerrada igual.
+let festivosEdit=[];
+
+function renderFestivos(){
+  const c=document.getElementById("sched-festivos");
+  if(!c) return;
+  festivosEdit.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  if(!festivosEdit.length){
+    c.innerHTML='<div style="font-size:11px;color:var(--muted);padding:6px 0">'+
+      'Sin festivos. La pantalla sigue el horario semanal todo el año.</div>';
+    return;
+  }
+  const hoy=new Date().toISOString().slice(0,10);
+  c.innerHTML="";
+  festivosEdit.forEach((f,i)=>{
+    const pasado=f.date<hoy;
+    const el=document.createElement("div");
+    el.style.cssText="display:grid;grid-template-columns:150px 90px 1fr 1fr auto;gap:8px;"+
+      "align-items:center;background:var(--s2);border:1px solid var(--b);border-radius:var(--r);"+
+      "padding:8px 10px;margin-bottom:6px"+(pasado?";opacity:.45":"");
+    el.innerHTML=
+      `<input type="date" class="finput" style="font-size:11px" value="${f.date}" onchange="festivoCampo(${i},'date',this.value)">`+
+      `<label style="font-size:11px;cursor:pointer;white-space:nowrap"><input type="checkbox" ${f.enabled?"checked":""} onchange="festivoCampo(${i},'enabled',this.checked)" style="cursor:pointer"> abierto</label>`+
+      `<input type="time" class="finput" style="font-size:11px" value="${f.start||""}" ${f.enabled?"":"disabled"} onchange="festivoCampo(${i},'start',this.value)" title="Vacío = todo el día">`+
+      `<input type="time" class="finput" style="font-size:11px" value="${f.end||""}" ${f.enabled?"":"disabled"} onchange="festivoCampo(${i},'end',this.value)" title="Vacío = todo el día">`+
+      `<button class="btn btn-danger btn-sm" onclick="quitarFestivo(${i})"><i class="fa-solid fa-xmark"></i></button>`;
+    c.appendChild(el);
+  });
+}
+
+function festivoCampo(i,campo,valor){
+  if(!festivosEdit[i]) return;
+  festivosEdit[i][campo]=valor;
+  if(campo==="enabled") renderFestivos();   // habilita o apaga los campos de hora
+}
+
+function anadirFestivo(){
+  const hoy=new Date().toISOString().slice(0,10);
+  if(festivosEdit.some(f=>f.date===hoy)){
+    toast("Ya hay un festivo en esa fecha — cambia la fecha del nuevo",true);
+  }
+  festivosEdit.push({date:hoy, enabled:false});
+  renderFestivos();
+}
+
+function quitarFestivo(i){
+  festivosEdit.splice(i,1);
+  renderFestivos();
 }
 
 // Oculta el editor de días cuando la pantalla está en modo 24/7
@@ -1204,6 +1273,16 @@ function saveSchedule(){
     const end=document.getElementById(`sched-end-${day}`).value||"20:00";
     schedule[day]={enabled,start,end};
   });
+
+  // Los festivos van dentro del horario, no aparte: asi viajan juntos en la
+  // copia de seguridad y en la configuracion de cada pantalla.
+  const vistas=new Set();
+  schedule.holidays=festivosEdit
+    .filter(f=>f&&f.date)
+    .filter(f=>{ if(vistas.has(f.date)) return false; vistas.add(f.date); return true; })
+    .map(f=>f.enabled
+      ? {date:f.date, enabled:true, start:f.start||"", end:f.end||""}
+      : {date:f.date, enabled:false});
 
   const alwaysOn=document.getElementById("sched-always").checked;
   content.screens[currentScheduleScreen].always_on=alwaysOn;

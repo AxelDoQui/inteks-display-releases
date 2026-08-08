@@ -275,16 +275,46 @@ function getDayName(){
   return days[new Date().getDay()];
 }
 
+function fechaHoy(){
+  const d=new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+
+         String(d.getDate()).padStart(2,"0");
+}
+
+// El horario semanal no sabe de fiestas: el 25 de diciembre cae en un día
+// laborable cualquiera y la tienda está cerrada igual. Un festivo es una fecha
+// concreta que manda sobre la regla del día de la semana, para cerrar o para
+// abrir con horas distintas.
+function festivoDeHoy(){
+  const lista=(screenSchedule&&screenSchedule.holidays)||[];
+  const hoy=fechaHoy();
+  for(let i=0;i<lista.length;i++){
+    if(lista[i]&&lista[i].date===hoy) return lista[i];
+  }
+  return null;
+}
+
 function isScreenActive(){
   if(PREVIEW) return true;                                       // la previa siempre muestra contenido
   if(screenConfig&&screenConfig.always_on) return true;          // modo 24/7 explícito
   if(!screenSchedule||!Object.keys(screenSchedule).length) return true;  // sin horario = siempre activa
-  const today=getDayName();
-  const dayConfig=screenSchedule[today];
+  let dayConfig=festivoDeHoy();
+  if(!dayConfig){
+    // Si solo hay festivos configurados, el resto del año se sigue como si no
+    // hubiera horario. Lo contrario apagaría todas las pantallas los 360 días
+    // que no son fiesta, y el modo festivos sería una trampa.
+    const dias=Object.keys(screenSchedule).filter(k=>k!=="holidays");
+    if(!dias.length) return true;
+    dayConfig=screenSchedule[getDayName()];
+  }
   if(!dayConfig||!dayConfig.enabled) return false;
   const now=new Date();
   const currentTime=String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
-  const {start,end}=dayConfig;
+  // Abierto sin horas = todo el día. Antes, enabled:true sin start/end dejaba
+  // la pantalla apagada las 24 horas comparando contra undefined: silencioso y
+  // desconcertante.
+  const start=dayConfig.start||"00:00";
+  const end=dayConfig.end||"23:59";
   // Comparar strings "HH:MM" solo sirve para intervalos del mismo día. Si el
   // horario cruza medianoche (p.ej. 22:00→02:00, típico de bares) start>end y
   // el intervalo es la unión de [start,23:59] y [00:00,end].
