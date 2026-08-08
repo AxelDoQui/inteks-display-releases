@@ -172,11 +172,13 @@ const params=new URLSearchParams(location.search);
 // ensuciaría screens.json marcando pantallas como conectadas.
 const PREVIEW=params.get("preview")==="1";
 // Identidad de la pantalla: URL (?screen=) → memoria del dispositivo → si no hay, emparejar.
+// La URL manda sobre la memoria a propósito: es el remedio para los televisores
+// que borran todo al apagarse. Se pega el enlace directo como página de inicio
+// y la identidad viaja donde ningún borrado la alcanza.
 const _sidParam=params.get("screen");
-let _sidStored=null; try{ _sidStored=localStorage.getItem("signalos_screen_id"); }catch(e){}
-const SCREEN_ID=_sidParam||_sidStored;
+const SCREEN_ID=_sidParam||leerIdentidad();
 if(!SCREEN_ID && !PREVIEW){ location.replace("/pair"); }   // en previa no hay ?screen=
-else if(_sidParam){ try{ localStorage.setItem("signalos_screen_id", _sidParam); }catch(e){} }  // recordar por dispositivo
+else if(_sidParam){ guardarIdentidad(_sidParam); }         // recordar por dispositivo
 // Rotación forzada por URL: ?rotation=0/90/180/270 (o ?vertical=1 → 90, retrocompat)
 const URL_ROTATION = params.get("rotation")!==null ? parseInt(params.get("rotation"))
                    : (params.get("vertical")==="1" ? 90 : null);
@@ -322,7 +324,20 @@ function connectSSE(){
   es.onmessage=(e)=>{
     if(!e.data) return;
     // La pantalla fue eliminada desde el admin -> desconectar y volver a emparejar
-    if(e.data.indexOf("deleted")===0){ es.close(); try{localStorage.removeItem("signalos_screen_id");}catch(e2){} location.href="/pair"; return; }
+    // «deleted» = la pantalla ya no existe. «unlink» = existe pero este
+    // dispositivo se suelta de ella para poder reenlazarlo. Para el televisor
+    // la reacción es la misma: olvidar quién era y volver a pedir código.
+    if(e.data.indexOf("deleted")===0 || e.data.indexOf("unlink")===0){
+      es.close();
+      // El destino se calcula ANTES de olvidar: si no, el nombre ya no está
+      // para mandarlo como pista y el panel no podría sugerir el reenlace.
+      // Y el ?nuevo=1 es imprescindible: sin él, /pair podría leer una
+      // identidad a medio borrar y devolver el televisor al player.
+      const destino="/pair?nuevo=1&era="+encodeURIComponent(SCREEN_ID||"");
+      olvidarIdentidad();
+      location.href=destino;
+      return;
+    }
     // Contenido nuevo: se recarga la PLAYLIST, nunca la página. Recargar la
     // página la hacía depender de que el servidor estuviese vivo en ese preciso
     // instante; si no lo estaba, la pantalla moría y no volvía sola.
