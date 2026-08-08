@@ -40,6 +40,26 @@ def pick_data_dir():
         return d
 
 DATA_DIR = pick_data_dir()
+LOG_FILE = os.path.join(DATA_DIR, "server.log")
+
+def log(msg=""):
+    """Escribe en la consola si la hay, y SIEMPRE en el log.
+
+    El servidor se ejecuta con pythonw.exe desde una tarea programada para que
+    no haya ninguna ventana que alguien pueda cerrar por error. Sin consola,
+    sys.stdout puede ser None y un simple print() tumbaría el arranque; además
+    se perdería cualquier pista de por qué no levanta. De ahí las dos vías.
+    """
+    try:
+        if sys.stdout is not None:
+            print(msg)
+    except Exception:
+        pass
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}  {msg}\n")
+    except OSError:
+        pass
 
 UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
 SCREENS_FILE = os.path.join(DATA_DIR, "screens.json")
@@ -231,7 +251,7 @@ PORT = int(sys.argv[sys.argv.index("--port")+1]) if "--port" in sys.argv else co
 port_to_use = find_free_port(PORT, config.get("port_fallback", PORT + 1))
 if not port_to_use:
     _fb = config.get("port_fallback", PORT + 1)
-    print(f"ERROR: No hay puertos disponibles (intentados: {PORT}, {_fb}, y {_fb+1}-{_fb+19})")
+    log(f"ERROR: No hay puertos disponibles (intentados: {PORT}, {_fb}, y {_fb+1}-{_fb+19})")
     sys.exit(1)
 PORT = port_to_use
 
@@ -362,13 +382,13 @@ def start_mdns_responder():
             mreq = socket.inet_aton(MDNS_ADDR) + socket.inet_aton("0.0.0.0")
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         except Exception as e:
-            print(f"  [mDNS] No disponible ({e}). Las tablets deberán usar la IP.")
+            log(f"  [mDNS] No disponible ({e}). Las tablets deberán usar la IP.")
             return
 
         # Anuncio inicial no solicitado para aparecer rápido en la red
         try: sock.sendto(_mdns_response(fqdn, get_ip()), (MDNS_ADDR, MDNS_PORT))
         except Exception: pass
-        print(f"  [mDNS] Anunciando '{fqdn}' en la red local")
+        log(f"  [mDNS] Anunciando '{fqdn}' en la red local")
 
         while True:
             try:
@@ -395,7 +415,7 @@ def start_mdns_responder():
     threading.Thread(target=run, daemon=True).start()
 
 class Handler(BaseHTTPRequestHandler):
-    def log_message(self, fmt, *args): print(f"  {self.address_string()} -> {args[0]}")
+    def log_message(self, fmt, *args): log(f"  {self.address_string()} -> {args[0]}")
     def cors(self):
         self.send_header("Access-Control-Allow-Origin","*")
         self.send_header("Access-Control-Allow-Methods","GET,POST,OPTIONS")
@@ -970,16 +990,16 @@ if __name__ == "__main__":
     srv = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     # Anunciar el nombre mDNS (http://signage.local) en la red local
     start_mdns_responder()
-    print("\n" + "="*56)
-    print("  SIGNALOS PRO — SERVIDOR DIGITAL SIGNAGE")
-    print("="*56)
-    print(f"  Admin:           {url_for('/admin.html', host='localhost')}")
-    print(f"  Enlazar (nombre): {url_for('/pair')}")
-    print(f"  Enlazar (IP):     {url_for('/pair', host=ip)}")
-    print(f"  Player tablet 1:  {url_for('/player.html?screen=pantalla1', host=ip)}")
-    print("="*56)
-    print(f"  PIN de enlace:   {pin_state['pin']} (válido 10 min)")
-    print("="*56)
-    print("  Ctrl+C para detener\n")
+    log("\n" + "="*56)
+    log("  SIGNALOS PRO — SERVIDOR DIGITAL SIGNAGE")
+    log("="*56)
+    log(f"  Admin:           {url_for('/admin.html', host='localhost')}")
+    log(f"  Enlazar (nombre): {url_for('/pair')}")
+    log(f"  Enlazar (IP):     {url_for('/pair', host=ip)}")
+    log(f"  Player tablet 1:  {url_for('/player.html?screen=pantalla1', host=ip)}")
+    log("="*56)
+    log(f"  PIN de enlace:   {pin_state['pin']} (válido 10 min)")
+    log("="*56)
+    log("  Ctrl+C para detener\n")
     try: srv.serve_forever()
-    except KeyboardInterrupt: print("\nDetenido.")
+    except KeyboardInterrupt: log("\nDetenido.")

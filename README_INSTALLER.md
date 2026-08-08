@@ -123,6 +123,43 @@ una carpeta concreta, lo que usan las pruebas.
 El `config.json` que instala el instalador sirve de **plantilla**: la primera
 vez se copia a la carpeta de datos, respetando el puerto y el nombre elegidos.
 
+## Cómo arranca el servidor
+
+Como **tarea programada** llamada `SignalOS Pro`, no como un `.bat` en el
+arranque. La registra `installer\registrar-tarea.ps1` durante la instalación:
+
+| | |
+|---|---|
+| Disparador | al **encender el equipo** |
+| Usuario | `SYSTEM` |
+| Ejecuta | `pythonw.exe server.py` |
+| Ventana | ninguna |
+| Si el proceso cae | Windows lo reinicia, hasta 3 veces con 1 minuto de espera |
+
+Dos razones para no usar la clave `Run` del registro:
+
+- `Run` se dispara **al iniciar sesión**. Tras un corte de luz de madrugada el
+  equipo arranca y se queda en la pantalla de bloqueo, con las pantallas sin
+  contenido hasta que alguien entre.
+- Ejecutaba un `.bat`, que abre una consola. En un PC que también se usa para
+  otras cosas, cualquiera puede cerrarla por error y dejar las pantallas
+  muertas.
+
+`pythonw.exe` no abre consola en absoluto, así que **no hay ventana que
+cerrar**. Como contrapartida no hay salida por pantalla, y por eso el servidor
+escribe su registro en `C:\ProgramData\SignalOS Pro\server.log`: es el primer
+sitio donde mirar si algo no arranca.
+
+El acceso directo del escritorio ya **no arranca el servidor**: abre el panel de
+administración, y despierta la tarea si no estuviera corriendo.
+
+Para comprobar el estado a mano:
+
+```powershell
+schtasks /Query /TN "SignalOS Pro" /V /FO LIST
+Get-Content "$env:ProgramData\SignalOS Pro\server.log" -Tail 20
+```
+
 ## Qué hace el instalador
 
 - Instala en `C:\Program Files\SignalOS Pro\`
