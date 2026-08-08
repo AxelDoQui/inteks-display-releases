@@ -11,7 +11,9 @@
 :root{--bg:#07182b;--s1:#0A2540;--s2:#0e2d4d;--s3:#13355a;--b:#1d3a5c;--b2:#274a72;--accent:#FF7F00;--a2:#3d9be0;--a3:#ff9d3d;--a4:#6aa9dd;--text:#eaf1f9;--muted:#7a8ca3;--danger:#f05050;--r:8px;--rl:12px}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;font-size:14px}
-.app{display:grid;grid-template-columns:220px 1fr;grid-template-rows:52px 1fr;height:100vh;overflow:hidden}
+/* minmax(0,1fr) en la columna de contenido: con "1fr" a secas, cualquier tabla
+   o nombre largo puede empujar la rejilla y sacar toda la pagina de la ventana. */
+.app{display:grid;grid-template-columns:220px minmax(0,1fr);grid-template-rows:52px 1fr;height:100vh;overflow:hidden}
 .topbar{grid-column:1/-1;display:flex;align-items:center;padding:0 20px;border-bottom:1px solid var(--b);background:var(--s1);gap:16px;z-index:10}
 .logo{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:3px;color:var(--accent)}
 .logo span{color:var(--muted)}
@@ -62,9 +64,19 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 /* Playlist modal */
 .modal-bd{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;align-items:center;justify-content:center}
 .modal-bd.show{display:flex}
-.modal{background:var(--s1);border:1px solid var(--b);border-radius:var(--rl);padding:22px;width:700px;max-width:96vw;max-height:92vh;overflow-y:auto}
+/* min-width:0 es imprescindible: .modal es un flex item de .modal-bd y su
+   min-width por defecto es "auto", asi que puede CRECER por encima de sus
+   700px si el contenido lo empuja. Eso desbordaba el modal de playlist fuera
+   de la ventana y dejaba la columna de libreria cortada. */
+.modal{background:var(--s1);border:1px solid var(--b);border-radius:var(--rl);padding:22px;width:700px;max-width:96vw;max-height:92vh;overflow-y:auto;overflow-x:hidden;min-width:0}
 .modal h3{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--a2);margin-bottom:4px}
-.pl-editor{display:grid;grid-template-columns:1fr 260px;gap:14px;margin-top:14px}
+/* minmax(0,1fr) y no 1fr: "1fr" equivale a minmax(AUTO,1fr), y ese minimo
+   automatico impide que la columna se encoja por debajo del ancho minimo de su
+   contenido. Con nombres de archivo largos la columna crecia y arrastraba al
+   modal entero fuera de la ventana. */
+.pl-editor{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:14px;margin-top:14px;min-width:0}
+/* En ventanas estrechas, una columna debajo de otra en vez de recortarse */
+@media (max-width:700px){ .pl-editor{grid-template-columns:minmax(0,1fr)} }
 .pl-item{display:flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--b);border-radius:var(--r);padding:9px 10px;cursor:grab;transition:border-color .15s;margin-bottom:5px}
 .pl-item:hover{border-color:var(--b2)}
 .pl-item.drag-over{border-color:var(--a2)}
@@ -839,7 +851,7 @@ JPY  Yen        162.5"></textarea>
       </div>
       <div>
         <div style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace;letter-spacing:1px;margin-bottom:7px">LIBRERÍA</div>
-        <div id="plm-lib" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;max-height:380px;overflow-y:auto"></div>
+        <div id="plm-lib" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px;max-height:380px;overflow-y:auto;overflow-x:hidden;min-width:0"></div>
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
