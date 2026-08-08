@@ -64,6 +64,38 @@ const elCode = document.getElementById("code");
 const elError = document.getElementById("error");
 let token = null, sondeo = null;
 
+// ── Identidad de la pantalla ───────────────────────────────────────────────
+// BLOQUE COMPARTIDO: copia literal en index.html, pair.html y player.html.
+// Va repetido a propósito y no en un .js aparte: un <script src> obliga a
+// hablar con el servidor antes de poder decidir a dónde ir, y con el servidor
+// caído el televisor se quedaría en blanco. Cada página decide sola.
+//
+// Dos almacenes porque hay navegadores de TV que limpian uno al apagarse pero
+// no el otro. Solo son más robustos si se olvidan A LA VEZ: si olvidar dejara
+// la cookie puesta, una pantalla borrada rebotaría entre /pair y el player sin
+// parar. tests/identidad.test.js vigila las dos cosas.
+var IDENT_KEY = "signalos_screen_id";
+var IDENT_COOKIE = "signalos_screen";
+function leerIdentidad(){
+  try{ var v = localStorage.getItem(IDENT_KEY); if(v) return v; }catch(e){}
+  try{
+    var m = document.cookie.match(/(?:^|;\s*)signalos_screen=([^;]*)/);
+    if(m && m[1]) return decodeURIComponent(m[1]);
+  }catch(e){}
+  return null;
+}
+function guardarIdentidad(sid){
+  if(!sid) return;
+  try{ localStorage.setItem(IDENT_KEY, sid); }catch(e){}
+  try{ document.cookie = IDENT_COOKIE + "=" + encodeURIComponent(sid) +
+       ";path=/;max-age=31536000;samesite=lax"; }catch(e){}
+}
+function olvidarIdentidad(){
+  try{ localStorage.removeItem(IDENT_KEY); }catch(e){}
+  try{ document.cookie = IDENT_COOKIE + "=;path=/;max-age=0;samesite=lax"; }catch(e){}
+}
+// ── fin del bloque compartido ──────────────────────────────────────────────
+
 function fallo(msg){
   elError.textContent = msg;
   elError.style.display = "block";
