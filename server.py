@@ -148,8 +148,15 @@ def _purge_pending():
     for t in [t for t, v in pending_screens.items() if ahora - v["created"] > PENDING_TTL]:
         del pending_screens[t]
 
-def pending_new():
-    """La pantalla pide un código. Devuelve (código, token)."""
+def pending_new(known_as=""):
+    """La pantalla pide un código. Devuelve (código, token).
+
+    known_as es el nombre que el dispositivo dice recordar. Es un dato SIN
+    autoridad —lo manda un cliente sin autenticar— y solo sirve para que el
+    panel sugiera el reenlace. Quien decide es el administrador, y pair-claim
+    valida el nombre contra screens.json igual que siempre. Se recorta a 64
+    caracteres para que nadie llene la memoria mandando basura.
+    """
     with pending_lock:
         _purge_pending()
         usados = {v["code"] for v in pending_screens.values()}
@@ -157,7 +164,8 @@ def pending_new():
             code = f"{random.randint(0, 9999):04d}"
             if code not in usados: break
         token = secrets.token_hex(16)
-        pending_screens[token] = {"code": code, "created": time.time(), "claimed_as": None}
+        pending_screens[token] = {"code": code, "created": time.time(),
+                                  "claimed_as": None, "known_as": str(known_as)[:64]}
         return code, token
 
 def pending_list():
@@ -165,7 +173,8 @@ def pending_list():
     with pending_lock:
         _purge_pending()
         return sorted(
-            ({"code": v["code"], "waiting_for": int(time.time() - v["created"])}
+            ({"code": v["code"], "waiting_for": int(time.time() - v["created"]),
+              "known_as": v.get("known_as", "")}
              for v in pending_screens.values() if not v["claimed_as"]),
             key=lambda x: x["waiting_for"])
 
@@ -867,7 +876,11 @@ class Handler(BaseHTTPRequestHandler):
         #    solo devuelve un número al azar que no sirve de nada sin que un
         #    administrador autenticado lo reclame desde el panel.
         if path == "/api/pair-request":
-            code, token = pending_new()
+            try:
+                known_as = str(json.loads(body or "{}").get("known_as", "") or "")
+            except Exception:
+                known_as = ""          # cuerpo vacío o mal formado: sin pista, y ya está
+            code, token = pending_new(known_as)
             jresp(200, {"ok": True, "code": code, "token": token}); return
 
         # ── La pantalla pregunta si ya la han enlazado, y con qué nombre.

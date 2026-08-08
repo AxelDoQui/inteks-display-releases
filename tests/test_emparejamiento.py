@@ -94,6 +94,23 @@ def main():
         except urllib.error.HTTPError as ex:
             check(ex.code == 400, "un nombre ya usado da error")
 
+        # ── known_as: la pista que permite el reenlace de un clic ──────────
+        # Cuando un televisor se desenlaza, recuerda como se llamaba y lo manda
+        # al pedir codigo. Es un dato SIN autoridad -lo envia un cliente sin
+        # autenticar- y solo sirve para que el panel sugiera; quien decide es el
+        # administrador.
+        d3 = req("/api/pair-request", {"known_as": "TV-Escaparate"})
+        pend = req("/api/pair-pending", tok=TOKEN)["pending"]
+        fila = next((x for x in pend if x["code"] == d3["code"]), None)
+        check(fila is not None and fila.get("known_as") == "TV-Escaparate",
+              "el panel ve de que pantalla venia el codigo")
+
+        d4 = req("/api/pair-request", {})
+        fila4 = next((x for x in req("/api/pair-pending", tok=TOKEN)["pending"]
+                      if x["code"] == d4["code"]), None)
+        check(fila4 is not None and fila4.get("known_as") == "",
+              "sin pista, known_as viene vacio y no rompe el panel")
+
         check(req("/api/pair-status", {"token": "inventado"}).get("expired") is True,
               "un token desconocido hace que la pantalla pida otro codigo")
     finally:
