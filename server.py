@@ -886,6 +886,31 @@ class Handler(BaseHTTPRequestHandler):
         if path != "/api/pair" and not self.require_auth():
             return
 
+        # ── Fusión de filas de divisas conservando el orden del admin ──────
+        # El usuario ordena su tablero a mano y ese orden es suyo: una
+        # actualización de tasas no puede reordenarlo aunque la extensión mande
+        # las filas en otro orden, que es lo que hacía al sustituirlas en bloque.
+        # La clave es país + moneda, no solo la moneda: un tablero de remesas
+        # lleva varias filas en dólares (Ecuador, Venezuela...) y confundirlas
+        # mezclaría sus tasas.
+        def fusionar_filas(existentes, entrantes):
+            def clave(r):
+                return (str(r.get("country", "")).strip().lower(),
+                        str(r.get("code", "")).strip().upper())
+            pendientes = {}
+            for r in entrantes:
+                pendientes.setdefault(clave(r), r)
+            out = []
+            for e in existentes or []:            # primero, en el orden del admin
+                k = clave(e)
+                if k in pendientes:
+                    out.append(pendientes.pop(k))
+            for r in entrantes:                   # las nuevas, al final
+                k = clave(r)
+                if k in pendientes:
+                    out.append(pendientes.pop(k))
+            return out
+
         # ── El admin pone nombre a una pantalla que está esperando
         if path == "/api/pair-claim":
             try:
@@ -1011,7 +1036,7 @@ class Handler(BaseHTTPRequestHandler):
                             # Antes se pisaban siempre título y moneda base, así que
                             # cada envío desde la extensión borraba lo que el usuario
                             # había configurado en el admin.
-                            item["rows"] = rows
+                            item["rows"] = fusionar_filas(item.get("rows"), rows)
                             if title: item["title"] = title
                             if base_currency: item["base_currency"] = base_currency
                             item["updated_at"] = updated_at
@@ -1034,7 +1059,7 @@ class Handler(BaseHTTPRequestHandler):
                 # deshace silenciosamente lo que acaba de hacer la extensión.
                 for item in content.get("items", []):
                     if item.get("type") == "fx" and item.get("id") in touched_ids:
-                        item["rows"] = rows
+                        item["rows"] = fusionar_filas(item.get("rows"), rows)
                         if title: item["title"] = title
                         if base_currency: item["base_currency"] = base_currency
                         item["updated_at"] = updated_at

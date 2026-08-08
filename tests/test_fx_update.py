@@ -103,6 +103,52 @@ def main():
         print(f"  {'ok  ' if ok else 'FALLO'} y conserva su propia configuracion")
         failed += not ok
 
+        # ── El orden lo fija el admin, no la extension ─────────────────────
+        # El usuario ordena su tablero a mano; una actualizacion de tasas no
+        # puede reordenarlo aunque la extension mande las filas en otro orden.
+        json.dump({"items": [dict(MODULO, rows=[
+                       {"flag": "ar", "country": "Argentina", "currency": "Peso", "code": "ARS", "rate": "1"},
+                       {"flag": "co", "country": "Colombia", "currency": "Peso", "code": "COP", "rate": "2"},
+                       {"flag": "hn", "country": "Honduras", "currency": "Lempira", "code": "HNL", "rate": "3"}])],
+                   "screens": {"TV": {"mode": "independent", "playlist": [dict(MODULO, rows=[
+                       {"flag": "ar", "country": "Argentina", "currency": "Peso", "code": "ARS", "rate": "1"},
+                       {"flag": "co", "country": "Colombia", "currency": "Peso", "code": "COP", "rate": "2"},
+                       {"flag": "hn", "country": "Honduras", "currency": "Lempira", "code": "HNL", "rate": "3"}])]}}},
+                  open(cpath, "w"))
+
+        # La extension las manda al reves y con una nueva al principio
+        post(base + "/api/fx-update", {"rows": [
+            {"flag": "py", "country": "Paraguay", "currency": "Guarani", "code": "PYG", "rate": "6900"},
+            {"flag": "hn", "country": "Honduras", "currency": "Lempira", "code": "HNL", "rate": "30,84"},
+            {"flag": "ar", "country": "Argentina", "currency": "Peso", "code": "ARS", "rate": "1800"},
+            {"flag": "co", "country": "Colombia", "currency": "Peso", "code": "COP", "rate": "4100"},
+        ], "screen_ids": ["TV"]})
+
+        filas = json.load(open(cpath))["screens"]["TV"]["playlist"][0]["rows"]
+        orden = [r["code"] for r in filas]
+        ok = orden[:3] == ["ARS", "COP", "HNL"]
+        print(f"  {'ok  ' if ok else 'FALLO'} se conserva el orden del admin -> {orden}")
+        failed += not ok
+
+        ok = orden[3:] == ["PYG"]
+        print(f"  {'ok  ' if ok else 'FALLO'} las divisas nuevas se anaden al final")
+        failed += not ok
+
+        tasas = {r["code"]: r["rate"] for r in filas}
+        ok = tasas["ARS"] == "1800" and tasas["COP"] == "4100" and tasas["HNL"] == "30,84"
+        print(f"  {'ok  ' if ok else 'FALLO'} y las tasas si se actualizan")
+        failed += not ok
+
+        lib = json.load(open(cpath))["items"][0]
+        ok = [r["code"] for r in lib["rows"]][:3] == ["ARS", "COP", "HNL"]
+        print(f"  {'ok  ' if ok else 'FALLO'} la libreria conserva el mismo orden")
+        failed += not ok
+
+        # Restaurar el contenido original para las comprobaciones siguientes
+        json.dump({"items": [dict(MODULO)],
+                   "screens": {"TV": {"mode": "independent", "playlist": [dict(MODULO)]}}},
+                  open(cpath, "w"))
+
         # Si se envía un título explícito, ese sí debe aplicarse.
         post(base + "/api/fx-update",
              {"rows": NUEVAS, "screen_ids": ["TV"], "title": "OTRO TITULO"})
