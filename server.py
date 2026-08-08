@@ -148,8 +148,15 @@ def _purge_pending():
     for t in [t for t, v in pending_screens.items() if ahora - v["created"] > PENDING_TTL]:
         del pending_screens[t]
 
-def pending_new():
-    """La pantalla pide un código. Devuelve (código, token)."""
+def pending_new(known_as=""):
+    """La pantalla pide un código. Devuelve (código, token).
+
+    known_as es el nombre que el dispositivo dice recordar. Es un dato SIN
+    autoridad —lo manda un cliente sin autenticar— y solo sirve para que el
+    panel sugiera el reenlace. Quien decide es el administrador, y pair-claim
+    valida el nombre contra screens.json igual que siempre. Se recorta a 64
+    caracteres para que nadie llene la memoria mandando basura.
+    """
     with pending_lock:
         _purge_pending()
         usados = {v["code"] for v in pending_screens.values()}
@@ -157,7 +164,8 @@ def pending_new():
             code = f"{random.randint(0, 9999):04d}"
             if code not in usados: break
         token = secrets.token_hex(16)
-        pending_screens[token] = {"code": code, "created": time.time(), "claimed_as": None}
+        pending_screens[token] = {"code": code, "created": time.time(),
+                                  "claimed_as": None, "known_as": str(known_as)[:64]}
         return code, token
 
 def pending_list():
@@ -165,7 +173,8 @@ def pending_list():
     with pending_lock:
         _purge_pending()
         return sorted(
-            ({"code": v["code"], "waiting_for": int(time.time() - v["created"])}
+            ({"code": v["code"], "waiting_for": int(time.time() - v["created"]),
+              "known_as": v.get("known_as", "")}
              for v in pending_screens.values() if not v["claimed_as"]),
             key=lambda x: x["waiting_for"])
 
@@ -384,6 +393,21 @@ def notify_deleted(screen_id):
         for wfile in list(sse_clients.get(screen_id, [])):
             try:
                 wfile.write(f"data: deleted:{screen_id}\n\n".encode())
+                wfile.flush()
+            except: pass
+
+def notify_unlink(screen_id):
+    """Le dice a la pantalla que olvide quién era, sin borrar su configuración.
+
+    Es lo contrario de notify_deleted: allí la pantalla desaparece; aquí sigue
+    existiendo con su playlist, su horario y su rotación, y lo único que se
+    suelta es el dispositivo. Sirve para reenlazar un televisor desde el panel
+    sin ir a tocarlo con el mando.
+    """
+    with sse_lock:
+        for wfile in list(sse_clients.get(screen_id, [])):
+            try:
+                wfile.write(f"data: unlink:{screen_id}\n\n".encode())
                 wfile.flush()
             except: pass
 
@@ -867,7 +891,11 @@ class Handler(BaseHTTPRequestHandler):
         #    solo devuelve un número al azar que no sirve de nada sin que un
         #    administrador autenticado lo reclame desde el panel.
         if path == "/api/pair-request":
-            code, token = pending_new()
+            try:
+                known_as = str(json.loads(body or "{}").get("known_as", "") or "")
+            except Exception:
+                known_as = ""          # cuerpo vacío o mal formado: sin pista, y ya está
+            code, token = pending_new(known_as)
             jresp(200, {"ok": True, "code": code, "token": token}); return
 
         # ── La pantalla pregunta si ya la han enlazado, y con qué nombre.
@@ -912,27 +940,47 @@ class Handler(BaseHTTPRequestHandler):
             return out
 
         # ── El admin pone nombre a una pantalla que está esperando
+        #
+        # Crear y reenlazar son intenciones opuestas y cada una se protege de su
+        # propio error: crear no debe pisar una pantalla que ya existe, y
+        # reenlazar no debe inventarse una que no. Antes solo existía "crear", y
+        # su comprobación de duplicados dejaba sin salida el caso de un televisor
+        # que había perdido su identidad: no se le podía devolver la suya.
         if path == "/api/pair-claim":
             try:
                 d = json.loads(body or "{}")
                 code = str(d.get("code", "")).strip()
                 nombre = str(d.get("screen_name", "")).strip()
+                modo = str(d.get("modo", "nueva")).strip().lower()
                 if not nombre:
                     jresp(400, {"ok": False, "error": "Ponle un nombre a la pantalla"}); return
                 screens = load_json(SCREENS_FILE)
-                if nombre in screens:
-                    jresp(400, {"ok": False, "error": f"Ya existe una pantalla llamada '{nombre}'"}); return
+                content = load_json(CONTENT_FILE)
+                # Se mira en los DOS sitios: una pantalla configurada que nunca
+                # llegó a conectarse vive solo en content.json, y crear encima de
+                # ella le borraría la playlist.
+                existe = nombre in screens or nombre in content.get("screens", {})
+                if modo == "reenlazar":
+                    if not existe:
+                        jresp(400, {"ok": False,
+                                    "error": f"No hay ninguna pantalla llamada '{nombre}'"}); return
+                elif existe:
+                    jresp(400, {"ok": False,
+                                "error": f"Ya existe una pantalla llamada '{nombre}'"}); return
                 ok_claim, msg = pending_claim(code, nombre)
                 if not ok_claim:
                     jresp(400, {"ok": False, "error": msg}); return
                 # Registrarla ya, para que aparezca en el panel sin esperar al SSE
                 screens[nombre] = {"id": nombre, "connected": True, "last_seen": time.time()}
                 save_json(SCREENS_FILE, screens)
-                content = load_json(CONTENT_FILE)
-                content.setdefault("screens", {}).setdefault(nombre, {"mode": "independent", "playlist": []})
+                # setdefault y no asignación: al reenlazar, la configuración que
+                # ya estuviera ahí se queda como está. Es todo el sentido del modo.
+                content.setdefault("screens", {}).setdefault(
+                    nombre, {"mode": "independent", "playlist": []})
                 save_json(CONTENT_FILE, content)
-                log(f"  [enlace] pantalla '{nombre}' enlazada con el código {code}")
-                ok({"screen_name": nombre})
+                verbo = "reenlazada" if modo == "reenlazar" else "enlazada"
+                log(f"  [enlace] pantalla '{nombre}' {verbo} con el código {code}")
+                ok({"screen_name": nombre, "modo": modo})
             except Exception as e: err(e)
             return
 
@@ -1004,6 +1052,26 @@ class Handler(BaseHTTPRequestHandler):
                 with sse_lock:
                     sse_clients.pop(sid, None)
                 ok()
+            except Exception as e: err(e)
+            return
+
+        # ── Soltar el dispositivo de una pantalla, sin borrar la pantalla
+        if path == "/api/screen-unlink":
+            try:
+                d = json.loads(body or "{}")
+                sid = str(d.get("screen", "")).strip()
+                screens = load_json(SCREENS_FILE)
+                content = load_json(CONTENT_FILE)
+                if not sid or (sid not in screens and sid not in content.get("screens", {})):
+                    jresp(400, {"ok": False, "error": "Esa pantalla no existe"}); return
+                notify_unlink(sid)
+                with sse_lock:
+                    sse_clients.pop(sid, None)
+                if sid in screens:
+                    screens[sid]["connected"] = False
+                    save_json(SCREENS_FILE, screens)
+                log(f"  [enlace] '{sid}' desenlazada: su dispositivo volvera a pedir codigo")
+                ok({"screen": sid})
             except Exception as e: err(e)
             return
 

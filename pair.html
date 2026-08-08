@@ -32,6 +32,18 @@ h1{font-size:clamp(18px,3.4vmin,34px);font-weight:500;margin-bottom:1.5vmin;lett
 @keyframes latido{0%,100%{opacity:.25}50%{opacity:1}}
 
 .error{margin-top:4vmin;font-size:clamp(12px,1.9vmin,18px);color:#f05050;display:none}
+
+/* Aviso cuando la pantalla ya estaba enlazada. El botón es grande y de alto
+   contraste porque a veces hay que pulsarlo con el mando del televisor desde
+   el otro lado del local. */
+.reanudar{display:none;margin-top:2vmin}
+.reanudar.visible{display:block}
+.reanudar-txt{font-size:clamp(15px,2.6vmin,26px);margin-bottom:1vmin}
+.reanudar-sub{font-size:clamp(12px,1.9vmin,18px);color:#7a8ca3;margin-bottom:4vmin}
+.reanudar-btn{font-family:inherit;font-size:clamp(14px,2.2vmin,22px);font-weight:600;
+  padding:clamp(12px,2vmin,22px) clamp(24px,4vmin,44px);border-radius:12px;
+  border:2px solid #FF7F00;background:transparent;color:#FF7F00;cursor:pointer}
+.reanudar-btn:focus,.reanudar-btn:hover{background:#FF7F00;color:#07182b;outline:none}
 .pie{position:fixed;bottom:3vmin;left:0;right:0;text-align:center;
   font-size:clamp(10px,1.5vmin,14px);color:#3a5170;font-family:'Space Mono',ui-monospace,monospace;
   letter-spacing:1px}
@@ -51,6 +63,12 @@ h1{font-size:clamp(18px,3.4vmin,34px);font-weight:500;margin-bottom:1.5vmin;lett
   </div>
 
   <div class="error" id="error"></div>
+
+  <div class="reanudar" id="reanudar">
+    <div class="reanudar-txt">Ya enlazada como <strong id="rean-nombre"></strong></div>
+    <div class="reanudar-sub">Abriendo su contenido en <span id="rean-seg">6</span> s…</div>
+    <button class="reanudar-btn" id="rean-btn">Enlazar de nuevo</button>
+  </div>
 </div>
 <div class="pie" id="pie"></div>
 
@@ -64,17 +82,70 @@ const elCode = document.getElementById("code");
 const elError = document.getElementById("error");
 let token = null, sondeo = null;
 
+// ── Identidad de la pantalla ───────────────────────────────────────────────
+// BLOQUE COMPARTIDO: copia literal en index.html, pair.html y player.html.
+// Va repetido a propósito y no en un .js aparte: un <script src> obliga a
+// hablar con el servidor antes de poder decidir a dónde ir, y con el servidor
+// caído el televisor se quedaría en blanco. Cada página decide sola.
+//
+// Dos almacenes porque hay navegadores de TV que limpian uno al apagarse pero
+// no el otro. Solo son más robustos si se olvidan A LA VEZ: si olvidar dejara
+// la cookie puesta, una pantalla borrada rebotaría entre /pair y el player sin
+// parar. tests/identidad.test.js vigila las dos cosas.
+var IDENT_KEY = "signalos_screen_id";
+var IDENT_COOKIE = "signalos_screen";
+function leerIdentidad(){
+  try{ var v = localStorage.getItem(IDENT_KEY); if(v) return v; }catch(e){}
+  try{
+    var m = document.cookie.match(/(?:^|;\s*)signalos_screen=([^;]*)/);
+    if(m && m[1]) return decodeURIComponent(m[1]);
+  }catch(e){}
+  return null;
+}
+function guardarIdentidad(sid){
+  if(!sid) return;
+  try{ localStorage.setItem(IDENT_KEY, sid); }catch(e){}
+  try{ document.cookie = IDENT_COOKIE + "=" + encodeURIComponent(sid) +
+       ";path=/;max-age=31536000;samesite=lax"; }catch(e){}
+}
+function olvidarIdentidad(){
+  try{ localStorage.removeItem(IDENT_KEY); }catch(e){}
+  try{ document.cookie = IDENT_COOKIE + "=;path=/;max-age=0;samesite=lax"; }catch(e){}
+}
+// ── fin del bloque compartido ──────────────────────────────────────────────
+
+// ── Decisión de arranque ───────────────────────────────────────────────────
+// Antes esta página pedía código siempre. Ahora primero mira si el dispositivo
+// ya sabe quién es: si lo sabe, lo devuelve a su contenido en vez de fabricar
+// un emparejamiento duplicado.
+//
+// No se pregunta al servidor si esa pantalla sigue existiendo, y es deliberado:
+// el player ya lo resuelve solo —el SSE responde «deleted» y él olvida la
+// identidad y vuelve aquí—, así que no hace falta un endpoint público nuevo. Y
+// con el servidor caído acabar en el player es MEJOR: muestra su caché en vez
+// de un código que no sirve de nada.
+function decidirArranque(identidad, params){
+  var forzar = params.get("nuevo") === "1";
+  var era = params.get("era") || "";
+  if(!forzar && identidad) return {accion:"reanudar", screen:identidad};
+  return {accion:"pedir", knownAs: era || identidad || ""};
+}
+// ── fin de la decisión de arranque ─────────────────────────────────────────
+
 function fallo(msg){
   elError.textContent = msg;
   elError.style.display = "block";
 }
 
-async function pedirCodigo(){
+async function pedirCodigo(knownAs){
   elError.style.display = "none";
   elCode.classList.add("cargando");
   elCode.textContent = "····";
   try{
-    const r = await fetch("/api/pair-request", {method:"POST"});
+    const r = await fetch("/api/pair-request", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({known_as: knownAs || ""})
+    });
     const d = await r.json();
     if(!d.ok || !d.code) throw new Error("respuesta inesperada");
     token = d.token;
@@ -85,7 +156,7 @@ async function pedirCodigo(){
     // Sin servidor no hay código posible. Se reintenta solo: la pantalla puede
     // encenderse antes que el PC, y nadie va a estar delante para recargar.
     fallo("Sin conexión con el servidor. Reintentando…");
-    setTimeout(pedirCodigo, 5000);
+    setTimeout(function(){ pedirCodigo(knownAs); }, 5000);
   }
 }
 
@@ -104,12 +175,12 @@ async function comprobar(){
     const d = await r.json();
     if(d.expired){                       // el servidor se reinició y olvidó el token
       clearInterval(sondeo); token = null;
-      pedirCodigo();
+      pedirCodigo(_decision.knownAs);
       return;
     }
     if(d.claimed && d.screen){
       clearInterval(sondeo);
-      try{ localStorage.setItem("signalos_screen_id", d.screen); }catch(e){}
+      guardarIdentidad(d.screen);
       elCode.textContent = "✓";
       document.querySelector(".subtitle").textContent = "Enlazada como «" + d.screen + "»";
       document.querySelector(".hint").innerHTML = "Iniciando…";
@@ -121,7 +192,57 @@ async function comprobar(){
 // Pie con la dirección, útil para saber a qué servidor está mirando la pantalla
 document.getElementById("pie").textContent = location.host;
 
-pedirCodigo();
+// ── Arranque ───────────────────────────────────────────────────────────────
+var _params = new URLSearchParams(location.search);
+var _decision = decidirArranque(leerIdentidad(), _params);
+
+if(_decision.accion === "reanudar"){
+  mostrarReanudacion(_decision.screen);
+}else{
+  pedirCodigo(_decision.knownAs);
+}
+
+function mostrarReanudacion(sid){
+  document.querySelector(".code").style.display = "none";
+  document.querySelector(".hint").style.display = "none";
+  document.querySelector(".subtitle").textContent = "Esta pantalla ya está configurada";
+  document.getElementById("rean-nombre").textContent = sid;
+  document.getElementById("reanudar").classList.add("visible");
+
+  var seg = 6, cuenta = null;
+  var elSeg = document.getElementById("rean-seg");
+  var btn = document.getElementById("rean-btn");
+
+  function irAlPlayer(){
+    location.replace("/player.html?screen=" + encodeURIComponent(sid));
+  }
+  // Cualquier tecla o clic para la cuenta atrás. Los mandos de televisor
+  // navegan con flechas y acertar con el foco del botón no siempre es fácil;
+  // así basta con pulsar cualquier cosa para tener tiempo de decidir.
+  function parar(){
+    if(cuenta === null) return;
+    clearInterval(cuenta); cuenta = null;
+    document.querySelector(".reanudar-sub").textContent = "Cuenta atrás detenida";
+    btn.focus();
+  }
+  document.addEventListener("keydown", parar);
+  document.addEventListener("click", parar);
+
+  btn.addEventListener("click", function(ev){
+    ev.stopPropagation();
+    // El orden importa: el nombre tiene que viajar en la URL ANTES de borrarse
+    // de los almacenes, o el panel ya no puede sugerir el reenlace.
+    var destino = "/pair?nuevo=1&era=" + encodeURIComponent(sid);
+    olvidarIdentidad();
+    location.replace(destino);
+  });
+
+  cuenta = setInterval(function(){
+    seg -= 1;
+    elSeg.textContent = seg;
+    if(seg <= 0){ clearInterval(cuenta); cuenta = null; irAlPlayer(); }
+  }, 1000);
+}
 </script>
 </body>
 </html>
