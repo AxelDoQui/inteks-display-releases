@@ -163,6 +163,32 @@ def main():
                   tok=TOKEN).get("ok"),
               "crear una pantalla nueva sigue funcionando")
 
+        # ── Desenlazar: soltar el dispositivo sin borrar la pantalla ────────
+        # Es lo contrario de eliminar. La pantalla sigue ahi con todo lo suyo;
+        # solo el televisor olvida quien era, para poder reenlazarlo desde el
+        # panel sin levantarse a tocarlo.
+        r7 = req("/api/screen-unlink", {"screen": "TV-Escaparate"}, tok=TOKEN)
+        check(r7.get("ok"), "se puede desenlazar una pantalla")
+
+        cont = json.load(open(cpath))["screens"].get("TV-Escaparate", {})
+        check(len(cont.get("playlist", [])) == 1,
+              "desenlazar NO borra la playlist")
+        check(cont.get("rotation") == 90, "ni la rotacion")
+        scr = json.load(open(os.path.join(datos, "screens.json")))
+        check("TV-Escaparate" in scr, "y la pantalla sigue en el registro")
+
+        try:
+            req("/api/screen-unlink", {"screen": "Fantasma"}, tok=TOKEN)
+            check(False, "desenlazar una inexistente deberia fallar")
+        except urllib.error.HTTPError as ex:
+            check(ex.code == 400, "desenlazar una pantalla inexistente da error")
+
+        try:
+            req("/api/screen-unlink", {"screen": "TV-Escaparate"})
+            check(False, "desenlazar sin autenticacion deberia fallar")
+        except urllib.error.HTTPError as ex:
+            check(ex.code == 401, "desenlazar exige autenticacion")
+
         check(req("/api/pair-status", {"token": "inventado"}).get("expired") is True,
               "un token desconocido hace que la pantalla pida otro codigo")
     finally:

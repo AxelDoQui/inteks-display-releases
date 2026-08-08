@@ -396,6 +396,21 @@ def notify_deleted(screen_id):
                 wfile.flush()
             except: pass
 
+def notify_unlink(screen_id):
+    """Le dice a la pantalla que olvide quién era, sin borrar su configuración.
+
+    Es lo contrario de notify_deleted: allí la pantalla desaparece; aquí sigue
+    existiendo con su playlist, su horario y su rotación, y lo único que se
+    suelta es el dispositivo. Sirve para reenlazar un televisor desde el panel
+    sin ir a tocarlo con el mando.
+    """
+    with sse_lock:
+        for wfile in list(sse_clients.get(screen_id, [])):
+            try:
+                wfile.write(f"data: unlink:{screen_id}\n\n".encode())
+                wfile.flush()
+            except: pass
+
 def load_json(path):
     with file_lock:
         try:
@@ -1037,6 +1052,26 @@ class Handler(BaseHTTPRequestHandler):
                 with sse_lock:
                     sse_clients.pop(sid, None)
                 ok()
+            except Exception as e: err(e)
+            return
+
+        # ── Soltar el dispositivo de una pantalla, sin borrar la pantalla
+        if path == "/api/screen-unlink":
+            try:
+                d = json.loads(body or "{}")
+                sid = str(d.get("screen", "")).strip()
+                screens = load_json(SCREENS_FILE)
+                content = load_json(CONTENT_FILE)
+                if not sid or (sid not in screens and sid not in content.get("screens", {})):
+                    jresp(400, {"ok": False, "error": "Esa pantalla no existe"}); return
+                notify_unlink(sid)
+                with sse_lock:
+                    sse_clients.pop(sid, None)
+                if sid in screens:
+                    screens[sid]["connected"] = False
+                    save_json(SCREENS_FILE, screens)
+                log(f"  [enlace] '{sid}' desenlazada: su dispositivo volvera a pedir codigo")
+                ok({"screen": sid})
             except Exception as e: err(e)
             return
 
