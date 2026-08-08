@@ -62,3 +62,48 @@ test("una fila más alta que el espacio disponible se coloca igualmente", () => 
 test("sin filas no hay páginas", () => {
   assert.deepStrictEqual(group()([], 300), []);
 });
+
+// ── Reparto equilibrado ────────────────────────────────────────────────────
+// Llenar la primera página hasta arriba deja huérfana la última: con 8 divisas
+// salían 7 y 1, y esa última se estiraba a pantalla completa. Queda feo y no
+// se lee mejor. Si hacen falta dos páginas, se reparten a la mitad.
+
+test("ocho filas en dos páginas salen a cuatro y cuatro", () => {
+  // Caben 7 por página, pero 7+1 es justo lo que hay que evitar
+  const alturas = new Array(8).fill(100);
+  const p = group()(alturas, 750);
+  assert.strictEqual(p.length, 2);
+  assert.deepStrictEqual(p.map(x => x.length), [4, 4]);
+});
+
+test("cuando no es divisible, la primera página lleva una más", () => {
+  const p = group()(new Array(9).fill(100), 750);
+  assert.deepStrictEqual(p.map(x => x.length), [5, 4]);
+});
+
+test("no se deja nunca una página con una sola fila si se puede evitar", () => {
+  for (const n of [8, 9, 11, 13, 15]) {
+    const p = group()(new Array(n).fill(100), 750);
+    const minimo = Math.min(...p.map(x => x.length));
+    assert.ok(minimo > 1,
+      `con ${n} filas queda una pagina de ${minimo}: ${JSON.stringify(p.map(x => x.length))}`);
+  }
+});
+
+test("si caben todas en una, no se parten", () => {
+  const p = group()(new Array(5).fill(100), 750);
+  assert.deepStrictEqual(p.map(x => x.length), [5]);
+});
+
+test("tres páginas también se reparten parejas", () => {
+  const p = group()(new Array(15).fill(100), 750);   // caben 7 -> 3 paginas
+  assert.deepStrictEqual(p.map(x => x.length), [5, 5, 5]);
+});
+
+test("no se pierde ni se repite ninguna fila al repartir", () => {
+  const p = group()(new Array(13).fill(100), 750);
+  const todas = p.flat();
+  assert.strictEqual(todas.length, 13);
+  assert.deepStrictEqual(todas, [...todas].sort((a, b) => a - b), "deben ir en orden");
+  assert.strictEqual(new Set(todas).size, 13, "sin repetidas");
+});

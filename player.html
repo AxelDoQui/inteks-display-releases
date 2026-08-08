@@ -25,37 +25,49 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 
 /* ── Módulo divisas */
 .mod-fx{width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden}
-.mod-fx-header{padding:3vh 4vw 2vh;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;--fx-title-size:clamp(18px,3vw,42px)}
-.mod-fx-title{font-size:var(--fx-title-size);font-weight:700;letter-spacing:2px;text-transform:uppercase}
-.mod-fx-date{font-size:clamp(11px,1.5vw,20px);opacity:.4;font-family:monospace;letter-spacing:1px}
-.mod-fx-page{font-size:clamp(11px,1.5vw,20px);opacity:.55;font-family:monospace;letter-spacing:1px;padding:2px 10px;border:1px solid rgba(255,255,255,.2);border-radius:99px}
-.mod-fx-logo{height:var(--fx-title-size);max-width:22vw;object-fit:contain}
-/* Las filas se REPARTEN el alto disponible (flex:1 1 0) en vez de agruparse en
-   el centro, y la tipografía escala con el alto que le toca a cada una
-   (--fx-row-h, que fija el JS). El segundo término en vw evita que en una
-   pantalla muy alta el texto crezca tanto que se salga por los lados. */
-.mod-fx-rows{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:0 4vw 3vh;gap:0;--fx-row-h:80px}
-.mod-fx-note{flex-shrink:0;max-height:18%;overflow:hidden;padding:1.5vh 4vw 2.5vh;border-top:1px solid rgba(255,255,255,.12);font-size:clamp(11px,1.6vw,22px);line-height:1.35;opacity:.75}
-.fx-row{flex:1 1 0;min-height:0;display:flex;align-items:center;border-bottom:1px solid rgba(255,255,255,.07);gap:2vw}
+/* Porcentajes y no vw, por lo mismo que en las filas: con el player rotado por
+   CSS, vw se refiere al viewport sin rotar y todo sale desproporcionado. El
+   título se recorta antes que partir en tres líneas y montarse sobre el logo. */
+.mod-fx-header{padding:3vh 4% 2vh;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:3%;--fx-title-size:clamp(16px,3.4vmin,40px)}
+.mod-fx-title{font-size:var(--fx-title-size);font-weight:700;letter-spacing:2px;text-transform:uppercase;min-width:0;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.15}
+.mod-fx-date{font-size:clamp(11px,1.7vmin,20px);opacity:.4;font-family:monospace;letter-spacing:1px;white-space:nowrap}
+.mod-fx-page{font-size:clamp(11px,1.7vmin,20px);opacity:.55;font-family:monospace;letter-spacing:1px;padding:2px 10px;border:1px solid rgba(255,255,255,.2);border-radius:99px;white-space:nowrap}
+.mod-fx-logo{height:var(--fx-title-size);max-width:26%;object-fit:contain;flex-shrink:0}
+/* Las filas se REPARTEN el alto disponible y la tipografía escala con el alto
+   que le toca a cada una (--fx-row-h, que fija el JS).
+   Los topes van contra --fx-box-w, el ancho REAL de la caja medido por el JS,
+   y NO contra vw. Con el player rotado por CSS (transform:rotate(90deg)) la
+   caja mide 100vh de ancho, así que vw se refiere al viewport sin rotar: los
+   topes salían un 78% más grandes de lo que cabía y el nombre del país se
+   solapaba con la cotización. */
+.mod-fx-rows{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:0 4% 3vh;gap:0;--fx-row-h:80px;--fx-box-w:1000px}
+.mod-fx-note{flex-shrink:0;max-height:18%;overflow:hidden;padding:1.5vh 4% 2.5vh;border-top:1px solid rgba(255,255,255,.12);font-size:clamp(11px,1.9vmin,22px);line-height:1.35;opacity:.75}
+.fx-row{flex:var(--fx-flex,1 1 0);min-height:0;display:flex;align-items:center;border-bottom:1px solid rgba(255,255,255,.07);gap:2.5%;height:var(--fx-row-h)}
 .fx-row:last-child{border-bottom:none}
-.fx-flag{font-size:min(calc(var(--fx-row-h)*.42),7vw);width:min(calc(var(--fx-row-h)*.55),9vw);text-align:center;flex-shrink:0}
+.fx-flag{font-size:min(calc(var(--fx-row-h)*.42),calc(var(--fx-box-w)*.075));width:min(calc(var(--fx-row-h)*.55),calc(var(--fx-box-w)*.10));text-align:center;flex-shrink:0}
 .fx-country{flex:1;min-width:0}
-.fx-country-name{font-size:min(calc(var(--fx-row-h)*.26),4.5vw);font-weight:600;letter-spacing:.5px}
-.fx-currency{font-size:min(calc(var(--fx-row-h)*.13),2.2vw);opacity:.45;font-family:monospace;letter-spacing:1px;margin-top:2px}
-.fx-rate{text-align:right;flex-shrink:0}
-.fx-rate-val{font-size:min(calc(var(--fx-row-h)*.42),7vw);font-weight:700;font-family:monospace;letter-spacing:-1px}
-.fx-rate-label{font-size:min(calc(var(--fx-row-h)*.10),1.7vw);opacity:.4;text-align:right;letter-spacing:1px;margin-top:2px}
+/* El nombre del país no puede empujar a la cotización: si no cabe, se recorta */
+.fx-country-name{font-size:min(calc(var(--fx-row-h)*.26),calc(var(--fx-box-w)*.055));font-weight:600;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fx-currency{font-size:min(calc(var(--fx-row-h)*.13),calc(var(--fx-box-w)*.028));opacity:.45;font-family:monospace;letter-spacing:1px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fx-rate{text-align:right;flex-shrink:0;min-width:0}
+.fx-rate-val{font-size:min(calc(var(--fx-row-h)*.42),calc(var(--fx-box-w)*.115));font-weight:700;font-family:monospace;letter-spacing:-1px;white-space:nowrap}
+.fx-rate-label{font-size:min(calc(var(--fx-row-h)*.10),calc(var(--fx-box-w)*.022));opacity:.4;text-align:right;letter-spacing:1px;margin-top:2px;white-space:nowrap}
 
 /* Pase de medición. La paginación necesita el alto NATURAL de cada fila: con
    flex:1 la suma daría siempre el alto disponible y saldría "todo cabe en una
    página" pasara lo que pasara. Estos valores son los de antes del reparto, de
    modo que cuántas filas caben por página se sigue decidiendo igual que antes. */
-.mod-fx-rows.fx-measuring .fx-row{flex:0 0 auto;padding:clamp(10px,2vh,28px) 0}
-.mod-fx-rows.fx-measuring .fx-flag{font-size:clamp(24px,4vw,56px);width:clamp(40px,5vw,72px)}
-.mod-fx-rows.fx-measuring .fx-country-name{font-size:clamp(13px,2vw,28px)}
-.mod-fx-rows.fx-measuring .fx-currency{font-size:clamp(10px,1.3vw,18px)}
-.mod-fx-rows.fx-measuring .fx-rate-val{font-size:clamp(20px,3.5vw,52px)}
-.mod-fx-rows.fx-measuring .fx-rate-label{font-size:clamp(9px,1vw,14px)}
+/* La medición usa los MISMOS topes que la presentación, en proporción a la caja
+   y no en vw. Antes iban en vw y, con el player rotado, medía filas más altas
+   de lo que luego se dibujaban: calculaba mal cuántas caben por página.
+   Al medir con el tope máximo, la capacidad queda del lado conservador y las
+   filas nunca desbordan. */
+.mod-fx-rows.fx-measuring .fx-row{flex:0 0 auto;height:auto;padding:clamp(10px,2vh,28px) 0}
+.mod-fx-rows.fx-measuring .fx-flag{font-size:calc(var(--fx-box-w)*.075);width:calc(var(--fx-box-w)*.10)}
+.mod-fx-rows.fx-measuring .fx-country-name{font-size:calc(var(--fx-box-w)*.055)}
+.mod-fx-rows.fx-measuring .fx-currency{font-size:calc(var(--fx-box-w)*.028)}
+.mod-fx-rows.fx-measuring .fx-rate-val{font-size:calc(var(--fx-box-w)*.115)}
+.mod-fx-rows.fx-measuring .fx-rate-label{font-size:calc(var(--fx-box-w)*.022)}
 
 /* ── Módulo clima */
 .mod-weather{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6vw;text-align:center}
@@ -575,16 +587,37 @@ function showSlide(idx){
 
 // Agrupa filas en páginas según la altura disponible. Pura a propósito: recibe
 // las alturas ya medidas, para poder probarla sin DOM (tests/fx-pagination.test.js).
+//
+// Reparte EQUILIBRADO, no llenando hasta arriba. Llenar la primera página al
+// máximo dejaba huérfana la última: con 8 divisas salía 7 y 1, y esa fila suelta
+// se estiraba a pantalla completa. Primero se calcula cuántas páginas hacen
+// falta y luego se reparten las filas a partes iguales.
+//
 // Una fila más alta que `avail` se coloca igualmente en su propia página: el
-// guardo `used>0` evita el bucle infinito y las páginas vacías.
+// guardo `cabe>0` evita el bucle infinito y las páginas vacías.
 function groupRowsIntoPages(heights, avail){
-  const pages=[]; let page=[]; let used=0;
-  heights.forEach((h,i)=>{
-    if(used>0 && used+h>avail){ pages.push(page); page=[]; used=0; }
-    page.push(i); used+=h;
-  });
-  if(page.length) pages.push(page);
-  return pages;
+  const n=heights.length;
+  if(!n) return [];
+
+  // Cuántas caben en una página, midiendo desde la más alta hacia abajo para
+  // que el reparto valga aunque las filas no midan todas lo mismo.
+  let cabe=0, usado=0;
+  for(const h of heights){
+    if(cabe>0 && usado+h>avail) break;
+    cabe++; usado+=h;
+  }
+  if(cabe<=0) cabe=1;
+  if(cabe>=n) return [heights.map((_,i)=>i)];       // caben todas: una página
+
+  const paginas=Math.ceil(n/cabe);
+  const base=Math.floor(n/paginas), resto=n%paginas;  // las primeras llevan una más
+  const out=[]; let i=0;
+  for(let p=0;p<paginas;p++){
+    const cuantas=base+(p<resto?1:0);
+    out.push(Array.from({length:cuantas},(_,k)=>i+k));
+    i+=cuantas;
+  }
+  return out;
 }
 
 // En modo previa, devolver al admin cuántas páginas han salido. Es la respuesta
@@ -605,12 +638,30 @@ function setupFxPagination(slide, perPageMs, onDone){
   if(container){
     const cs=getComputedStyle(container);
     avail=container.clientHeight-(parseFloat(cs.paddingTop)||0)-(parseFloat(cs.paddingBottom)||0);
+    // ANTES de medir: el pase de medición también usa --fx-box-w para calcular
+    // los tamaños, así que si se fijara después mediría con el valor por defecto.
+    container.style.setProperty("--fx-box-w", container.clientWidth+"px");
   }
   // Reparte el alto disponible entre las filas visibles de la página actual.
   // La tipografía cuelga de esta variable, así que 4 divisas en un 4K vertical
   // salen grandes y sin huecos, en vez de diminutas y agrupadas en el medio.
+  // Reparte el alto entre las filas visibles y publica el ancho REAL de la caja,
+  // del que cuelgan los topes de tipografía. Se mide aquí y no se usa vw porque
+  // con el player rotado por CSS vw se refiere al viewport sin rotar.
+  //
+  // El alto de fila se limita a un cuarto de la caja: con una sola divisa en la
+  // página, repartir "todo el alto entre una" daba una fila de pantalla completa
+  // con el texto gigante. Por debajo de cuatro filas se centran en vez de estirarse.
+  const MIN_FILAS_VISUALES=4;
   const fitRows=(n)=>{
-    if(container) container.style.setProperty("--fx-row-h", (avail/Math.max(1,n))+"px");
+    if(!container) return;
+    const filas=Math.max(1,n);
+    const alto=Math.min(avail/filas, avail/MIN_FILAS_VISUALES);
+    container.style.setProperty("--fx-row-h", alto+"px");
+    container.style.setProperty("--fx-box-w", container.clientWidth+"px");
+    // Si no llenan, agrupar en el centro; si llenan, repartir todo el alto.
+    container.style.justifyContent = (filas<MIN_FILAS_VISUALES) ? "center" : "stretch";
+    container.style.setProperty("--fx-flex", filas<MIN_FILAS_VISUALES ? "0 0 auto" : "1 1 0");
   };
 
   if(rows.length<=1 || avail<=0){                      // nada que paginar
