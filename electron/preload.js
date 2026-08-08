@@ -1,3 +1,3 @@
 window.addEventListener('DOMContentLoaded', () => {
-  console.log('SignalOS Pro iniciado');
+  console.log('InTeks Display iniciado');
 });

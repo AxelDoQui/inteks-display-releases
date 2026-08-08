@@ -1,4 +1,4 @@
-# SignalOS Pro — Construcción del Instalador
+# InTeks Display — Construcción del Instalador
 
 > Actualizado: 7 de agosto de 2026.
 
@@ -11,7 +11,7 @@
 ## ⚠️ El instalador NO incluye Python
 
 Conviene tenerlo claro antes de distribuir. `setup.iss` empaqueta los archivos
-de SignalOS, no un intérprete: `start_signalos.bat` invoca el `python.exe` del
+de InTeks Display, no un intérprete: `abrir-panel.bat` invoca el `python.exe` del
 PATH del sistema. En un equipo sin Python el lanzador se detiene y muestra
 instrucciones para instalarlo, en lugar de fallar en silencio como antes.
 
@@ -46,10 +46,10 @@ Digital Signage/
 ├── pair.html
 ├── sw.js               ← service worker de la PWA
 ├── config.json         (se instala con onlyifdoesntexist)
-├── start_signalos.bat
+├── abrir-panel.bat
 ├── assets/
 ├── vendor/
-├── signalos-extension/ ← se copia a {app}\extension\
+├── inteks-extension/ ← se copia a {app}\extension\
 └── installer/
     └── instalar-extension.html  ← la guía de 3 pasos
 ```
@@ -74,7 +74,7 @@ O abre `installer/setup.iss` con Inno Setup y pulsa *Compile*.
 ### 4. Resultado
 
 ```
-dist/installer/SignalOS_Pro_Setup_v1.0.0.exe
+dist/installer/InTeks_Display_Setup_v1.0.0.exe
 ```
 
 ## La extensión de Chrome
@@ -93,7 +93,7 @@ Quedan dos vías legítimas si algún día hace falta la instalación automátic
 
 - **Política de empresa** (`ExtensionInstallForcelist` en
   `HKLM\SOFTWARE\Policies\Google\Chrome`) apuntando a un `update.xml` propio.
-  SignalOS ya es un servidor HTTP y podría alojarlo. A cambio hay que firmar la
+  InTeks Display ya es un servidor HTTP y podría alojarlo. A cambio hay que firmar la
   extensión y el cliente no puede desinstalarla desde Chrome.
 - **Chrome Web Store** como extensión *no listada*, visible solo con el enlace.
   Cuesta 5 USD una vez, pasa revisión de Google y se actualiza sola.
@@ -103,13 +103,13 @@ tres clics una sola vez.
 
 ## Dónde viven los datos
 
-El programa se instala en `C:\Program Files\SignalOS Pro\` y **los datos van
-aparte**, en `C:\ProgramData\SignalOS Pro\`:
+El programa se instala en `C:\Program Files\InTeks Display\` y **los datos van
+aparte**, en `C:\ProgramData\InTeks Display\`:
 
 | Carpeta | Contenido | Al desinstalar |
 |---|---|---|
 | `{app}` | server.py, los .html, vendor, assets, extension | se borra |
-| `{commonappdata}\SignalOS Pro` | config.json, content.json, screens.json, admin.json, pin.json, uploads/ | **se conserva** |
+| `{commonappdata}\InTeks Display` | config.json, content.json, screens.json, admin.json, pin.json, uploads/ | **se conserva** |
 
 Windows prohíbe escribir en `Program Files` a los procesos sin elevar, así que
 guardar ahí el estado hacía que el servidor muriera al arrancar con
@@ -125,7 +125,7 @@ vez se copia a la carpeta de datos, respetando el puerto y el nombre elegidos.
 
 ## Cómo arranca el servidor
 
-Como **tarea programada** llamada `SignalOS Pro`, no como un `.bat` en el
+Como **tarea programada** llamada `InTeks Display`, no como un `.bat` en el
 arranque. La registra `installer\registrar-tarea.ps1` durante la instalación:
 
 | | |
@@ -147,7 +147,7 @@ Dos razones para no usar la clave `Run` del registro:
 
 `pythonw.exe` no abre consola en absoluto, así que **no hay ventana que
 cerrar**. Como contrapartida no hay salida por pantalla, y por eso el servidor
-escribe su registro en `C:\ProgramData\SignalOS Pro\server.log`: es el primer
+escribe su registro en `C:\ProgramData\InTeks Display\server.log`: es el primer
 sitio donde mirar si algo no arranca.
 
 El acceso directo del escritorio ya **no arranca el servidor**: abre el panel de
@@ -156,16 +156,16 @@ administración, y despierta la tarea si no estuviera corriendo.
 Para comprobar el estado a mano:
 
 ```powershell
-schtasks /Query /TN "SignalOS Pro" /V /FO LIST
-Get-Content "$env:ProgramData\SignalOS Pro\server.log" -Tail 20
+schtasks /Query /TN "InTeks Display" /V /FO LIST
+Get-Content "$env:ProgramData\InTeks Display\server.log" -Tail 20
 ```
 
 ## Qué hace el instalador
 
-- Instala en `C:\Program Files\SignalOS Pro\`
+- Instala en `C:\Program Files\InTeks Display\`
 - Accesos directos en escritorio y menú inicio
 - Opción de arranque con Windows (entrada en `HKCU\...\Run`)
-- Al ejecutar, `start_signalos.bat` lee el puerto de `config.json`, arranca
+- Al ejecutar, `abrir-panel.bat` lee el puerto de `config.json`, arranca
   `server.py`, espera a que escuche y abre el navegador en el puerto correcto
 - Desinstalador en "Programas y características"
 
@@ -192,7 +192,7 @@ causa más habitual de que la instalación acabe en el 9000.
 
 ## Distribución
 
-- Comparte `SignalOS_Pro_Setup_v1.0.0.exe`
+- Comparte `InTeks_Display_Setup_v1.0.0.exe`
 - Requiere Python 3.10+ en el equipo destino (ver arriba)
 - No requiere Node.js
 - Windows 10 y 11, 64 bits

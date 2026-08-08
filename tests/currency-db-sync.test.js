@@ -1,6 +1,6 @@
 /**
  * La base de monedas está duplicada: una copia en admin.html y otra en
- * signalos-extension/parser.js. La extensión es un paquete aparte y no puede
+ * inteks-extension/parser.js. La extensión es un paquete aparte y no puede
  * importar del admin, así que la duplicación es inevitable.
  *
  * Lo que sí se puede evitar es que se separen en silencio. Ya pasó una vez: se
@@ -32,7 +32,7 @@ function entradas(file, desde, hasta) {
 }
 
 const enAdmin = () => entradas("admin.html", "const CURRENCY_DB = [", "const CODE_MAP");
-const enExt = () => entradas("signalos-extension/parser.js", "const CURRENCY_DB = [", "const CODE_MAP");
+const enExt = () => entradas("inteks-extension/parser.js", "const CURRENCY_DB = [", "const CODE_MAP");
 
 const codigos = ls => ls.map(l => l.match(/code:"([A-Z]{3})"/)[1]);
 

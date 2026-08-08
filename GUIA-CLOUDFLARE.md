@@ -1,10 +1,10 @@
-# Guía: Acceso remoto a SignalOS Pro con Cloudflare Tunnel
+# Guía: Acceso remoto a InTeks Display con Cloudflare Tunnel
 
 > Objetivo: que tus pantallas (Smart TV, tablet, mini-PC) y tú podáis acceder al
-> servidor SignalOS **desde cualquier lugar** a través de una URL `https://`,
+> servidor InTeks Display **desde cualquier lugar** a través de una URL `https://`,
 > sin abrir puertos en el router y sin VPN en los dispositivos.
 >
-> Escenario: dominio comprado en **Hostinger**, servidor SignalOS en una **PC con
+> Escenario: dominio comprado en **Hostinger**, servidor InTeks Display en una **PC con
 > Windows** (puerto 80), una pantalla **Smart TV en otra oficina**.
 
 ---
@@ -17,7 +17,7 @@
      ☁ Cloudflare (HTTPS automático)
             │  (conexión SALIENTE desde el servidor; sin abrir puertos)
             ▼
-   PC servidor (Windows)  ──  cloudflared (servicio)  ──►  SignalOS en localhost:80
+   PC servidor (Windows)  ──  cloudflared (servicio)  ──►  InTeks Display en localhost:80
             │
    (otros sistemas con credenciales: INTACTOS, no se tocan)
 
@@ -34,13 +34,13 @@
 ## 1. Antes de empezar (requisitos)
 
 - [ ] Dominio comprado en Hostinger (ej. `tudominio.com`).
-- [ ] La PC servidor enciende y ejecuta SignalOS (`python server.py`, puerto 80).
+- [ ] La PC servidor enciende y ejecuta InTeks Display (`python server.py`, puerto 80).
 - [ ] **Contraseña del admin ya creada** (la pusiste en la primera pantalla de login).
 - [ ] **Token de API** copiado desde el admin → *Ajustes → Seguridad y acceso*
       (lo necesitarás solo si usarás la extensión de Chrome a distancia).
 
 > ⚠️ Importante: NO expongas el servidor a internet sin la contraseña del admin.
-> Eso ya está hecho en SignalOS, pero verifica que al abrir `/admin.html` te pide login.
+> Eso ya está hecho en InTeks Display, pero verifica que al abrir `/admin.html` te pide login.
 
 ---
 
@@ -109,7 +109,7 @@ Windows** (arranca solo con la PC, ideal para señalización).
 
 ---
 
-## 5. Conectar el subdominio con SignalOS
+## 5. Conectar el subdominio con InTeks Display
 
 Seguimos en el asistente del túnel, pestaña **Public Hostname** (o
 *Route traffic → Public hostnames → Add a public hostname*):
@@ -123,7 +123,7 @@ Seguimos en el asistente del túnel, pestaña **Public Hostname** (o
    - URL: `localhost:80`
 5. **Save hostname**.
 
-✅ ¡Listo! En 1–2 minutos, `https://signage.tudominio.com` apunta a tu SignalOS.
+✅ ¡Listo! En 1–2 minutos, `https://signage.tudominio.com` apunta a tu InTeks Display.
 
 ### Añadir más subdominios (opcional)
 Puedes repetir el paso 5 con otros subdominios al **mismo** `localhost:80`,
@@ -179,14 +179,14 @@ Si actualizas tipos de cambio desde otra PC con la extensión:
   el contenido y aguantan cortes de internet mucho mejor.
 - 🚪 **Cero puertos abiertos** en el router (la conexión sale del servidor).
 - 🛡️ Tus otros sistemas con credenciales **no se ven afectados** (cloudflared solo
-  expone el puerto 80 de SignalOS, nada más).
+  expone el puerto 80 de InTeks Display, nada más).
 
 ---
 
 ## 10. Mantenimiento y notas
 
 - **Reinicios de la PC**: `cloudflared` está como servicio → arranca solo. Asegúrate
-  también de que SignalOS arranque solo (admin → *Ajustes → Iniciar con Windows*).
+  también de que InTeks Display arranque solo (admin → *Ajustes → Iniciar con Windows*).
 - **El servidor debe estar encendido**: si la PC se apaga, las pantallas pierden
   conexión (igual que en local). El túnel no sustituye a tener el servidor activo.
 - **Vídeo pesado**: el plan gratis de Cloudflare desaconseja usarlo como CDN de
@@ -203,7 +203,7 @@ Si actualizas tipos de cambio desde otra PC con la extensión:
 |---|---|---|
 | El dominio sigue "Pending" en Cloudflare | Nameservers no propagados | Espera; verifica en Hostinger que pusiste **exactamente** los 2 NS de Cloudflare |
 | `signage.tudominio.com` da error 1033 / "tunnel not found" | El servicio cloudflared no corre | En la PC: `Get-Service cloudflared` → debe estar *Running*. Reinícialo: `Restart-Service cloudflared` |
-| Carga pero da **502 Bad Gateway** | SignalOS no está activo en localhost:80 | Arranca `python server.py`; comprueba `http://localhost` en la propia PC |
+| Carga pero da **502 Bad Gateway** | InTeks Display no está activo en localhost:80 | Arranca `python server.py`; comprueba `http://localhost` en la propia PC |
 | El subdominio no aparece en el desplegable | El dominio no está *Active* en Cloudflare | Termina el paso 3 antes del 5 |
 | La extensión da 401 a distancia | Falta el token o URL incorrecta | Pon `https://signage.tudominio.com` + el token en la extensión |
 | Quiero ver logs del túnel | — | `cloudflared.exe tunnel info signalos` o revisa el panel Zero Trust → Tunnels |
@@ -258,9 +258,9 @@ ingress:
 - [ ] Probado `https://signage.tudominio.com` desde fuera
 - [ ] Contraseña del admin verificada
 - [ ] (Opcional) Extensión configurada con URL https + token
-- [ ] SignalOS y cloudflared configurados para **arrancar con Windows**
+- [ ] InTeks Display y cloudflared configurados para **arrancar con Windows**
 
 ---
 
-*Documento generado para SignalOS Pro. Cuando tengas el dominio, sígueme los pasos
+*Documento generado para InTeks Display. Cuando tengas el dominio, sígueme los pasos
 1→6 y avísame si algo no cuadra; lo afinamos juntos.*

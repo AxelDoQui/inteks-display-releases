@@ -1,4 +1,4 @@
-# Registra SignalOS Pro como tarea programada al ENCENDER el equipo.
+# Registra InTeks Display como tarea programada al ENCENDER el equipo.
 #
 # Por qué una tarea y no la clave Run del registro:
 #   - Run se dispara al INICIAR SESIÓN. Tras un corte de luz de madrugada el PC
@@ -12,7 +12,7 @@
 # otras cosas. El servidor escribe su registro en server.log, dentro de la
 # carpeta de datos.
 #
-# Uso:  registrar-tarea.ps1 -AppDir "C:\Program Files\SignalOS Pro"
+# Uso:  registrar-tarea.ps1 -AppDir "C:\Program Files\InTeks Display"
 #       registrar-tarea.ps1 -Quitar
 
 param(
@@ -20,12 +20,35 @@ param(
     [switch]$Quitar
 )
 
-$TAREA = "SignalOS Pro"
+$TAREA = "InTeks Display"
+# El producto se llamaba SignalOS Pro. Su tarea hay que borrarla siempre, o
+# quedarian dos arrancando servidores que se pelean por el puerto 80.
+$TAREAS_VIEJAS = @("SignalOS Pro", "SignalOS")
 
 if ($Quitar) {
-    schtasks /Delete /TN $TAREA /F 2>$null | Out-Null
+    foreach ($t in @($TAREA) + $TAREAS_VIEJAS) { schtasks /Delete /TN $t /F 2>$null | Out-Null }
     Write-Host "Tarea '$TAREA' eliminada."
     exit 0
+}
+
+# Limpieza de la version anterior, antes de registrar la nueva
+foreach ($t in $TAREAS_VIEJAS) {
+    if (Get-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue) {
+        Stop-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue
+        schtasks /Delete /TN $t /F 2>$null | Out-Null
+        Write-Host "Tarea antigua '$t' eliminada."
+    }
+}
+# Y cualquier servidor de la instalacion anterior que siga vivo: si no, ocupa
+# el puerto 80 y el nuevo nunca llega a arrancar ahi.
+Get-Process python,pythonw -ErrorAction SilentlyContinue | ForEach-Object {
+    try {
+        $cl = (Get-CimInstance Win32_Process -Filter "ProcessId=$($_.Id)" -ErrorAction Stop).CommandLine
+        if ($cl -like "*SignalOS*server.py*") {
+            Write-Host "Cerrando servidor anterior (PID $($_.Id))."
+            Stop-Process -Id $_.Id -Force
+        }
+    } catch {}
 }
 
 if (-not $AppDir -or -not (Test-Path (Join-Path $AppDir "server.py"))) {

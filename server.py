@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SignalOS Pro — Servidor Digital Signage
+InTeks Display — Servidor Digital Signage
 Ejecutar: python server.py [--port PUERTO]
 Admin:    http://localhost/admin.html   (puerto 80 por defecto)
 Player:   http://TU_IP/player.html?screen=NOMBRE
@@ -35,7 +35,7 @@ def pick_data_dir():
         return APP_DIR
     except OSError:
         base = os.environ.get("PROGRAMDATA") or os.path.expanduser("~")
-        d = os.path.join(base, "SignalOS Pro")
+        d = os.path.join(base, "InTeks Display")
         os.makedirs(d, exist_ok=True)
         return d
 
@@ -87,6 +87,28 @@ if DATA_DIR != APP_DIR and not os.path.exists(CONFIG_FILE) and os.path.exists(_p
     try: shutil.copy2(_plantilla, CONFIG_FILE)
     except OSError: pass
 
+ESTADO = ("screens.json", "content.json", "admin.json", "pin.json")
+
+def _traer_de(origen):
+    """Copia el estado desde una ubicación anterior. Nunca pisa lo que ya
+    exista en destino: si hay datos nuevos, mandan ellos."""
+    if not origen or not os.path.isdir(origen) or os.path.abspath(origen) == os.path.abspath(DATA_DIR):
+        return
+    for nombre in ESTADO:
+        viejo, nuevo = os.path.join(origen, nombre), os.path.join(DATA_DIR, nombre)
+        if os.path.exists(viejo) and not os.path.exists(nuevo):
+            try:
+                shutil.copy2(viejo, nuevo)
+                log(f"  [migración] {nombre} traído de {origen}")
+            except OSError: pass
+    viejo_up = os.path.join(origen, "uploads")
+    if os.path.isdir(viejo_up):
+        for f in os.listdir(viejo_up):
+            o, d = os.path.join(viejo_up, f), os.path.join(UPLOAD_DIR, f)
+            if os.path.isfile(o) and not os.path.exists(d):
+                try: shutil.copy2(o, d)
+                except OSError: pass
+
 def migrar_datos_antiguos():
     """Trae el estado de versiones que lo guardaban junto al programa.
 
@@ -97,20 +119,14 @@ def migrar_datos_antiguos():
     """
     if DATA_DIR == APP_DIR:
         return
-    for nombre in ("screens.json", "content.json", "admin.json", "pin.json"):
-        viejo, nuevo = os.path.join(APP_DIR, nombre), os.path.join(DATA_DIR, nombre)
-        if os.path.exists(viejo) and not os.path.exists(nuevo):
-            try:
-                shutil.copy2(viejo, nuevo)
-                log(f"  [migración] {nombre} traído de la instalación anterior")
-            except OSError: pass
-    viejo_up = os.path.join(APP_DIR, "uploads")
-    if os.path.isdir(viejo_up):
-        for f in os.listdir(viejo_up):
-            o, d = os.path.join(viejo_up, f), os.path.join(UPLOAD_DIR, f)
-            if os.path.isfile(o) and not os.path.exists(d):
-                try: shutil.copy2(o, d)
-                except OSError: pass
+    # Junto al programa: versiones anteriores a separar programa y datos.
+    _traer_de(APP_DIR)
+    # Carpeta del nombre anterior: el producto se llamaba SignalOS Pro y sus
+    # datos vivían en ProgramData\SignalOS Pro. Sin traerlos, cambiarle el
+    # nombre al producto le borraría al cliente sus pantallas y su contraseña.
+    base = os.path.dirname(DATA_DIR)
+    for antiguo in ("SignalOS Pro", "SignalOS"):
+        _traer_de(os.path.join(base, antiguo))
 
 migrar_datos_antiguos()
 
@@ -179,7 +195,7 @@ def load_config():
     default_config = {
         "port": 80,
         "port_fallback": 9000,
-        "installation_name": "SignalOS Pro",
+        "installation_name": "InTeks Display",
         "mdns_name": "signage",
         "autostart": False,
         "first_run": True

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "SignalOS Pro — Divisas",
+  "name": "InTeks Display — Divisas",
   "version": "1.0.0",
-  "description": "Detecta tipos de cambio en cualquier web y los envía a SignalOS Pro con un clic.",
+  "description": "Detecta tipos de cambio en cualquier web y los envía a InTeks Display con un clic.",
   "permissions": ["activeTab", "storage", "scripting"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "action": {

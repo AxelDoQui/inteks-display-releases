@@ -1,8 +1,8 @@
-// Panel lateral de SignalOS Pro — corre dentro del iframe inyectado en la página.
+// Panel lateral de InTeks Display — corre dentro del iframe inyectado en la página.
 let selectedRows = [];
 let detectedRows = [];
 let savedModules = [];   // módulos de divisas que ya existen en el admin
-let serverUrl = 'http://localhost';   // puerto 80 por defecto (SignalOS); configurable
+let serverUrl = 'http://localhost';   // puerto 80 por defecto (InTeks Display); configurable
 let apiToken = '';                    // token de API (Ajustes del admin); requerido si hay contraseña
 let screens = [];
 
@@ -217,7 +217,7 @@ function renderSelected() {
 }
 function updateSendBtn() { document.getElementById('send-btn').disabled = selectedRows.length === 0; }
 
-async function sendToSignalOS() {
+async function enviarAServidor() {
   const btn = document.getElementById('send-btn');
   const screenId = document.getElementById('screen-select').value;
   btn.textContent = 'Enviando...'; btn.disabled = true;
@@ -241,12 +241,12 @@ async function sendToSignalOS() {
       selectedRows.forEach(r => { r.was = r.rate; r.changed = false; });
       renderSelected();
       loadModules();
-      setTimeout(() => { btn.textContent = 'Actualizar SignalOS'; btn.style.background = ''; updateSendBtn(); }, 2000);
+      setTimeout(() => { btn.textContent = 'Actualizar InTeks Display'; btn.style.background = ''; updateSendBtn(); }, 2000);
     } else { throw new Error(d.error || 'Error'); }
   } catch (e) {
     btn.textContent = e && e.auth ? '✗ Falta el token de API' : '✗ Error — reintentar';
     btn.style.background = 'var(--danger)';
-    setTimeout(() => { btn.textContent = 'Actualizar SignalOS'; btn.style.background = ''; btn.disabled = false; }, 3000);
+    setTimeout(() => { btn.textContent = 'Actualizar InTeks Display'; btn.style.background = ''; btn.disabled = false; }, 3000);
   }
 }
 
@@ -276,7 +276,7 @@ async function saveConfig() {
 }
 
 function setupEventListeners() {
-  document.getElementById('send-btn').addEventListener('click', sendToSignalOS);
+  document.getElementById('send-btn').addEventListener('click', enviarAServidor);
   document.getElementById('m-add').addEventListener('click', addManual);
   document.getElementById('save-config').addEventListener('click', saveConfig);
   document.getElementById('module-select').addEventListener('change', pickModule);

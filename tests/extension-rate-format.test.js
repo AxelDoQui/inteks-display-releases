@@ -12,7 +12,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-const PARSER = path.join(__dirname, "..", "signalos-extension", "parser.js");
+const PARSER = path.join(__dirname, "..", "inteks-extension", "parser.js");
 
 function loadNormalize() {
   const src = fs.readFileSync(PARSER, "utf8");
