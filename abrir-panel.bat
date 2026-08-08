@@ -77,5 +77,24 @@ if not defined READY (
 
 REM Se abre el ADMIN, no la raiz. La raiz es el router de arranque de PANTALLAS:
 REM sin identidad guardada redirige a /pair, y eso toca en una tablet, no aqui.
-start "" "http://localhost:%READY%/admin.html"
+set "PANEL=http://localhost:%READY%/admin.html"
+
+REM En modo aplicacion (--app): ventana propia, sin barra de direcciones ni
+REM pestanas del navegador, y con el icono de InTeks Display en la barra de
+REM tareas. Parece un programa y no una pestana perdida entre las demas.
+REM Si no hay Chrome ni Edge, se abre en el navegador por defecto.
+set "NAVEGADOR="
+for %%P in (
+  "%ProgramFiles%\Google\Chrome\Application\chrome.exe"
+  "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
+  "%LocalAppData%\Google\Chrome\Application\chrome.exe"
+  "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"
+  "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"
+) do if not defined NAVEGADOR if exist %%P set "NAVEGADOR=%%~P"
+
+if defined NAVEGADOR (
+    start "" "%NAVEGADOR%" --app="%PANEL%"
+) else (
+    start "" "%PANEL%"
+)
 exit /b 0
