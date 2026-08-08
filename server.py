@@ -1174,7 +1174,7 @@ if __name__ == "__main__":
     # Anunciar el nombre mDNS (http://signage.local) en la red local
     start_mdns_responder()
     log("\n" + "="*56)
-    log("  SIGNALOS PRO — SERVIDOR DIGITAL SIGNAGE")
+    log("  INTEKS DISPLAY — SERVIDOR DIGITAL SIGNAGE")
     log("="*56)
     log(f"  Admin:           {url_for('/admin.html', host='localhost')}")
     log(f"  Enlazar (nombre): {url_for('/pair')}")
