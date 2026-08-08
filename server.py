@@ -87,6 +87,90 @@ if DATA_DIR != APP_DIR and not os.path.exists(CONFIG_FILE) and os.path.exists(_p
     try: shutil.copy2(_plantilla, CONFIG_FILE)
     except OSError: pass
 
+def migrar_datos_antiguos():
+    """Trae el estado de versiones que lo guardaban junto al programa.
+
+    Antes todo vivía en la carpeta de instalación. Al separar programa y datos,
+    una actualización dejaría ese estado huérfano y el cliente perdería sus
+    pantallas, su contenido y su contraseña. Se copia una sola vez y NUNCA se
+    pisa lo que ya exista en destino: si hay datos nuevos, mandan ellos.
+    """
+    if DATA_DIR == APP_DIR:
+        return
+    for nombre in ("screens.json", "content.json", "admin.json", "pin.json"):
+        viejo, nuevo = os.path.join(APP_DIR, nombre), os.path.join(DATA_DIR, nombre)
+        if os.path.exists(viejo) and not os.path.exists(nuevo):
+            try:
+                shutil.copy2(viejo, nuevo)
+                log(f"  [migración] {nombre} traído de la instalación anterior")
+            except OSError: pass
+    viejo_up = os.path.join(APP_DIR, "uploads")
+    if os.path.isdir(viejo_up):
+        for f in os.listdir(viejo_up):
+            o, d = os.path.join(viejo_up, f), os.path.join(UPLOAD_DIR, f)
+            if os.path.isfile(o) and not os.path.exists(d):
+                try: shutil.copy2(o, d)
+                except OSError: pass
+
+migrar_datos_antiguos()
+
+# ── Emparejamiento inverso ─────────────────────────────────────────────────
+# Antes el admin generaba un PIN y había que teclearlo EN la pantalla, con el
+# mando del televisor. Ahora la pantalla pide un código, lo muestra en grande, y
+# el nombre se le pone desde el ordenador: se lee un número en el TV y se teclea
+# con un teclado de verdad. Además el nombre deja de escribirse con el mando.
+#
+# En memoria a propósito: el emparejamiento dura segundos y se cura solo. Si el
+# servidor se reinicia, la pantalla no reconoce su token, pide otro código y
+# vuelve a mostrarlo. Persistirlo sería complicarlo sin ganar nada.
+pending_lock = threading.Lock()
+pending_screens = {}          # token -> {code, created, claimed_as}
+PENDING_TTL = 900             # 15 min sin reclamar y se olvida
+
+def _purge_pending():
+    ahora = time.time()
+    for t in [t for t, v in pending_screens.items() if ahora - v["created"] > PENDING_TTL]:
+        del pending_screens[t]
+
+def pending_new():
+    """La pantalla pide un código. Devuelve (código, token)."""
+    with pending_lock:
+        _purge_pending()
+        usados = {v["code"] for v in pending_screens.values()}
+        for _ in range(200):
+            code = f"{random.randint(0, 9999):04d}"
+            if code not in usados: break
+        token = secrets.token_hex(16)
+        pending_screens[token] = {"code": code, "created": time.time(), "claimed_as": None}
+        return code, token
+
+def pending_list():
+    """Códigos a la espera, para que el admin los muestre."""
+    with pending_lock:
+        _purge_pending()
+        return sorted(
+            ({"code": v["code"], "waiting_for": int(time.time() - v["created"])}
+             for v in pending_screens.values() if not v["claimed_as"]),
+            key=lambda x: x["waiting_for"])
+
+def pending_claim(code, name):
+    """El admin asigna un nombre a un código. Devuelve (ok, mensaje)."""
+    with pending_lock:
+        _purge_pending()
+        for v in pending_screens.values():
+            if v["code"] == str(code).strip() and not v["claimed_as"]:
+                v["claimed_as"] = name
+                return True, "enlazada"
+        return False, "Ese código no está esperando. Comprueba el número en la pantalla."
+
+def pending_status(token):
+    """La pantalla pregunta si ya la han enlazado."""
+    with pending_lock:
+        _purge_pending()
+        v = pending_screens.get(token)
+        if not v: return None
+        return v["claimed_as"]
+
 def init_file(path, default):
     if not os.path.exists(path):
         with open(path, "w") as f: json.dump(default, f, indent=2)
@@ -518,6 +602,14 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(200); self.send_header("Content-Type","application/json")
             self.cors(); self.end_headers(); self.wfile.write(body); return
 
+        # ── API: pantallas encendidas esperando a que se les ponga nombre
+        if path == "/api/pair-pending":
+            if not self.require_auth(): return
+            body = json.dumps({"pending": pending_list()}).encode()
+            self.send_response(200); self.send_header("Content-Type","application/json")
+            self.send_header("Cache-Control","no-store")
+            self.cors(); self.end_headers(); self.wfile.write(body); return
+
         # ── API: obtener pantallas registradas  (solo admin / extensión con token)
         if path == "/api/screens":
             if not self.require_auth(): return
@@ -748,9 +840,53 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"ok": True}).encode())
             return
 
+        # ── La pantalla pide un código de emparejamiento. Público a la fuerza:
+        #    una pantalla sin enlazar no tiene sesión ni token. No expone nada,
+        #    solo devuelve un número al azar que no sirve de nada sin que un
+        #    administrador autenticado lo reclame desde el panel.
+        if path == "/api/pair-request":
+            code, token = pending_new()
+            jresp(200, {"ok": True, "code": code, "token": token}); return
+
+        # ── La pantalla pregunta si ya la han enlazado, y con qué nombre.
+        if path == "/api/pair-status":
+            try:
+                d = json.loads(body or "{}")
+                nombre = pending_status(d.get("token", ""))
+                if nombre is None and d.get("token", "") not in pending_screens:
+                    jresp(200, {"ok": True, "expired": True}); return
+                jresp(200, {"ok": True, "claimed": bool(nombre), "screen": nombre or ""}); return
+            except Exception as e: err(e)
+            return
+
         # ── PUERTA DE CONTROL: todo lo que sigue exige sesión válida (cookie) o api_token.
         #    Excepción: /api/pair es público (las pantallas se enlazan con el PIN).
         if path != "/api/pair" and not self.require_auth():
+            return
+
+        # ── El admin pone nombre a una pantalla que está esperando
+        if path == "/api/pair-claim":
+            try:
+                d = json.loads(body or "{}")
+                code = str(d.get("code", "")).strip()
+                nombre = str(d.get("screen_name", "")).strip()
+                if not nombre:
+                    jresp(400, {"ok": False, "error": "Ponle un nombre a la pantalla"}); return
+                screens = load_json(SCREENS_FILE)
+                if nombre in screens:
+                    jresp(400, {"ok": False, "error": f"Ya existe una pantalla llamada '{nombre}'"}); return
+                ok_claim, msg = pending_claim(code, nombre)
+                if not ok_claim:
+                    jresp(400, {"ok": False, "error": msg}); return
+                # Registrarla ya, para que aparezca en el panel sin esperar al SSE
+                screens[nombre] = {"id": nombre, "connected": True, "last_seen": time.time()}
+                save_json(SCREENS_FILE, screens)
+                content = load_json(CONTENT_FILE)
+                content.setdefault("screens", {}).setdefault(nombre, {"mode": "independent", "playlist": []})
+                save_json(CONTENT_FILE, content)
+                log(f"  [enlace] pantalla '{nombre}' enlazada con el código {code}")
+                ok({"screen_name": nombre})
+            except Exception as e: err(e)
             return
 
         # ── Subir archivo a librería global

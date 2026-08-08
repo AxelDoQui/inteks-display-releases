@@ -114,7 +114,70 @@ def main():
     finally:
         parar(p)
 
-    for d in (dev, app, datos, app2, datos2):
+    # ── 4. Al actualizar no se pierden las pantallas ya configuradas ────────
+    # Las versiones anteriores guardaban el estado junto al programa. Si al
+    # actualizar no se trae, el cliente pierde sus pantallas y su contenido.
+    app3 = tempfile.mkdtemp(prefix="signalos_app3_")
+    datos3 = tempfile.mkdtemp(prefix="signalos_data3_")
+    for f in ESTATICOS:
+        shutil.copy2(os.path.join(SRC, f), app3)
+    json.dump({"TV-Salon": {"id": "TV-Salon", "connected": False, "last_seen": 1}},
+              open(os.path.join(app3, "screens.json"), "w"))
+    json.dump({"items": [{"id": "fx_1", "type": "fx", "title": "WU", "rows": []}],
+               "screens": {"TV-Salon": {"mode": "independent", "playlist": []}}},
+              open(os.path.join(app3, "content.json"), "w"))
+    json.dump({"salt": "aa", "pwd_hash": "bb", "secret": "cc"},
+              open(os.path.join(app3, "admin.json"), "w"))
+    os.makedirs(os.path.join(app3, "uploads"), exist_ok=True)
+    open(os.path.join(app3, "uploads", "logo.png"), "wb").write(b"PNG")
+
+    p, err = arrancar(app3, {"SIGNALOS_DATA": datos3}, PORT + 3)
+    try:
+        if err:
+            print(f"  FALLO no arranco: {str(err)[:200]}")
+            fallos += 1
+        else:
+            scr = json.load(open(os.path.join(datos3, "screens.json")))
+            ok = "TV-Salon" in scr
+            print(f"  {'ok  ' if ok else 'FALLO'} al actualizar se conservan las pantallas configuradas")
+            fallos += not ok
+
+            cont = json.load(open(os.path.join(datos3, "content.json")))
+            ok = len(cont.get("items", [])) == 1
+            print(f"  {'ok  ' if ok else 'FALLO'} y el contenido de la libreria")
+            fallos += not ok
+
+            ok = os.path.exists(os.path.join(datos3, "admin.json"))
+            print(f"  {'ok  ' if ok else 'FALLO'} y la contrasena, para no obligar a crearla de nuevo")
+            fallos += not ok
+
+            ok = os.path.exists(os.path.join(datos3, "uploads", "logo.png"))
+            print(f"  {'ok  ' if ok else 'FALLO'} y los archivos subidos")
+            fallos += not ok
+    finally:
+        parar(p)
+
+    # ── 5. No pisar datos ya existentes ─────────────────────────────────────
+    app4 = tempfile.mkdtemp(prefix="signalos_app4_")
+    datos4 = tempfile.mkdtemp(prefix="signalos_data4_")
+    for f in ESTATICOS:
+        shutil.copy2(os.path.join(SRC, f), app4)
+    json.dump({"VIEJA": {}}, open(os.path.join(app4, "screens.json"), "w"))
+    json.dump({"NUEVA": {}}, open(os.path.join(datos4, "screens.json"), "w"))
+    p, err = arrancar(app4, {"SIGNALOS_DATA": datos4}, PORT + 4)
+    try:
+        if err:
+            print(f"  FALLO no arranco: {str(err)[:200]}")
+            fallos += 1
+        else:
+            scr = json.load(open(os.path.join(datos4, "screens.json")))
+            ok = "NUEVA" in scr and "VIEJA" not in scr
+            print(f"  {'ok  ' if ok else 'FALLO'} la migracion no pisa datos que ya existen")
+            fallos += not ok
+    finally:
+        parar(p)
+
+    for d in (dev, app, datos, app2, datos2, app3, datos3, app4, datos4):
         shutil.rmtree(d, ignore_errors=True)
     print("TODO OK" if fallos == 0 else f"{fallos} FALLO(S)")
     return 1 if fallos else 0
