@@ -177,7 +177,44 @@ def main():
     finally:
         parar(p)
 
-    for d in (dev, app, datos, app2, datos2, app3, datos3, app4, datos4):
+    # ── 6. Al cambiar el nombre del producto tampoco se pierde nada ─────────
+    # Los datos vivian en ProgramData\SignalOS Pro y ahora van a
+    # ProgramData\InTeks Display. Sin traerlos, renombrar el producto le
+    # borraria al cliente sus pantallas y su contrasena.
+    app5 = tempfile.mkdtemp(prefix="signalos_app5_")
+    raiz5 = tempfile.mkdtemp(prefix="signalos_pd_")          # simula ProgramData
+    viejo5 = os.path.join(raiz5, "SignalOS Pro")
+    os.makedirs(os.path.join(viejo5, "uploads"), exist_ok=True)
+    for f in ESTATICOS:
+        shutil.copy2(os.path.join(SRC, f), app5)
+    json.dump({"TV-Viejo": {"id": "TV-Viejo", "connected": False, "last_seen": 1}},
+              open(os.path.join(viejo5, "screens.json"), "w"))
+    json.dump({"items": [{"id": "fx_9", "type": "fx", "title": "WU", "rows": []}], "screens": {}},
+              open(os.path.join(viejo5, "content.json"), "w"))
+    json.dump({"salt": "aa", "pwd_hash": "bb"}, open(os.path.join(viejo5, "admin.json"), "w"))
+    open(os.path.join(viejo5, "uploads", "foto.png"), "wb").write(b"PNG")
+
+    nuevo5 = os.path.join(raiz5, "InTeks Display")
+    p, err = arrancar(app5, {"SIGNALOS_DATA": nuevo5}, PORT + 5)
+    try:
+        if err:
+            print(f"  FALLO no arranco: {str(err)[:200]}")
+            fallos += 1
+        else:
+            scr = json.load(open(os.path.join(nuevo5, "screens.json")))
+            ok = "TV-Viejo" in scr
+            print(f"  {'ok  ' if ok else 'FALLO'} al renombrar el producto se conservan las pantallas")
+            fallos += not ok
+            ok = os.path.exists(os.path.join(nuevo5, "admin.json"))
+            print(f"  {'ok  ' if ok else 'FALLO'} y la contrasena")
+            fallos += not ok
+            ok = os.path.exists(os.path.join(nuevo5, "uploads", "foto.png"))
+            print(f"  {'ok  ' if ok else 'FALLO'} y los archivos subidos")
+            fallos += not ok
+    finally:
+        parar(p)
+
+    for d in (dev, app, datos, app2, datos2, app3, datos3, app4, datos4, app5, raiz5):
         shutil.rmtree(d, ignore_errors=True)
     print("TODO OK" if fallos == 0 else f"{fallos} FALLO(S)")
     return 1 if fallos else 0

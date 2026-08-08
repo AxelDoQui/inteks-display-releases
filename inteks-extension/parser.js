@@ -1,4 +1,4 @@
-// SignalOS Pro — detección de divisas (compartido por content.js y sidebar.js)
+// InTeks Display — detección de divisas (compartido por content.js y sidebar.js)
 // No usa ES modules: expone window.SignalosParser para content scripts.
 window.SignalosParser = (function () {
   // Base de monedas — COPIA EXACTA de la de admin.html.

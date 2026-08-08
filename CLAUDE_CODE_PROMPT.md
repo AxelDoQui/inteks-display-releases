@@ -1,4 +1,4 @@
-# SignalOS Pro — Contexto para Claude Code
+# InTeks Display — Contexto para Claude Code
 
 > Actualizado: 7 de agosto de 2026. Este documento describe el estado **real** del
 > código. Si algo aquí no cuadra con lo que ves en los archivos, gana el código:
@@ -82,10 +82,10 @@ Los `clamp()`/`vw`/`vh` se resuelven así contra el viewport real, de modo que l
 cuenta de "cuántas divisas caben" la da el renderizador de verdad y no hay
 lógica de maquetación duplicada que se desincronice al tocar el CSS.
 
-### Extensión de Chrome — `signalos-extension/`
+### Extensión de Chrome — `inteks-extension/`
 
 Manifest V3. Detecta tablas de tipos de cambio en cualquier web y las envía a
-SignalOS con un clic, vía `POST /api/fx-update` autenticado con el token de API
+InTeks Display con un clic, vía `POST /api/fx-update` autenticado con el token de API
 que se copia desde *Ajustes → Seguridad*. Sirve también en remoto a través del
 túnel de Cloudflare.
 
@@ -122,7 +122,7 @@ GET       /uploads/*           archivos subidos (soporta Range)
 
 Todos son rutas **relativas**, así que el servidor debe ejecutarse con el
 working directory en su propia carpeta. Es la razón de que
-`start_signalos.bat` haga `cd /d` antes de arrancar: lanzado desde el registro
+`abrir-panel.bat` haga `cd /d` antes de arrancar: lanzado desde el registro
 de autoarranque, el CWD sería `System32` y crearía allí una base de datos
 vacía.
 

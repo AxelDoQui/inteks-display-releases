@@ -14,7 +14,7 @@ function loadConfig() {
   const defaults = {
     port: 80,
     port_fallback: 9000,
-    installation_name: "SignalOS Pro",
+    installation_name: "InTeks Display",
     mdns_name: "signage",
     autostart: false,
     kiosk: false,             // si true: esta PC también es pantalla (player a pantalla completa)
@@ -139,7 +139,7 @@ function createWindow(port) {
 function createTray(port) {
   tray = new Tray(path.join(__dirname, '..', 'assets', 'icon.ico'));
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'SignalOS Pro', enabled: false },
+    { label: 'InTeks Display', enabled: false },
     { type: 'separator' },
     { label: 'Abrir Admin', click: () => shell.openExternal(`http://localhost:${port}/`) },
     { label: 'Recargar pantalla', click: () => { if (mainWindow) mainWindow.reload(); } },
@@ -147,7 +147,7 @@ function createTray(port) {
     { label: 'Salir', click: () => { isQuitting = true; app.quit(); } }
   ]);
   tray.setContextMenu(contextMenu);
-  tray.setToolTip('SignalOS Pro');
+  tray.setToolTip('InTeks Display');
   tray.on('click', () => { if (mainWindow) (mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show()); });
 }
 

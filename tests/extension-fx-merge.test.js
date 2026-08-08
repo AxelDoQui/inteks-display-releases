@@ -14,7 +14,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-const SIDEBAR = path.join(__dirname, "..", "signalos-extension", "sidebar.js");
+const SIDEBAR = path.join(__dirname, "..", "inteks-extension", "sidebar.js");
 
 // Ejecuta applyDetectedToSelected() con un estado dado y devuelve el resultado.
 function merge(guardadas, detectadas) {

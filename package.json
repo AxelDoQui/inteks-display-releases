@@ -1,5 +1,5 @@
 {
-  "name": "signalos-pro",
+  "name": "inteks-display",
   "version": "1.0.0",
   "description": "Sistema de cartelería digital profesional",
   "main": "electron/main.js",
@@ -7,7 +7,7 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "test": "node --test tests/*.test.js",
-    "pack": "electron-packager . SignalOS_Pro --platform=win32 --arch=x64 --out=dist --overwrite --icon=assets/icon.ico --ignore=node_modules --ignore=dist --ignore=installer"
+    "pack": "electron-packager . InTeks_Display --platform=win32 --arch=x64 --out=dist --overwrite --icon=assets/icon.ico --ignore=node_modules --ignore=dist --ignore=installer"
   },
   "keywords": [
     "digital",

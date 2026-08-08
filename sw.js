@@ -1,4 +1,4 @@
-// Service Worker de SignalOS Pro — caché offline para el player.
+// Service Worker de InTeks Display — caché offline para el player.
 // SOLO funciona en contexto seguro (localhost o HTTPS). En http://IP no se registra.
 // Diseño SEGURO: nunca intercepta /api/ (datos/SSE) ni vídeos (HTTP Range) para no romperlos.
 const CACHE = 'signalos-v1';

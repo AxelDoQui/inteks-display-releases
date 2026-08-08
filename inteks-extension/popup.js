@@ -18,7 +18,7 @@ async function checkStatus(url) {
     }
   } catch (e) {}
   dot.className = 'dot';
-  txt.textContent = 'Sin conexión con SignalOS';
+  txt.textContent = 'Sin conexión con InTeks Display';
 }
 
 document.getElementById('save').addEventListener('click', async () => {
