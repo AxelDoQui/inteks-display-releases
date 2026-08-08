@@ -925,27 +925,47 @@ class Handler(BaseHTTPRequestHandler):
             return out
 
         # ── El admin pone nombre a una pantalla que está esperando
+        #
+        # Crear y reenlazar son intenciones opuestas y cada una se protege de su
+        # propio error: crear no debe pisar una pantalla que ya existe, y
+        # reenlazar no debe inventarse una que no. Antes solo existía "crear", y
+        # su comprobación de duplicados dejaba sin salida el caso de un televisor
+        # que había perdido su identidad: no se le podía devolver la suya.
         if path == "/api/pair-claim":
             try:
                 d = json.loads(body or "{}")
                 code = str(d.get("code", "")).strip()
                 nombre = str(d.get("screen_name", "")).strip()
+                modo = str(d.get("modo", "nueva")).strip().lower()
                 if not nombre:
                     jresp(400, {"ok": False, "error": "Ponle un nombre a la pantalla"}); return
                 screens = load_json(SCREENS_FILE)
-                if nombre in screens:
-                    jresp(400, {"ok": False, "error": f"Ya existe una pantalla llamada '{nombre}'"}); return
+                content = load_json(CONTENT_FILE)
+                # Se mira en los DOS sitios: una pantalla configurada que nunca
+                # llegó a conectarse vive solo en content.json, y crear encima de
+                # ella le borraría la playlist.
+                existe = nombre in screens or nombre in content.get("screens", {})
+                if modo == "reenlazar":
+                    if not existe:
+                        jresp(400, {"ok": False,
+                                    "error": f"No hay ninguna pantalla llamada '{nombre}'"}); return
+                elif existe:
+                    jresp(400, {"ok": False,
+                                "error": f"Ya existe una pantalla llamada '{nombre}'"}); return
                 ok_claim, msg = pending_claim(code, nombre)
                 if not ok_claim:
                     jresp(400, {"ok": False, "error": msg}); return
                 # Registrarla ya, para que aparezca en el panel sin esperar al SSE
                 screens[nombre] = {"id": nombre, "connected": True, "last_seen": time.time()}
                 save_json(SCREENS_FILE, screens)
-                content = load_json(CONTENT_FILE)
-                content.setdefault("screens", {}).setdefault(nombre, {"mode": "independent", "playlist": []})
+                # setdefault y no asignación: al reenlazar, la configuración que
+                # ya estuviera ahí se queda como está. Es todo el sentido del modo.
+                content.setdefault("screens", {}).setdefault(
+                    nombre, {"mode": "independent", "playlist": []})
                 save_json(CONTENT_FILE, content)
-                log(f"  [enlace] pantalla '{nombre}' enlazada con el código {code}")
-                ok({"screen_name": nombre})
+                verbo = "reenlazada" if modo == "reenlazar" else "enlazada"
+                log(f"  [enlace] pantalla '{nombre}' {verbo} con el código {code}")
+                ok({"screen_name": nombre, "modo": modo})
             except Exception as e: err(e)
             return
 

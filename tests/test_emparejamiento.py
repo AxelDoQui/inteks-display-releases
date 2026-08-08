@@ -111,6 +111,58 @@ def main():
         check(fila4 is not None and fila4.get("known_as") == "",
               "sin pista, known_as viene vacio y no rompe el panel")
 
+        # ── Reenlazar: devolverle su identidad a una pantalla existente ─────
+        # Es el caso que dejaba sin salida: el televisor perdio su memoria (o
+        # arranco por /pair) y hay que devolverle SU pantalla, con su playlist,
+        # su horario y su rotacion intactos.
+        cpath = os.path.join(datos, "content.json")
+        cont = json.load(open(cpath))
+        cont["screens"]["TV-Escaparate"] = {
+            "mode": "independent", "rotation": 90,
+            "playlist": [{"id": "x1", "type": "text", "title": "HOLA"}],
+            "schedule": {"lunes": {"enabled": True, "start": "09:00", "end": "21:00"}},
+        }
+        json.dump(cont, open(cpath, "w"))
+
+        d5 = req("/api/pair-request", {"known_as": "TV-Escaparate"})
+        r5 = req("/api/pair-claim",
+                 {"code": d5["code"], "screen_name": "TV-Escaparate", "modo": "reenlazar"},
+                 tok=TOKEN)
+        check(r5.get("ok"), "se puede reenlazar a una pantalla que ya existe")
+
+        st5 = req("/api/pair-status", {"token": d5["token"]})
+        check(st5["claimed"] and st5["screen"] == "TV-Escaparate",
+              "y la pantalla recibe su nombre de siempre")
+
+        cont = json.load(open(cpath))["screens"]["TV-Escaparate"]
+        check(len(cont.get("playlist", [])) == 1 and cont["playlist"][0]["title"] == "HOLA",
+              "reenlazar NO toca la playlist")
+        check(cont.get("rotation") == 90, "ni la rotacion")
+        check(cont.get("schedule", {}).get("lunes", {}).get("start") == "09:00",
+              "ni el horario")
+
+        d6 = req("/api/pair-request", {})
+        try:
+            req("/api/pair-claim",
+                {"code": d6["code"], "screen_name": "No-Existe", "modo": "reenlazar"},
+                tok=TOKEN)
+            check(False, "reenlazar a una inexistente deberia fallar")
+        except urllib.error.HTTPError as ex:
+            check(ex.code == 400, "reenlazar a una pantalla inexistente da error")
+
+        # Retrocompatibilidad: sin modo, se comporta como "nueva"
+        try:
+            req("/api/pair-claim", {"code": d6["code"], "screen_name": "TV-Escaparate"},
+                tok=TOKEN)
+            check(False, "sin modo, un nombre duplicado deberia seguir fallando")
+        except urllib.error.HTTPError as ex:
+            check(ex.code == 400, "sin modo se sigue comportando como 'nueva'")
+
+        check(req("/api/pair-claim",
+                  {"code": d6["code"], "screen_name": "TV-Caja", "modo": "nueva"},
+                  tok=TOKEN).get("ok"),
+              "crear una pantalla nueva sigue funcionando")
+
         check(req("/api/pair-status", {"token": "inventado"}).get("expired") is True,
               "un token desconocido hace que la pantalla pida otro codigo")
     finally:
