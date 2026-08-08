@@ -1000,6 +1000,8 @@ function renderScreens(){
           <button class="btn btn-a2 btn-sm" onclick="openScheduleModal('${sid}')"><i class="fa-regular fa-clock"></i> Horario</button>
           ${rotBtn}
           ${isWall?`<button class="btn btn-sm btn-danger" onclick="unlinkWall('${sid}')"><i class="fa-solid fa-link-slash"></i> Wall</button>`:''}
+          <button class="btn btn-ghost btn-sm" onclick="copiarEnlace('${sid}')" title="Copiar el enlace directo de esta pantalla"><i class="fa-solid fa-copy"></i></button>
+          <button class="btn btn-a4 btn-sm" onclick="desenlazar('${sid}')" title="Soltar el televisor sin borrar la pantalla"><i class="fa-solid fa-link-slash"></i></button>
           <button class="btn btn-danger btn-sm" onclick="deleteScreen('${sid}')" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
         </div>
       </div>`;
@@ -1016,6 +1018,43 @@ function renderScreens(){
       });
     },100);
   });
+}
+
+// Enlace directo: el remedio para los televisores que borran localStorage y las
+// cookies al apagarse. Se pega como pagina de inicio y la identidad viaja en la
+// URL, donde ningun borrado la alcanza.
+async function copiarEnlace(sid){
+  const el=document.getElementById("url-"+sid);
+  const url=((el&&el.textContent)||"").trim();
+  if(!url || url==="—"){ toast("Todavía no se ha calculado el enlace",true); return; }
+  try{
+    await navigator.clipboard.writeText(url);
+    toast("Enlace copiado ✓");
+  }catch(e){
+    // navigator.clipboard solo existe en contexto seguro. Con el panel abierto
+    // por localhost lo hay; si alguien entra por la IP de la red, no. En ese
+    // caso al menos se deja el enlace a la vista para copiarlo a mano.
+    prompt("Copia este enlace:", url);
+  }
+}
+
+// Desenlazar NO es eliminar: la pantalla conserva playlist, horario y rotacion,
+// y solo el televisor olvida quien era. Es la forma de reenlazar un televisor
+// sin ir a tocarlo con el mando.
+async function desenlazar(sid){
+  if(!confirm("Soltar «"+sid+"» de su televisor.\n\n"+
+              "La pantalla NO se borra: conserva su playlist, su horario y su rotación.\n"+
+              "El televisor volverá a pedir un código para que lo reenlaces.\n\n¿Continuar?")) return;
+  try{
+    const r=await fetch("/api/screen-unlink",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({screen:sid})});
+    const d=await r.json();
+    if(!d.ok){ toast(d.error||"No se pudo desenlazar",true); return; }
+    toast("«"+sid+"» desenlazada — pedirá un código nuevo");
+    await loadPairPending();
+    await loadScreens();
+  }catch(e){ toast("Error al desenlazar",true); }
 }
 
 function addScreenManual(){
@@ -2593,41 +2632,77 @@ async function loadPairPending(){
       'Ninguna pantalla esperando ahora mismo.</div>';
     return;
   }
-  // Solo se repinta si cambian los codigos, para no borrar lo que se esta
-  // escribiendo en el campo de nombre mientras se sondea cada 3 segundos.
-  const firma=pend.map(p=>p.code).join(",");
+  // Se repinta solo si cambian los codigos o las pistas, para no borrar lo que
+  // se esta escribiendo en el campo de nombre mientras se sondea cada 3 s.
+  const firma=pend.map(p=>p.code+":"+(p.known_as||"")).join(",");
   if(cont.dataset.firma===firma) return;
   cont.dataset.firma=firma;
 
+  // Pantallas que ya existen, para poder reenlazar en vez de crear otra.
+  const existentes=[...new Set([...Object.keys(regScreens||{}),
+                                ...Object.keys((content&&content.screens)||{})])]
+                     .filter(n=>n!=="admin").sort();
+
   cont.innerHTML="";
   pend.forEach(p=>{
+    // Si el televisor recordaba su nombre y esa pantalla sigue existiendo, se
+    // deja el reenlace ya elegido: un clic y a correr.
+    const sugerida=(p.known_as && existentes.includes(p.known_as)) ? p.known_as : "";
+    const opciones=['<option value="">— crear una pantalla nueva —</option>']
+      .concat(existentes.map(n=>'<option value="'+n+'"'+(n===sugerida?' selected':'')+
+                               '>reenlazar a: '+n+'</option>')).join("");
+    const pista=sugerida
+      ? '<div style="font-size:11px;color:var(--accent);width:100%">'+
+        '<i class="fa-solid fa-rotate-left"></i> dice que era «'+sugerida+'»</div>'
+      : '';
+
     const el=document.createElement("div");
     el.style.cssText="display:flex;align-items:center;gap:12px;background:var(--s2);"+
       "border:1px solid var(--b);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;flex-wrap:wrap";
     el.innerHTML='<div style="font-family:monospace;font-size:30px;font-weight:700;'+
       'color:var(--accent);letter-spacing:4px;min-width:120px">'+p.code+'</div>'+
       '<input class="finput" placeholder="Nombre: caja-1, escaparate..." '+
-      'style="flex:1;min-width:200px" data-code="'+p.code+'">'+
+      'style="flex:1;min-width:180px"'+(sugerida?' disabled':'')+'>'+
+      '<select class="finput" style="flex:1;min-width:180px">'+opciones+'</select>'+
       '<button class="btn btn-accent"><i class="fa-solid fa-link"></i> Enlazar</button>'+
-      '<div style="font-size:11px;color:var(--muted);width:100%">esperando desde hace '+p.waiting_for+' s</div>';
-    const inp=el.querySelector("input"), btn=el.querySelector("button");
-    const enlazar=()=>claimPairing(p.code, inp.value, cont);
+      pista+
+      '<div style="font-size:11px;color:var(--muted);width:100%">esperando desde hace '+
+      p.waiting_for+' s</div>';
+
+    const inp=el.querySelector("input"), sel=el.querySelector("select"),
+          btn=el.querySelector("button");
+    // El desplegable y el campo de texto son excluyentes: o reenlazas a una que
+    // existe, o creas una nueva. Dejar los dos activos invita a equivocarse.
+    sel.addEventListener("change",()=>{
+      inp.disabled=!!sel.value;
+      if(sel.value) inp.value="";
+    });
+    const enlazar=()=> sel.value
+      ? claimPairing(p.code, sel.value, "reenlazar", cont)
+      : claimPairing(p.code, inp.value, "nueva", cont);
     btn.addEventListener("click", enlazar);
     inp.addEventListener("keydown", e=>{ if(e.key==="Enter") enlazar(); });
     cont.appendChild(el);
   });
 }
 
-async function claimPairing(code, nombre, cont){
+async function claimPairing(code, nombre, modo, cont){
   nombre=(nombre||"").trim();
-  if(!nombre){ toast("Ponle un nombre a la pantalla",true); return; }
+  if(!nombre){ toast("Ponle un nombre a la pantalla o elige una existente",true); return; }
+  // Dos televisores con el mismo tablero es un uso legitimo, pero casi nunca es
+  // lo que se pretende: mas vale avisar antes que dejar una pantalla huerfana.
+  if(modo==="reenlazar" && (regScreens[nombre]||{}).connected){
+    if(!confirm("«"+nombre+"» está conectada ahora mismo.\n\n"+
+                "Si continúas quedarán dos dispositivos mostrando lo mismo.\n\n¿Seguir?")) return;
+  }
   try{
     const r=await fetch("/api/pair-claim",{method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({code, screen_name:nombre})});
+      body:JSON.stringify({code, screen_name:nombre, modo:modo||"nueva"})});
     const d=await r.json();
     if(!d.ok){ toast(d.error||"No se pudo enlazar",true); return; }
-    toast("Pantalla «"+nombre+"» enlazada ✓");
+    toast(modo==="reenlazar" ? "«"+nombre+"» recupera su pantalla ✓"
+                             : "Pantalla «"+nombre+"» enlazada ✓");
     if(cont) cont.dataset.firma="";        // forzar repintado
     await loadPairPending();
     await loadScreens();
