@@ -748,6 +748,31 @@ JPY  Yen        162.5"></textarea>
   </div>
 
   <div class="card">
+    <div class="card-title">Copia de seguridad</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6">
+      Guarda pantallas, playlists, paquetes, módulos de divisas y los archivos subidos.
+      Sirve para no perderlo todo si este ordenador falla, y para montar otra tienda
+      copiando esta.<br>
+      <strong style="color:var(--text)">No incluye la contraseña ni el token de la extensión</strong>,
+      así que el archivo se puede guardar en un pendrive o mandar por correo sin riesgo.
+    </p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="btn btn-accent" onclick="descargarCopia(true)"><i class="fa-solid fa-download"></i> Descargar copia completa</button>
+      <button class="btn btn-ghost" onclick="descargarCopia(false)"><i class="fa-solid fa-file-arrow-down"></i> Solo configuración</button>
+    </div>
+    <div style="border-top:1px solid var(--b);padding-top:14px">
+      <label class="flabel">Restaurar desde un archivo</label>
+      <p style="font-size:11px;color:#f0a050;margin:4px 0 10px">
+        Sobrescribe la configuración actual de este equipo. Descarga una copia antes, por si acaso.
+      </p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="file" id="restore-file" accept=".zip" class="finput" style="flex:1;min-width:220px;padding:6px">
+        <button class="btn btn-a4" onclick="restaurarCopia()"><i class="fa-solid fa-upload"></i> Restaurar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
     <div class="card-title">Opciones avanzadas</div>
     <div style="margin-bottom:12px">
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
@@ -2710,6 +2735,47 @@ async function saveScreensConfig(){
 }
 // Persiste el contenido COMPLETO (items + screens). Antes sólo guardaba screens,
 // por lo que los módulos (divisas, clima, QR...) nunca se guardaban en el servidor.
+// ── Copia de seguridad ─────────────────────────────────────────────────────
+// Se descarga como blob y no con un enlace directo porque la descarga va
+// autenticada por cookie de sesion; asi ademas se puede avisar si falla en vez
+// de dejar al navegador con una pagina de error en blanco.
+async function descargarCopia(conMedia){
+  toast("Preparando la copia…");
+  try{
+    const r=await fetch("/api/backup?media="+(conMedia?"1":"0"));
+    if(!r.ok){ toast("No se pudo generar la copia",true); return; }
+    const blob=await r.blob();
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    const f=new Date();
+    const p=n=>String(n).padStart(2,"0");
+    a.download=`InTeks-Display-copia-${f.getFullYear()}-${p(f.getMonth()+1)}-${p(f.getDate())}-${p(f.getHours())}${p(f.getMinutes())}.zip`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),10000);
+    toast(`Copia descargada (${(blob.size/1048576).toFixed(1)} MB) ✓`);
+  }catch(e){ toast("Error al descargar la copia",true); }
+}
+
+async function restaurarCopia(){
+  const inp=document.getElementById("restore-file");
+  const f=inp.files&&inp.files[0];
+  if(!f){ toast("Elige primero el archivo de copia",true); return; }
+  if(!confirm("Restaurar «"+f.name+"».\n\n"+
+              "Se sobrescriben las pantallas, playlists, paquetes y archivos de este equipo.\n"+
+              "La contraseña y el token de la extensión NO se tocan.\n\n¿Continuar?")) return;
+  toast("Restaurando…");
+  try{
+    // El zip va en crudo, no en base64: ahorra un tercio del tamano y evita
+    // que un JSON gigante se cargue dos veces en memoria en el servidor.
+    const r=await fetch("/api/restore",{method:"POST",
+      headers:{"Content-Type":"application/zip"}, body:f});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.ok){ toast(d.error||"No se pudo restaurar",true); return; }
+    toast("Restaurado ✓ — recargando el panel");
+    setTimeout(()=>location.reload(),1200);
+  }catch(e){ toast("Error al restaurar",true); }
+}
+
 async function saveContentLocal(){
   await fetch("/api/content",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(content)});
 }

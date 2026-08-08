@@ -7,7 +7,7 @@ Player:   http://TU_IP/player.html?screen=NOMBRE
 Enlazar:  http://signage.local/pair     (nombre mDNS, configurable en config.json)
 """
 import json, os, base64, mimetypes, threading, time, socket, sys, random, struct
-import hmac, hashlib, secrets, shutil
+import hmac, hashlib, secrets, shutil, io, zipfile
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -396,6 +396,94 @@ def notify_deleted(screen_id):
                 wfile.flush()
             except: pass
 
+# ── Copia de seguridad ─────────────────────────────────────────────────────
+# Toda la configuración de una tienda vivía solo en el disco de ese PC. Si el
+# equipo moría, se perdía entera; y montar una segunda tienda obligaba a rehacer
+# el trabajo desde cero.
+#
+# Lo que NO viaja: admin.json y pin.json. Llevan el hash de la contraseña, el
+# secreto de sesión y el token de la extensión. Un archivo que va por correo o
+# en un pendrive no puede llevar eso dentro, y además cada equipo debe conservar
+# sus credenciales al restaurar.
+BACKUP_JSONS = ("content.json", "screens.json", "config.json")
+BACKUP_FICHA = "inteks-backup.json"
+MAX_BODY_BYTES = 512 * 1024 * 1024      # el cuerpo POST se carga entero en RAM
+
+def crear_backup(incluir_media=True):
+    """Devuelve los bytes de un zip con la configuración (y opcionalmente los
+    archivos subidos). Sin multimedia cabe en un correo; con ella es un clon."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr(BACKUP_FICHA, json.dumps({
+            "app": "InTeks Display",
+            "version": 1,
+            "created_at": time.time(),
+            "created_at_txt": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "media": bool(incluir_media),
+        }, indent=2))
+        for nombre in BACKUP_JSONS:
+            ruta = os.path.join(DATA_DIR, nombre)
+            if os.path.exists(ruta):
+                z.write(ruta, nombre)
+        if incluir_media and os.path.isdir(UPLOAD_DIR):
+            for raiz, _, ficheros in os.walk(UPLOAD_DIR):
+                for f in ficheros:
+                    completa = os.path.join(raiz, f)
+                    rel = os.path.relpath(completa, UPLOAD_DIR).replace("\\", "/")
+                    z.write(completa, f"uploads/{rel}")
+    return buf.getvalue()
+
+def _destino_seguro(nombre):
+    """Ruta absoluta dentro de DATA_DIR, o None si el zip intenta salirse.
+
+    Un zip malicioso puede traer nombres como '../../algo': extraerlo a pelo
+    escribiría fuera de la carpeta de datos. Se comprueba la ruta YA RESUELTA,
+    porque comprobar solo si empieza por '..' se esquiva de varias formas.
+    """
+    nombre = nombre.replace("\\", "/")
+    if nombre.endswith("/"):
+        return None
+    if nombre != BACKUP_FICHA and nombre not in BACKUP_JSONS \
+            and not nombre.startswith("uploads/"):
+        return None                          # nada fuera de lo que ponemos nosotros
+    destino = os.path.realpath(os.path.join(DATA_DIR, *nombre.split("/")))
+    base = os.path.realpath(DATA_DIR)
+    if destino != base and not destino.startswith(base + os.sep):
+        return None
+    return destino
+
+def restaurar_backup(datos):
+    """Vuelca una copia sobre la carpeta de datos. Devuelve (ok, mensaje)."""
+    try:
+        z = zipfile.ZipFile(io.BytesIO(datos))
+    except Exception:
+        return False, "Ese archivo no es una copia de seguridad válida."
+    if BACKUP_FICHA not in z.namelist():
+        return False, "Ese zip no es una copia de InTeks Display."
+    try:
+        ficha = json.loads(z.read(BACKUP_FICHA))
+    except Exception:
+        ficha = {}
+    if ficha.get("app") != "InTeks Display":
+        return False, "Ese zip no es una copia de InTeks Display."
+
+    escritos, saltados = 0, 0
+    for nombre in z.namelist():
+        if nombre == BACKUP_FICHA:
+            continue
+        destino = _destino_seguro(nombre)
+        if not destino:
+            saltados += 1
+            log(f"  [copia] entrada descartada por ruta insegura: {nombre}")
+            continue
+        os.makedirs(os.path.dirname(destino), exist_ok=True)
+        with z.open(nombre) as origen, open(destino, "wb") as salida:
+            shutil.copyfileobj(origen, salida)
+        escritos += 1
+    log(f"  [copia] restaurados {escritos} archivo(s)"
+        + (f", {saltados} descartado(s)" if saltados else ""))
+    return True, f"{escritos} archivo(s) restaurados"
+
 def expandir_paquetes(playlist, content):
     """Sustituye las referencias a paquetes por los contenidos que tienen AHORA.
 
@@ -688,6 +776,24 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(200); self.send_header("Content-Type","application/json")
             self.cors(); self.end_headers(); self.wfile.write(body); return
 
+        # ── API: descargar una copia de seguridad
+        if path == "/api/backup":
+            if not self.require_auth(): return
+            try:
+                media = qs.get("media", ["1"])[0] != "0"
+                datos = crear_backup(media)
+                nombre = time.strftime("InTeks-Display-copia-%Y-%m-%d-%H%M.zip")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/zip")
+                self.send_header("Content-Disposition", f'attachment; filename="{nombre}"')
+                self.send_header("Content-Length", str(len(datos)))
+                self.send_header("Cache-Control", "no-store")
+                self.cors(); self.end_headers(); self.wfile.write(datos)
+            except Exception as e:
+                log(f"  [copia] error al generar: {e}")
+                self.send_response(500); self.cors(); self.end_headers()
+            return
+
         # ── API: pantallas encendidas esperando a que se les ponga nombre
         if path == "/api/pair-pending":
             if not self.require_auth(): return
@@ -881,6 +987,18 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         length = int(self.headers.get("Content-Length",0))
+        # Techo de seguridad: el cuerpo se carga ENTERO en memoria, así que un
+        # envío gigante (una restauración con vídeos, una subida equivocada)
+        # tumbaría el servidor de la tienda. Se rechaza antes de leerlo.
+        if length > MAX_BODY_BYTES:
+            self.send_response(413)
+            self.send_header("Content-Type","application/json")
+            self.send_header("Connection","close")
+            self.cors(); self.end_headers()
+            self.wfile.write(json.dumps({"ok": False, "error":
+                f"El envío es demasiado grande ({length // (1024*1024)} MB). "
+                f"El máximo son {MAX_BODY_BYTES // (1024*1024)} MB."}).encode())
+            return
         body = self.rfile.read(length)
 
         def ok(extra={}):
@@ -1100,6 +1218,18 @@ class Handler(BaseHTTPRequestHandler):
                 with sse_lock:
                     sse_clients.pop(sid, None)
                 ok()
+            except Exception as e: err(e)
+            return
+
+        # ── Restaurar una copia de seguridad (el cuerpo es el zip en crudo)
+        if path == "/api/restore":
+            try:
+                ok_r, msg = restaurar_backup(body)
+                if not ok_r:
+                    jresp(400, {"ok": False, "error": msg}); return
+                # Las pantallas tienen que recoger la configuración restaurada
+                notify_all()
+                ok({"mensaje": msg})
             except Exception as e: err(e)
             return
 
