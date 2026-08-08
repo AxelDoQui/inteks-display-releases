@@ -69,6 +69,10 @@ Source: "..\pair.html"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\sw.js"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\config.json"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
 Source: "..\abrir-panel.bat"; DestDir: "{app}"; Flags: ignoreversion
+; Recuperar el acceso al panel si se olvida la contrasena. Va como herramienta
+; local y no como endpoint: por la red seria una puerta trasera.
+Source: "..\restablecer-contrasena.py"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\restablecer-contrasena.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\vendor\*"; DestDir: "{app}\vendor"; Flags: ignoreversion recursesubdirs createallsubdirs
 

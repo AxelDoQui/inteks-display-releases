@@ -45,6 +45,28 @@ h1{font-size:20px;font-weight:500;margin-bottom:6px;letter-spacing:1px}
 
   <div class="status" id="status"></div>
   <p class="hint" id="hint"></p>
+
+  <!-- No hay recuperacion por la red a proposito: seria una puerta trasera
+       para cualquiera conectado al wifi de la tienda. Se recupera desde el
+       propio ordenador, que es la prueba de identidad de verdad. -->
+  <details id="olvido" style="margin-top:22px">
+    <summary style="cursor:pointer;font-size:12px;color:#7a8ca3;list-style:none">
+      ¿Olvidaste la contraseña?
+    </summary>
+    <div style="font-size:12px;color:#7a8ca3;line-height:1.7;margin-top:10px;
+                border-left:2px solid #1d3a5c;padding-left:12px">
+      Se restablece <strong style="color:#eaf1f9">desde el ordenador donde está
+      instalado el servidor</strong>, no desde aquí: si se pudiera hacer por la red,
+      cualquiera conectado al wifi podría quedarse con el panel.
+      <ol style="margin:10px 0 0 16px;padding:0">
+        <li>Ve a la carpeta del programa (<em>Archivos de programa → InTeks Display</em>).</li>
+        <li>Ejecuta <strong style="color:#eaf1f9">restablecer-contrasena.bat</strong>.</li>
+        <li>Vuelve aquí: te pedirá crear una contraseña nueva.</li>
+      </ol>
+      <p style="margin-top:10px">El token de la extensión de Chrome no se toca,
+      así que seguirá enviando las tasas sin reconfigurar nada.</p>
+    </div>
+  </details>
 </div>
 
 <script>
