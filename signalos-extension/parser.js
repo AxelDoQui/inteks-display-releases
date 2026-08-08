@@ -170,6 +170,92 @@ window.SignalosParser = (function () {
     return null;
   }
 
+  // ── Elección de agente en Ria ────────────────────────────────────────────
+  // Ria ofrece VARIOS agentes de pago por país, cada uno con su tasa. El
+  // criterio del negocio NO es "la más alta": en Colombia se recomienda
+  // Davivienda (3.613,36) aunque 4-72 pague 3.645, porque 4-72 es el servicio
+  // postal; y Ria Colombia se descarta por ser un servicio nuevo. Nada de eso
+  // se deduce de los números, así que manda una lista de preferencias del
+  // usuario y la tasa solo decide cuando esa lista no resuelve.
+
+  function normalizeAgent(s) {
+    return String(s == null ? '' : s)
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  // Ria trunca las etiquetas ("Almacenes Ex", "Davivienda H"), así que hay que
+  // emparejar en los dos sentidos: la pantalla puede quedarse corta respecto a
+  // lo que escribió el usuario, o al revés.
+  function agentMatches(enPantalla, preferido) {
+    const a = normalizeAgent(enPantalla), b = normalizeAgent(preferido);
+    if (!a || b.length < 3) return false;      // evita que "Ba" case con todo
+    return a.startsWith(b) || b.startsWith(a);
+  }
+
+  function rateToNumber(r) {
+    // Las tasas ya vienen normalizadas: coma decimal y sin separador de millares
+    const n = parseFloat(String(r == null ? '' : r).replace(',', '.'));
+    return isNaN(n) ? null : n;
+  }
+
+  /**
+   * Decide qué agente ofrecer para un país.
+   * @param candidatos  [{agent, rate, currency}] tal y como salen en la página
+   * @param preferencias  nombres de agente en orden de preferencia
+   * @param monedaLocal  código ISO de la moneda del país (COP, HNL, PYG...)
+   */
+  function elegirAgente(candidatos, preferencias, monedaLocal) {
+    const lista = Array.isArray(candidatos) ? candidatos : [];
+    const prefs = Array.isArray(preferencias) ? preferencias : [];
+    const descartados = [];
+
+    // 1. Solo la moneda local. Comparar 6.900 PYG con 1,1015 USD no significa
+    //    nada: no es que uno sea mejor, es que miden cosas distintas.
+    const validos = [];
+    lista.forEach(c => {
+      if (monedaLocal && String(c.currency).toUpperCase() !== String(monedaLocal).toUpperCase()) {
+        descartados.push({ agent: c.agent, rate: c.rate, currency: c.currency, motivo: 'otra-moneda' });
+      } else if (rateToNumber(c.rate) === null) {
+        descartados.push({ agent: c.agent, rate: c.rate, currency: c.currency, motivo: 'tasa-ilegible' });
+      } else {
+        validos.push(c);
+      }
+    });
+
+    if (!validos.length) return { elegido: null, motivo: 'ninguno', descartados, mejorAlternativa: null };
+
+    // 2. El primero de la lista de preferencias que aparezca en la página.
+    let elegido = null, motivo = 'sin-preferencia';
+    for (const p of prefs) {
+      const hit = validos.find(c => agentMatches(c.agent, p));
+      if (hit) { elegido = hit; motivo = 'preferencia'; break; }
+    }
+    // 3. Si la lista no resuelve, entonces sí manda la tasa. Se marca como
+    //    'sin-preferencia' para poder distinguir una elección del usuario de
+    //    una por defecto.
+    if (!elegido) {
+      elegido = validos.reduce((a, b) => (rateToNumber(b.rate) > rateToNumber(a.rate) ? b : a));
+    }
+
+    // 4. Aviso informativo: ¿hay alguien que pague notablemente más?
+    //    No cambia la elección; solo evita perder dinero sin enterarse.
+    const mejor = validos.reduce((a, b) => (rateToNumber(b.rate) > rateToNumber(a.rate) ? b : a));
+    let mejorAlternativa = null;
+    if (mejor !== elegido) {
+      const base = rateToNumber(elegido.rate);
+      const diffPct = base > 0 ? ((rateToNumber(mejor.rate) - base) / base) * 100 : 0;
+      if (diffPct > 0.5) {
+        mejorAlternativa = { agent: mejor.agent, rate: mejor.rate, diffPct: Math.round(diffPct * 100) / 100 };
+      }
+    }
+
+    validos.forEach(c => {
+      if (c !== elegido) descartados.push({ agent: c.agent, rate: c.rate, currency: c.currency, motivo: 'no-elegido' });
+    });
+    return { elegido, motivo, descartados, mejorAlternativa };
+  }
+
   // Recorre líneas de texto buscando moneda + tasa
   function detectInText(text) {
     const out = [], seen = new Set();
@@ -212,5 +298,6 @@ window.SignalosParser = (function () {
     return results;
   }
 
-  return { CURRENCY_DB, CODE_MAP, matchCurrency, extractRate, detectInText, scanPage };
+  return { CURRENCY_DB, CODE_MAP, matchCurrency, extractRate, detectInText, scanPage,
+           normalizeRate, normalizeAgent, agentMatches, elegirAgente };
 })();
