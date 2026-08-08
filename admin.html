@@ -96,6 +96,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .tb-fx{background:rgba(61,155,224,.1);color:var(--a2)}
 .tb-weather{background:rgba(100,160,240,.1);color:#64a0f0}
 .tb-ticker{background:rgba(200,160,240,.1);color:var(--a4)}
+.tb-package{background:rgba(255,127,0,.14);color:var(--accent)}
+/* Un paquete dentro de una playlist es un grupo vivo, no una copia. Se marca
+   con un borde para que se vea de un vistazo que ese bloque cambia solo. */
+.pl-item.pl-pkg{border-left:3px solid var(--accent)}
 .dur-inp{width:46px;background:var(--s3);border:1px solid var(--b);border-radius:4px;color:var(--text);font-size:11px;text-align:center;padding:3px;font-family:'Space Mono',monospace}
 .dur-inp:focus{outline:none;border-color:var(--accent)}
 /* Library */
@@ -953,6 +957,20 @@ function updateStats(){
   document.getElementById("st-items").textContent=(content.items||[]).length;
 }
 
+// Cuantos contenidos VE de verdad la pantalla. Una referencia a un paquete
+// ocupa una linea en la playlist pero puede valer por cinco diapositivas, y la
+// tarjeta estaria mintiendo si contara las lineas.
+function contarPlaylist(pl){
+  return (pl||[]).reduce((n,x)=>{
+    if(x && x.type==="package"){
+      const p=(content.packages||[]).find(q=>q.id===x.pkg_id);
+      if(!p) return n;                       // paquete borrado: no cuenta nada
+      return n + pkgItems(p).filter(s=>(content.items||[]).some(i=>i.id===s.id)).length;
+    }
+    return n+1;
+  },0);
+}
+
 // ── Screens
 function renderScreens(){
   const grid=document.getElementById("screens-grid");
@@ -994,7 +1012,7 @@ function renderScreens(){
       <div class="sc-body">
         ${partnerInfo}
         <div class="sc-url" id="url-${sid}">—</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">${pl.length} elemento(s)</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">${contarPlaylist(pl)} elemento(s)</div>
         <div class="sc-actions">
           <button class="btn btn-ghost btn-sm" onclick="openPlModal('${sid}')"><i class="fa-solid fa-list"></i> Playlist</button>
           <button class="btn btn-a2 btn-sm" onclick="openScheduleModal('${sid}')"><i class="fa-regular fa-clock"></i> Horario</button>
@@ -1336,10 +1354,32 @@ function cancelPkgEdit(){
   renderPkgPicker(); renderPkgSelected();
 }
 function deletePackage(id){
-  if(!confirm("¿Borrar este paquete? (no borra los contenidos, solo el grupo)")) return;
+  const p=(content.packages||[]).find(x=>x.id===id);
+  const usan=Object.entries(content.screens||{})
+    .filter(([,cfg])=>((cfg||{}).playlist||[]).some(x=>x.type==="package"&&x.pkg_id===id))
+    .map(([sid])=>sid);
+  if(usan.length){
+    if(!confirm(`«${p?p.name:id}» está en ${usan.length} pantalla(s): ${usan.join(", ")}.\n\n`+
+                "Sus contenidos se quedarán sueltos en esas playlists: no se pierde nada, "+
+                "pero dejarán de actualizarse juntos.\n\n¿Continuar?")) return;
+    // Desagrupar antes de borrar. Si solo quitaramos el paquete, la referencia
+    // quedaria huerfana y esas pantallas perderian ese bloque de contenido.
+    usan.forEach(sid=>{
+      const pl=content.screens[sid].playlist;
+      for(let i=pl.length-1;i>=0;i--){
+        if(pl[i].type==="package" && pl[i].pkg_id===id){
+          const copias=pkgItems(p||{}).map(sel=>{
+            const it=(content.items||[]).find(x=>x.id===sel.id);
+            return it?{...it,duration:sel.duration||it.duration||8}:null;
+          }).filter(Boolean);
+          pl.splice(i,1,...copias);
+        }
+      }
+    });
+  }else if(!confirm("¿Borrar este paquete? (no borra los contenidos, solo el grupo)")) return;
   content.packages=(content.packages||[]).filter(x=>x.id!==id);
-  saveContentLocal(); renderPackages();
-  toast("Paquete borrado");
+  saveContentLocal(); renderPackages(); renderScreens();
+  toast(usan.length?"Paquete borrado — sus contenidos quedaron sueltos":"Paquete borrado");
 }
 function renderPackages(){
   const c=document.getElementById("pkg-list");
@@ -1356,18 +1396,34 @@ function renderPackages(){
     c.appendChild(el);
   });
 }
-// Añade todos los contenidos de un paquete a la playlist que se edita
+// Enlaza un paquete a la playlist que se edita.
+//
+// Antes esto COPIABA los contenidos dentro de la playlist y no dejaba ninguna
+// huella de donde venian. Editar el paquete despues no cambiaba nada en las
+// pantallas, y no habia forma de arreglarlo: no existia el dato que dijera que
+// esas diapositivas salieron de ese paquete. Ahora se guarda una referencia y
+// el servidor la resuelve al servir la playlist, asi que no puede quedarse vieja.
 function applyPackage(pkgId){
   const p=(content.packages||[]).find(x=>x.id===pkgId);
   if(!p||!editingScreen)return;
   if(!content.screens[editingScreen]) content.screens[editingScreen]={mode:"independent",playlist:[]};
-  let added=0;
-  pkgItems(p).forEach(sel=>{
-    const item=(content.items||[]).find(i=>i.id===sel.id);
-    if(item){ content.screens[editingScreen].playlist.push({...item,duration:sel.duration||item.duration||8}); added++; }
-  });
+  const pl=content.screens[editingScreen].playlist;
+  if(pl.some(x=>x.type==="package"&&x.pkg_id===p.id)){
+    toast(`"${p.name}" ya está en esta playlist`,true); return;
+  }
+  pl.push({type:"package", pkg_id:p.id, name:p.name});
   renderPlList(editingScreen);
-  toast(`Paquete "${p.name}": ${added} contenido(s) añadidos`);
+  toast(`Paquete "${p.name}" añadido — se actualizará solo cuando lo edites`);
+}
+// Atajo desde la playlist: llevar al formulario del paquete.
+// Se guarda ANTES de navegar: si no, la referencia recien anadida se perderia
+// al cerrarse el modal y el usuario no entenderia por que.
+async function irAEditarPaquete(pkgId){
+  await savePlModal();
+  const btn=[...document.querySelectorAll(".nav-item")]
+    .find(b=>/paquete/i.test(b.textContent||""));
+  showPage("packages", btn);
+  editPackage(pkgId);
 }
 function renderPlPackages(){
   const c=document.getElementById("plm-packages");
@@ -1396,6 +1452,32 @@ function renderPlList(sid){
   c.innerHTML="";
   pl.forEach((item,i)=>{
     const el=document.createElement("div");el.className="pl-item";el.draggable=true;el.dataset.i=i;
+    // Un paquete no es un contenido: es una referencia que el servidor resuelve
+    // al servir la playlist. Aqui se pinta como un bloque, no como una tarjeta
+    // mas, para que se entienda que su interior no se edita desde aqui.
+    if(item.type==="package"){
+      el.classList.add("pl-pkg");
+      const p=(content.packages||[]).find(x=>x.id===item.pkg_id);
+      const n=p?pkgItems(p).filter(x=>(content.items||[]).some(i2=>i2.id===x.id)).length:0;
+      const nombre=p?p.name:"Paquete borrado";
+      const detalle=p?`PAQUETE · ${n} contenido(s) · se actualiza solo`
+                     :"ya no existe — quítalo de aquí";
+      el.innerHTML=`<span class="pl-handle"><i class="fa-solid fa-grip-vertical"></i></span>`+
+        `<div class="pl-thumb"><i class="fa-solid fa-boxes-stacked" style="font-size:16px;color:var(--accent)"></i></div>`+
+        `<div class="pl-info"><div class="pl-name">${nombre}</div>`+
+        `<span class="pl-tbadge tb-package">${detalle}</span></div>`+
+        (p?`<button class="btn btn-a2 btn-sm" onclick="irAEditarPaquete('${item.pkg_id}')" title="Editar el paquete"><i class="fa-solid fa-pen"></i></button>`:"")+
+        `<button class="btn btn-danger btn-sm" onclick="rmFromPl('${sid}',${i})"><i class="fa-solid fa-xmark"></i></button>`;
+      el.addEventListener("dragstart",()=>{dragSrc=i;setTimeout(()=>el.classList.add("dragging"),0);});
+      el.addEventListener("dragend",()=>el.classList.remove("dragging"));
+      el.addEventListener("dragover",e=>{e.preventDefault();el.classList.add("drag-over");});
+      el.addEventListener("dragleave",()=>el.classList.remove("drag-over"));
+      el.addEventListener("drop",e=>{e.preventDefault();el.classList.remove("drag-over");
+        if(dragSrc!==null&&dragSrc!==i){const q=content.screens[sid].playlist;const m=q.splice(dragSrc,1)[0];q.splice(i,0,m);renderPlList(sid);}
+      });
+      c.appendChild(el);
+      return;
+    }
     let thumb=`<i class="fa-solid ${typeIcon(item.type)}" style="font-size:16px;color:var(--muted)"></i>`;
     if(item.type==="image")thumb=`<img src="${item.src}" alt="">`;
     else if(item.type==="video")thumb=`<video src="${item.src}" muted preload="metadata"></video>`;

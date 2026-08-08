@@ -396,6 +396,52 @@ def notify_deleted(screen_id):
                 wfile.flush()
             except: pass
 
+def expandir_paquetes(playlist, content):
+    """Sustituye las referencias a paquetes por los contenidos que tienen AHORA.
+
+    Un paquete es un grupo vivo, no un «pegar varios de golpe». Antes el admin
+    copiaba los contenidos dentro de la playlist de cada pantalla y no dejaba
+    ninguna huella de dónde venían: editar el paquete después no cambiaba nada,
+    y no había forma de arreglarlo porque no existía el dato que dijera qué
+    diapositivas salieron de qué paquete.
+
+    Ahora la playlist guarda {"type": "package", "pkg_id": ...} y se resuelve
+    aquí, al servirla. Así no hay copias que puedan quedarse viejas: es
+    imposible por construcción, y el player no se entera de nada porque recibe
+    la lista ya resuelta.
+
+    Nada de esto puede tumbar una pantalla: un paquete borrado, un contenido que
+    ya no está en la librería o un paquete vacío se saltan en silencio y el
+    resto de la playlist sigue reproduciéndose.
+    """
+    paquetes = {p.get("id"): p for p in content.get("packages", []) if p.get("id")}
+    biblioteca = {i.get("id"): i for i in content.get("items", []) if i.get("id")}
+
+    def contenidos_de(pkg):
+        # Formato actual: [{"id", "duration"}]. El antiguo guardaba solo ids.
+        if isinstance(pkg.get("items"), list):
+            return [{"id": x.get("id"), "duration": x.get("duration")}
+                    for x in pkg["items"] if isinstance(x, dict)]
+        return [{"id": i, "duration": None} for i in pkg.get("itemIds", [])]
+
+    salida = []
+    for entrada in playlist or []:
+        if not isinstance(entrada, dict) or entrada.get("type") != "package":
+            salida.append(entrada)
+            continue
+        pkg = paquetes.get(entrada.get("pkg_id"))
+        if not pkg:
+            continue                       # paquete borrado: el resto sigue
+        for sel in contenidos_de(pkg):
+            item = biblioteca.get(sel.get("id"))
+            if not item:
+                continue                   # contenido borrado de la librería
+            copia = dict(item)
+            copia["duration"] = sel.get("duration") or item.get("duration") or 8
+            copia["from_pkg"] = pkg.get("id")
+            salida.append(copia)
+    return salida
+
 def notify_unlink(screen_id):
     """Le dice a la pantalla que olvide quién era, sin borrar su configuración.
 
@@ -665,13 +711,15 @@ class Handler(BaseHTTPRequestHandler):
             scr = screens_cfg.get(sid, {})
             mode = scr.get("mode", "independent")
             playlist = []
+            # Los paquetes se resuelven aquí, en el único sitio por el que pasan
+            # todas las pantallas. Lo que sale por esta puerta ya son contenidos.
+            resuelta = expandir_paquetes(scr.get("playlist", []), content)
             if mode == "wall":
                 partner = scr.get("partner","")
                 wall_pos = scr.get("wall_pos","left")
-                wall_playlist = scr.get("playlist",[])
-                playlist = [dict(item, wall_mode=True, wall_pos=wall_pos) for item in wall_playlist]
+                playlist = [dict(item, wall_mode=True, wall_pos=wall_pos) for item in resuelta]
             else:
-                playlist = scr.get("playlist", [])
+                playlist = resuelta
             result = {"playlist": playlist, "mode": mode, "screen_id": sid, "config": scr}
             self.send_response(200); self.send_header("Content-Type","application/json")
             self.cors(); self.end_headers(); self.wfile.write(json.dumps(result).encode()); return
