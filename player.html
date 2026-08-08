@@ -53,22 +53,6 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 .fx-rate-val{font-size:min(calc(var(--fx-row-h)*.42),calc(var(--fx-box-w)*.115));font-weight:700;font-family:monospace;letter-spacing:-1px;white-space:nowrap}
 .fx-rate-label{font-size:min(calc(var(--fx-row-h)*.10),calc(var(--fx-box-w)*.022));opacity:.4;text-align:right;letter-spacing:1px;margin-top:2px;white-space:nowrap}
 
-/* Pase de medición. La paginación necesita el alto NATURAL de cada fila: con
-   flex:1 la suma daría siempre el alto disponible y saldría "todo cabe en una
-   página" pasara lo que pasara. Estos valores son los de antes del reparto, de
-   modo que cuántas filas caben por página se sigue decidiendo igual que antes. */
-/* La medición usa los MISMOS topes que la presentación, en proporción a la caja
-   y no en vw. Antes iban en vw y, con el player rotado, medía filas más altas
-   de lo que luego se dibujaban: calculaba mal cuántas caben por página.
-   Al medir con el tope máximo, la capacidad queda del lado conservador y las
-   filas nunca desbordan. */
-.mod-fx-rows.fx-measuring .fx-row{flex:0 0 auto;height:auto;padding:clamp(10px,2vh,28px) 0}
-.mod-fx-rows.fx-measuring .fx-flag{font-size:calc(var(--fx-box-w)*.075);width:calc(var(--fx-box-w)*.10)}
-.mod-fx-rows.fx-measuring .fx-country-name{font-size:calc(var(--fx-box-w)*.055)}
-.mod-fx-rows.fx-measuring .fx-currency{font-size:calc(var(--fx-box-w)*.028)}
-.mod-fx-rows.fx-measuring .fx-rate-val{font-size:calc(var(--fx-box-w)*.115)}
-.mod-fx-rows.fx-measuring .fx-rate-label{font-size:calc(var(--fx-box-w)*.022)}
-
 /* ── Módulo clima */
 .mod-weather{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6vw;text-align:center}
 .weather-city{font-size:clamp(18px,3vw,40px);font-weight:500;opacity:.5;letter-spacing:3px;text-transform:uppercase;margin-bottom:1vh}
@@ -585,6 +569,22 @@ function showSlide(idx){
   }
 }
 
+// Cuántas divisas caben por página. Es una regla de LEGIBILIDAD, no una medida.
+//
+// Antes se deducía midiendo el DOM con los tamaños máximos de tipografía. Esos
+// topes existen para que el texto no desborde a lo ancho, pero usarlos como
+// altura típica es absurdo: en una pantalla horizontal la caja mide ~1766 px, la
+// cotización se medía a 203 px y salían filas de 300 px de alto. Con 700 px
+// útiles solo caben dos, y 9 divisas acababan en 5 páginas de 2.
+//
+// Ahora: nunca más de 8 por página —por encima de eso no se leen de lejos— y
+// nunca filas de menos de 56 px, que es el suelo en pantallas pequeñas.
+const MAX_FILAS_POR_PAGINA = 8;
+function capacidadPagina(avail){
+  const alto = Math.max(56, avail / MAX_FILAS_POR_PAGINA);
+  return Math.max(1, Math.min(MAX_FILAS_POR_PAGINA, Math.floor(avail / alto) || 1));
+}
+
 // Agrupa filas en páginas según la altura disponible. Pura a propósito: recibe
 // las alturas ya medidas, para poder probarla sin DOM (tests/fx-pagination.test.js).
 //
@@ -633,18 +633,12 @@ function setupFxPagination(slide, perPageMs, onDone){
   const container=slide.querySelector(".mod-fx-rows");
   const indicator=slide.querySelector(".mod-fx-page");
   const rows=container?Array.from(container.querySelectorAll(".fx-row")):[];
-  rows.forEach(r=>r.style.display="");                 // reset para medir
+  rows.forEach(r=>r.style.display="");
   let avail=0;
   if(container){
     const cs=getComputedStyle(container);
     avail=container.clientHeight-(parseFloat(cs.paddingTop)||0)-(parseFloat(cs.paddingBottom)||0);
-    // ANTES de medir: el pase de medición también usa --fx-box-w para calcular
-    // los tamaños, así que si se fijara después mediría con el valor por defecto.
-    container.style.setProperty("--fx-box-w", container.clientWidth+"px");
   }
-  // Reparte el alto disponible entre las filas visibles de la página actual.
-  // La tipografía cuelga de esta variable, así que 4 divisas en un 4K vertical
-  // salen grandes y sin huecos, en vez de diminutas y agrupadas en el medio.
   // Reparte el alto entre las filas visibles y publica el ancho REAL de la caja,
   // del que cuelgan los topes de tipografía. Se mide aquí y no se usa vw porque
   // con el player rotado por CSS vw se refiere al viewport sin rotar.
@@ -670,13 +664,10 @@ function setupFxPagination(slide, perPageMs, onDone){
     reportPreviewPages(1, rows.length);
     startProgress(perPageMs); timer=setTimeout(onDone, perPageMs); return;
   }
-  // Medir con las filas a su alto NATURAL. Sin esto la suma daría siempre el
-  // alto disponible (flex:1 1 0) y nunca se paginaría nada.
-  container.classList.add("fx-measuring");
-  const natural=rows.map(r=>r.offsetHeight);
-  container.classList.remove("fx-measuring");
-
-  const pages=groupRowsIntoPages(natural, avail).map(idxs=>idxs.map(i=>rows[i]));
+  // La capacidad sale de una regla de legibilidad, no de medir el DOM. Se pasan
+  // alturas uniformes para que groupRowsIntoPages calcule el reparto equilibrado.
+  const altoFila=avail/capacidadPagina(avail);
+  const pages=groupRowsIntoPages(rows.map(()=>altoFila), avail).map(idxs=>idxs.map(i=>rows[i]));
 
   if(pages.length<=1){                                 // caben todas: comportamiento normal
     if(indicator) indicator.style.display="none";

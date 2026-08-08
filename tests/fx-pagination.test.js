@@ -14,6 +14,53 @@ const vm = require("node:vm");
 
 const PLAYER = path.join(__dirname, "..", "player.html");
 
+function loadCapacidad() {
+  const src = fs.readFileSync(PLAYER, "utf8");
+  // Desde la constante, no desde la función: MAX_FILAS_POR_PAGINA es un `const`
+  // y quedaría fuera del ámbito si se extrajera solo el cuerpo de la función.
+  const from = src.indexOf("const MAX_FILAS_POR_PAGINA");
+  const to = src.indexOf("function groupRowsIntoPages(", from);
+  if (from === -1 || to === -1 || to <= from) {
+    throw new Error("No se encuentra capacidadPagina() antes de groupRowsIntoPages() en player.html.");
+  }
+  const ctx = {};
+  vm.createContext(ctx);
+  vm.runInContext(src.slice(from, to), ctx);
+  return ctx.capacidadPagina;
+}
+
+// ── Cuántas filas caben por página ─────────────────────────────────────────
+// Antes se deducía midiendo el DOM con los tamaños MÁXIMOS de tipografía, y en
+// una pantalla horizontal eso daba filas de 300 px: solo caben dos. La
+// capacidad tiene que salir de una regla de legibilidad, no de medir.
+
+test("en una pantalla horizontal caben varias filas, no dos", () => {
+  const cap = loadCapacidad();
+  assert.ok(cap(700) >= 6, "con 700 px utiles deberian caber al menos 6, salen " + cap(700));
+});
+
+test("en una pantalla vertical también", () => {
+  const cap = loadCapacidad();
+  assert.ok(cap(1350) >= 6, "con 1350 px utiles salen " + cap(1350));
+});
+
+test("nunca tantas que dejen de leerse", () => {
+  const cap = loadCapacidad();
+  assert.ok(cap(4000) <= 8, "un espacio enorme no debe llenarse de filas diminutas: " + cap(4000));
+});
+
+test("en un espacio muy pequeño cabe al menos una", () => {
+  const cap = loadCapacidad();
+  assert.strictEqual(cap(30), 1);
+  assert.strictEqual(cap(0), 1);
+});
+
+test("nueve divisas caben en dos páginas, no en cinco", () => {
+  const cap = loadCapacidad();
+  const paginas = Math.ceil(9 / cap(700));
+  assert.strictEqual(paginas, 2, "con 700 px salen " + paginas + " paginas");
+});
+
 function loadGroupRowsIntoPages() {
   const src = fs.readFileSync(PLAYER, "utf8");
   const from = src.indexOf("function groupRowsIntoPages(");
