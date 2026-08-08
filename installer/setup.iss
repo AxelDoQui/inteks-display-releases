@@ -24,14 +24,12 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Crear acceso directo en escritorio"; GroupDescription: "Accesos directos:"
 Name: "startupicon"; Description: "Iniciar SignalOS Pro automáticamente al encender el equipo (recomendado)"; GroupDescription: "Arranque:"
 
-[Registry]
-; Arranque automático con Windows (se elimina al desinstalar).
-; Va en HKLM y no en HKCU a propósito: el instalador corre elevado, así que
-; HKCU sería el registro del ADMINISTRADOR, no el del usuario que va a usar el
-; equipo. Con credenciales de otra cuenta la pantalla no arrancaría sola y no
-; habría ningún error que lo delatara. En HKLM arranca con cualquier sesión,
-; que es justo lo que se quiere en un PC dedicado a señalización.
-Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "SignalOS Pro"; ValueData: """{app}\start_signalos.bat"""; Tasks: startupicon; Flags: uninsdeletevalue
+; Sin sección [Registry]: el arranque automático ya NO va por la clave Run.
+; Run se dispara al iniciar sesión, así que tras un corte de luz el equipo se
+; quedaría en la pantalla de bloqueo con las pantallas sin contenido. Y además
+; ejecutaba un .bat, que abre una consola que cualquiera puede cerrar por error.
+; Ahora lo hace una tarea programada al encender el equipo, con pythonw.exe y
+; sin ventana. Ver [Run] y installer\registrar-tarea.ps1.
 
 [Dirs]
 ; Los datos NO pueden vivir en {app}: Windows prohíbe escribir en Program Files
@@ -65,6 +63,7 @@ Source: "..\vendor\*"; DestDir: "{app}\vendor"; Flags: ignoreversion recursesubd
 ; que se copia la carpeta y se guía al usuario con instalar-extension.html.
 Source: "..\signalos-extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "instalar-extension.html"; DestDir: "{app}"; Flags: ignoreversion
+Source: "registrar-tarea.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
 ; NO empaquetar nunca:
 ;   content.json / screens.json  -> server.py los crea vacíos al arrancar
@@ -81,4 +80,19 @@ Name: "{group}\Desinstalar"; Filename: "{uninstallexe}"
 Name: "{commondesktop}\SignalOS Pro"; Filename: "{app}\start_signalos.bat"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\start_signalos.bat"; Description: "Iniciar SignalOS Pro"; Flags: nowait postinstall skipifsilent
+; Registrar el servidor como tarea al encender el equipo. Corre como SYSTEM con
+; pythonw.exe: sin ventana que cerrar y sin depender de que alguien inicie
+; sesión. Windows la reinicia sola si el proceso se cae.
+Filename: "powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\registrar-tarea.ps1"" -AppDir ""{app}"""; \
+  StatusMsg: "Configurando el arranque automatico..."; \
+  Flags: runhidden waituntilterminated; Tasks: startupicon
+
+Filename: "{app}\start_signalos.bat"; Description: "Abrir el panel de administracion"; Flags: nowait postinstall skipifsilent
+
+[UninstallRun]
+; Quitar la tarea al desinstalar, o quedaría intentando arrancar un programa
+; que ya no existe en cada encendido.
+Filename: "powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\registrar-tarea.ps1"" -Quitar"; \
+  Flags: runhidden waituntilterminated; RunOnceId: "QuitarTareaSignalOS"
