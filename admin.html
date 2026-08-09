@@ -1045,6 +1045,37 @@ function contarPlaylist(pl){
   },0);
 }
 
+// ── Duplicar una pantalla ──────────────────────────────────────────────────
+// Montar la segunda caja de una tienda obligaba a rehacer a mano la playlist,
+// el horario, la rotacion y la transicion.
+function clonarConfigPantalla(cfg){
+  // Copia profunda. Sin ella, editar la playlist de la nueva editaria tambien
+  // la de la original: mismo array, dos nombres. Es el fallo mas facil de
+  // cometer aqui y el mas dificil de ver despues.
+  const c=JSON.parse(JSON.stringify(cfg||{}));
+  // Lo que ata esta pantalla a un televisor o a otra pantalla NO se copia.
+  delete c.connected; delete c.last_seen; delete c.id;
+  delete c.partner; delete c.wall_pos;
+  c.mode="independent";
+  if(!Array.isArray(c.playlist)) c.playlist=[];
+  return c;
+}
+// ── fin del clonado ────────────────────────────────────────────────────────
+
+async function duplicarPantalla(sid){
+  const origen=(content.screens||{})[sid];
+  if(!origen){ toast("Esa pantalla no tiene nada que copiar",true); return; }
+  const nombre=(prompt("Nombre de la pantalla nueva:", sid+" (copia)")||"").trim();
+  if(!nombre) return;
+  const existentes=new Set([...Object.keys(regScreens||{}),
+                            ...Object.keys(content.screens||{})]);
+  if(existentes.has(nombre)){ toast(`Ya existe una pantalla llamada «${nombre}»`,true); return; }
+  content.screens[nombre]=clonarConfigPantalla(origen);
+  await saveScreensConfig();
+  renderScreens(); updateStats();
+  toast(`«${nombre}» creada como copia de «${sid}» ✓`);
+}
+
 // ── Screens
 function renderScreens(){
   const grid=document.getElementById("screens-grid");
@@ -1096,6 +1127,7 @@ function renderScreens(){
           <button class="btn btn-a2 btn-sm" onclick="openScheduleModal('${sid}')"><i class="fa-regular fa-clock"></i> Horario</button>
           ${rotBtn}
           ${isWall?`<button class="btn btn-sm btn-danger" onclick="unlinkWall('${sid}')"><i class="fa-solid fa-link-slash"></i> Wall</button>`:''}
+          <button class="btn btn-ghost btn-sm" onclick="duplicarPantalla('${sid}')" title="Crear otra pantalla igual que esta"><i class="fa-solid fa-clone"></i></button>
           <button class="btn btn-ghost btn-sm" onclick="copiarEnlace('${sid}')" title="Copiar el enlace directo de esta pantalla"><i class="fa-solid fa-copy"></i></button>
           <button class="btn btn-a4 btn-sm" onclick="desenlazar('${sid}')" title="Soltar el televisor sin borrar la pantalla"><i class="fa-solid fa-link-slash"></i></button>
           <button class="btn btn-danger btn-sm" onclick="deleteScreen('${sid}')" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
