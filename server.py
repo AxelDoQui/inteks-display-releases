@@ -659,6 +659,49 @@ def filtrar_vigentes(playlist, hoy):
         return list(playlist)
     return out
 
+DIAS_ES = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+
+def pantalla_activa(cfg, ahora):
+    """¿Debería estar encendida esta pantalla ahora mismo?
+
+    Copia en Python de isScreenActive() de player.html. La duplicación es
+    inevitable —son dos lenguajes— y hace falta porque el servidor tiene que
+    decidir si avisa de una pantalla caída: sin esto avisaría de todas las
+    pantallas del mundo a las tres de la madrugada.
+
+    tests/casos-horario.json es el mismo corpus que ejecuta schedule.test.js.
+    Si esta función y la de JavaScript se separan, uno de los dos tests peta.
+    """
+    cfg = cfg or {}
+    if cfg.get("always_on"):
+        return True
+    horario = cfg.get("schedule") or {}
+    if not horario:
+        return True
+
+    hoy = time.strftime("%Y-%m-%d", ahora)
+    dia_cfg = None
+    for f in horario.get("holidays") or []:
+        if isinstance(f, dict) and f.get("date") == hoy:
+            dia_cfg = f
+            break
+
+    if dia_cfg is None:
+        dias = [k for k in horario.keys() if k != "holidays"]
+        if not dias:
+            return True                       # solo hay festivos configurados
+        dia_cfg = horario.get(DIAS_ES[ahora.tm_wday])
+
+    if not dia_cfg or not dia_cfg.get("enabled"):
+        return False
+
+    actual = time.strftime("%H:%M", ahora)
+    inicio = dia_cfg.get("start") or "00:00"
+    fin = dia_cfg.get("end") or "23:59"
+    if inicio <= fin:
+        return inicio <= actual <= fin
+    return actual >= inicio or actual <= fin   # cruza medianoche
+
 def notify_unlink(screen_id):
     """Le dice a la pantalla que olvide quién era, sin borrar su configuración.
 
