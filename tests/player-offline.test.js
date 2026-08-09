@@ -34,6 +34,10 @@ function loadResiliencia(localStorageStub) {
     // con ReferenceError y no se probaria la cache, que es el tema.
     sincronizarMedios() {},
     aplicarTransicion() {},
+    // restoreFromCache arranca el ciclo por la lista de orden. Aqui no
+    // interesa que orden sale; solo que la playlist se recupere entera.
+    rehacerOrden() {},
+    orden: [0],
   };
   vm.createContext(ctx);
   vm.runInContext(src.slice(from, to) + "\n;__ms = OFFLINE_AFTER_MS;", ctx);

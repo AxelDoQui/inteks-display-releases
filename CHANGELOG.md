@@ -8,6 +8,21 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.5 — 2026-08-09
+
+### Nuevo
+
+- **Orden aleatorio** por pantalla, en Playlist junto a la transición. Cada
+  vuelta se baraja de nuevo, y nunca repite el último de la vuelta anterior.
+
+### Corregido
+
+- **Los accesos directos no tenían icono.** Apuntan a un `.bat`, y sin indicar
+  el icono Windows ponía el genérico de archivo por lotes. Ahora usan
+  `assets\icon.ico`, también en «Programas instalados».
+
+---
+
 ## 1.0.4 — 2026-08-09
 
 ### Corregido

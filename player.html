@@ -225,6 +225,31 @@ if(URL_ROTATION!==null) applyRotation(URL_ROTATION);
 
 let playlist=[],current=0,timer=null,screenSchedule=null,screenConfig=null;
 
+// ── Orden de reproduccion ──────────────────────────────────────────────────
+// Una pantalla de tienda repite el mismo ciclo todo el día. Con pocos
+// contenidos, el orden fijo hace que el cliente que espera su turno vea
+// exactamente la misma secuencia tres veces seguidas.
+//
+// Lo delicado no es barajar —eso es Fisher-Yates— sino el empalme entre una
+// vuelta y la siguiente: si la última de una vuelta abre la siguiente, el mismo
+// cartel sale dos veces seguidas y parece que la pantalla se ha colgado. De ahí
+// el parámetro `ultimo`.
+function ordenReproduccion(n, aleatorio, ultimo){
+  var o = [];
+  for(var i = 0; i < n; i++) o.push(i);
+  if(!aleatorio || n < 2) return o;
+  for(var j = o.length - 1; j > 0; j--){          // Fisher-Yates
+    var k = Math.floor(Math.random() * (j + 1));
+    var t = o[j]; o[j] = o[k]; o[k] = t;
+  }
+  // Con un solo contenido repetir es inevitable; con dos o más, se aparta.
+  if(ultimo >= 0 && o[0] === ultimo){
+    var t2 = o[0]; o[0] = o[1]; o[1] = t2;
+  }
+  return o;
+}
+// ── fin del orden ──────────────────────────────────────────────────────────
+
 // ── Transiciones entre diapositivas ────────────────────────────────────────
 // Ya había un fundido de 1 s metido en el CSS de .slide, pero no se podía
 // elegir ni ajustar. Ahora el tipo y la duración van por pantalla: un
@@ -457,7 +482,8 @@ function restoreFromCache(){
   playlist=d.playlist;
   aplicarTransicion(screenConfig);   // la caché también recuerda cómo transiciona
   rebuildSlides();
-  showSlide(0);
+  rehacerOrden();
+  showSlide(orden[0]||0);
   // Arranque en frío con el servidor caído: aquí es donde de verdad importa
   // tener las imágenes guardadas en el propio televisor.
   sincronizarMedios();
@@ -557,7 +583,11 @@ async function loadPlaylist(){
     aplicarTransicion(screenConfig);
     lastContact=Date.now();
     updateScreenStatus();
-    if(changed){playlist=d.playlist;rebuildSlides();if(playlist.length)showSlide(0);}
+    // Rehacer el orden SIEMPRE, no solo si cambió la playlist: el usuario
+    // puede haber activado el aleatorio sin tocar el contenido.
+    if(changed){playlist=d.playlist;rebuildSlides();}
+    rehacerOrden();
+    if(changed&&playlist.length) showSlide(orden[0]||0);
     saveCache();
     // Descargar al televisor lo que aún no tenga. Va sin await a propósito: la
     // pantalla ya está pintando desde la red y esto es trabajo de fondo.
@@ -1044,7 +1074,26 @@ function setupFxPagination(slide, perPageMs, onDone){
   show();
 }
 
-function next(){clearTimeout(timer);showSlide(current+1);}
+// El ciclo va por una lista de indices, no por current+1. Asi el orden puede
+// ser el del usuario o uno barajado sin que showSlide se entere de nada.
+let orden=[], posOrden=0;
+
+function rehacerOrden(){
+  const aleatorio=!!(screenConfig&&screenConfig.shuffle);
+  const ultimo=orden.length?orden[orden.length-1]:-1;
+  orden=ordenReproduccion(playlist.length, aleatorio, ultimo);
+  posOrden=0;
+}
+
+function next(){
+  clearTimeout(timer);
+  if(!playlist.length) return;
+  posOrden++;
+  // Al acabar la vuelta se rehace: con orden fijo sale la misma lista, y con
+  // aleatorio una baraja nueva que no empieza por donde acabo la anterior.
+  if(posOrden>=orden.length) rehacerOrden();
+  showSlide(orden.length?orden[posOrden]:0);
+}
 
 document.addEventListener("keydown",e=>{
   if(e.key==="ArrowRight")next();

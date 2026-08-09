@@ -7,19 +7,21 @@
 
 [Setup]
 AppName=InTeks Display
-AppVersion=1.0.4
+AppVersion=1.0.5
 AppPublisher=InTeks Solutions
 DefaultDirName={autopf}\InTeks Display
 DefaultGroupName=InTeks Display
 OutputDir=..\dist\installer
-OutputBaseFilename=InTeks_Display_Setup_v1.0.4
+OutputBaseFilename=InTeks_Display_Setup_v1.0.5
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
-UninstallDisplayIcon={app}\abrir-panel.bat
+; Apuntar al .ico y no al .bat: un acceso directo a un archivo por lotes toma
+; el icono generico de Windows (los engranajes), no el del programa.
+UninstallDisplayIcon={app}\assets\icon.ico
 
 [Languages]
 Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
@@ -118,10 +120,12 @@ Source: "parar-servidor.ps1"; Flags: dontcopy
 ;   uploads\                     -> os.makedirs lo crea (server.py:31).
 
 [Icons]
-Name: "{group}\InTeks Display"; Filename: "{app}\abrir-panel.bat"; WorkingDir: "{app}"
-Name: "{group}\Instalar extension de divisas"; Filename: "{app}\instalar-extension.html"; WorkingDir: "{app}"
+; IconFilename en todos: sin el, un acceso directo a un .bat sale con el icono
+; generico de archivo por lotes y el programa parece un script suelto.
+Name: "{group}\InTeks Display"; Filename: "{app}\abrir-panel.bat"; WorkingDir: "{app}"; IconFilename: "{app}\assets\icon.ico"
+Name: "{group}\Instalar extension de divisas"; Filename: "{app}\instalar-extension.html"; WorkingDir: "{app}"; IconFilename: "{app}\assets\icon.ico"
 Name: "{group}\Desinstalar"; Filename: "{uninstallexe}"
-Name: "{commondesktop}\InTeks Display"; Filename: "{app}\abrir-panel.bat"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{commondesktop}\InTeks Display"; Filename: "{app}\abrir-panel.bat"; WorkingDir: "{app}"; IconFilename: "{app}\assets\icon.ico"; Tasks: desktopicon
 
 [Run]
 ; Registrar el servidor como tarea al encender el equipo. Corre como SYSTEM con
