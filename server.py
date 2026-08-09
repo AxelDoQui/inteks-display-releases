@@ -10,6 +10,7 @@ import json, os, base64, mimetypes, threading, time, socket, sys, random, struct
 import hmac, hashlib, secrets, shutil, io, zipfile
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
+import urllib.request
 
 # ── Programa y datos van SEPARADOS ─────────────────────────────────────────
 # Instalado en C:\Program Files, Windows prohíbe escribir junto al ejecutable:
@@ -241,6 +242,9 @@ def load_config():
         "installation_name": "InTeks Display",
         "mdns_name": "signage",
         "autostart": False,
+        # Dónde se publica la última versión. Vacío = el servidor no habla con
+        # nadie de fuera. Se rellena el día que haya donde publicarla.
+        "update_url": "",
         "first_run": True
     }
     init_file(CONFIG_FILE, default_config)
@@ -429,6 +433,61 @@ def notify_deleted(screen_id):
                 wfile.write(f"data: deleted:{screen_id}\n\n".encode())
                 wfile.flush()
             except: pass
+
+# ── Aviso de version nueva ─────────────────────────────────────────────────
+# Esto NO instala nada solo. En una pantalla de escaparate, actualizarse sin
+# permiso es la peor idea posible: el momento lo eliges tú, no el programa.
+# Solo avisa en el panel.
+#
+# Viene apagado: `update_url` vacía en config.json. Mientras no se rellene, el
+# servidor no habla con nadie de fuera.
+_update_cache = {"cuando": 0, "datos": None}
+UPDATE_TTL = 3600                  # no molestar al servidor de versiones cada rato
+
+def comparar_versiones(a, b):
+    """-1 si a<b, 0 si iguales, 1 si a>b.
+
+    Comparar como texto sería un error clásico: "1.0.10" < "1.0.9" en
+    alfabético, así que la actualización más esperada sería justo la que no se
+    anuncia. Se comparan los números.
+    """
+    def partes(v):
+        out = []
+        for t in str(v or "").split("."):
+            digitos = "".join(c for c in t if c.isdigit())
+            out.append(int(digitos) if digitos else 0)
+        return out
+    pa, pb = partes(a), partes(b)
+    n = max(len(pa), len(pb))
+    pa += [0] * (n - len(pa))
+    pb += [0] * (n - len(pb))
+    return (pa > pb) - (pa < pb)
+
+def comprobar_actualizacion(url):
+    """Consulta la última versión publicada. Nunca lanza: el panel no puede
+    romperse porque el sitio de versiones esté caído o devuelva basura."""
+    ahora = time.time()
+    if _update_cache["datos"] and ahora - _update_cache["cuando"] < UPDATE_TTL:
+        return _update_cache["datos"]
+    base = {"enabled": True, "current": APP_VERSION, "update_available": False}
+    try:
+        peticion = urllib.request.Request(
+            url, headers={"User-Agent": f"InTeks-Display/{APP_VERSION}"})
+        with urllib.request.urlopen(peticion, timeout=5) as r:
+            remoto = json.loads(r.read(65536).decode("utf-8", "replace"))
+        ultima = str(remoto.get("version", "")).strip()
+        if not ultima:
+            raise ValueError("la respuesta no trae 'version'")
+        base.update({
+            "latest": ultima,
+            "update_available": comparar_versiones(APP_VERSION, ultima) < 0,
+            "url": remoto.get("url", ""),
+            "notes": remoto.get("notes", ""),
+        })
+    except Exception as e:
+        base["error"] = f"No se pudo consultar: {e}"
+    _update_cache.update({"cuando": ahora, "datos": base})
+    return base
 
 # ── Copia de seguridad ─────────────────────────────────────────────────────
 # Toda la configuración de una tienda vivía solo en el disco de ese PC. Si el
@@ -809,6 +868,22 @@ class Handler(BaseHTTPRequestHandler):
             if not self.require_auth(): return
             body = json.dumps(load_json(CONTENT_FILE)).encode()
             self.send_response(200); self.send_header("Content-Type","application/json")
+            self.cors(); self.end_headers(); self.wfile.write(body); return
+
+        # ── API: ¿hay una version mas nueva publicada?
+        if path == "/api/update-check":
+            if not self.require_auth(): return
+            url = str(load_config().get("update_url", "") or "").strip()
+            if not url:
+                datos = {"enabled": False, "current": APP_VERSION,
+                         "update_available": False}
+            else:
+                if qs.get("force", ["0"])[0] == "1":
+                    _update_cache["datos"] = None      # el boton "comprobar ahora"
+                datos = comprobar_actualizacion(url)
+            body = json.dumps(datos).encode()
+            self.send_response(200); self.send_header("Content-Type","application/json")
+            self.send_header("Cache-Control","no-store")
             self.cors(); self.end_headers(); self.wfile.write(body); return
 
         # ── API: descargar una copia de seguridad

@@ -738,13 +738,15 @@ JPY  Yen        162.5"></textarea>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <span style="font-weight:500">Estado actual</span>
       </div>
-      <div>Versión instalada: <strong id="set-version" style="color:var(--text)">—</strong></div>
+      <div>Versión instalada: <strong id="set-version" style="color:var(--text)">—</strong>
+        <span id="set-update" style="margin-left:8px"></span></div>
       <div>Puerto en uso: <strong id="set-current-port" style="color:var(--text)">—</strong></div>
       <div>IP del portátil: <strong id="set-current-ip" style="color:var(--text)">—</strong></div>
     </div>
     <div style="display:flex;gap:8px">
       <button class="btn btn-accent" onclick="saveSettings()"><i class="fa-solid fa-floppy-disk"></i> Guardar cambios</button>
       <button class="btn btn-a2 btn-sm" onclick="restartServer()"><i class="fa-solid fa-rotate-right"></i> Reiniciar servidor</button>
+      <button class="btn btn-ghost btn-sm" onclick="comprobarActualizacion(true)"><i class="fa-solid fa-cloud-arrow-down"></i> Comprobar actualizaciones</button>
     </div>
   </div>
 
@@ -2815,6 +2817,39 @@ async function saveScreensConfig(){
 }
 // Persiste el contenido COMPLETO (items + screens). Antes sólo guardaba screens,
 // por lo que los módulos (divisas, clima, QR...) nunca se guardaban en el servidor.
+// Aviso de version nueva. NO instala nada solo: en una pantalla de escaparate,
+// actualizarse sin permiso es la peor idea posible. Solo avisa.
+async function comprobarActualizacion(forzar){
+  const el=document.getElementById("set-update");
+  if(!el) return;
+  if(forzar) el.innerHTML='<span style="color:var(--muted)">comprobando…</span>';
+  try{
+    const r=await fetch("/api/update-check"+(forzar?"?force=1":""));
+    if(!r.ok){ el.innerHTML=""; return; }
+    const d=await r.json();
+    if(!d.enabled){
+      // Apagado: no se dice nada en la vista normal, pero al pulsar el boton
+      // hay que explicar por que no pasa nada.
+      el.innerHTML=forzar
+        ? '<span style="color:var(--muted)">sin dirección de comprobación configurada</span>'
+        : "";
+      return;
+    }
+    if(d.error){
+      el.innerHTML='<span style="color:var(--muted)" title="'+d.error.replace(/"/g,"")+'">no se pudo comprobar</span>';
+      return;
+    }
+    if(d.update_available){
+      const enlace=d.url
+        ? ' <a href="'+d.url+'" target="_blank" rel="noopener" style="color:var(--accent)">descargar</a>'
+        : "";
+      el.innerHTML='<span style="color:var(--accent);font-weight:600">hay versión '+d.latest+' disponible</span>'+enlace;
+    }else{
+      el.innerHTML='<span style="color:var(--muted)">al día</span>';
+    }
+  }catch(e){ el.innerHTML=""; }
+}
+
 // ── Copia de seguridad ─────────────────────────────────────────────────────
 // Se descarga como blob y no con un enlace directo porque la descarga va
 // autenticada por cookie de sesion; asi ademas se puede avisar si falla en vez
@@ -3177,6 +3212,7 @@ async function loadServerInfo(){
       // instalaciones es adivinar que codigo tiene delante cada una.
       const elV=document.getElementById("set-version");
       if(elV) elV.textContent=info.version||"desconocida";
+      comprobarActualizacion(false);
     }
   }catch(e){console.error("Error loading server info",e);}
 }
