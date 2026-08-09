@@ -982,7 +982,7 @@ async function loadContent(){try{const r=await fetch("/api/content");content=awa
 async function loadScreens(){
   try{
     const r=await fetch("/api/screens");regScreens=await r.json();
-    const on=Object.values(regScreens).filter(s=>s.connected).length;
+    const on=Object.entries(regScreens).filter(([k,s])=>k!=="admin"&&s.connected).length;
     document.getElementById("srv-dot").className="sdot"+(on>0?" live":"");
     document.getElementById("srv-txt").textContent=on>0?`${on} en línea`:"sin pantallas";
   }catch(e){}
@@ -1001,7 +1001,8 @@ function showPage(id,btn){
 }
 function updateStats(){
   const sids=new Set([...Object.keys(regScreens),...Object.keys(content.screens||{})]);
-  const on=Object.values(regScreens).filter(s=>s.connected).length;
+  sids.delete("admin");                       // el panel no cuenta como pantalla
+  const on=Object.entries(regScreens).filter(([k,s])=>k!=="admin"&&s.connected).length;
   const walls=Object.values(content.screens||{}).filter(s=>s.mode==="wall").length/2;
   document.getElementById("st-total").textContent=sids.size;
   document.getElementById("st-online").textContent=on;
@@ -1026,7 +1027,11 @@ function contarPlaylist(pl){
 // ── Screens
 function renderScreens(){
   const grid=document.getElementById("screens-grid");
+  // 'admin' no es una pantalla: es este panel, que escucha los avisos por SSE.
+  // El servidor ya no lo inscribe, pero se filtra tambien aqui por si queda
+  // alguno de una version anterior o de otro equipo restaurado.
   const ids=new Set([...Object.keys(regScreens),...Object.keys(content.screens||{})]);
+  ids.delete("admin");
   if(!ids.size){grid.innerHTML='<div class="empty-state" style="grid-column:1/-1">Abre player.html en una tablet para que aparezca aquí</div>';return;}
   grid.innerHTML="";
   ids.forEach(sid=>{

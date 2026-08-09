@@ -214,6 +214,25 @@ def main():
         except urllib.error.HTTPError as ex:
             check(ex.code == 401, "desenlazar exige autenticacion")
 
+        # ── El panel no es una pantalla ─────────────────────────────────────
+        # admin.html se conecta al SSE con screen=admin para enterarse de los
+        # cambios. El servidor le dejaba pasar (bien) pero ademas lo inscribia
+        # en screens.json (mal), asi que el panel aparecia en su propia lista
+        # de pantallas como una tele fantasma llamada "admin".
+        def escuchar_admin():
+            try:
+                r = urllib.request.urlopen(base + "/api/events?screen=admin", timeout=3)
+                r.readline()
+            except Exception:
+                pass
+
+        h = threading.Thread(target=escuchar_admin, daemon=True)
+        h.start()
+        time.sleep(1.2)
+        scr = json.load(open(os.path.join(datos, "screens.json")))
+        check("admin" not in scr,
+              f"el panel no se inscribe como pantalla -> {sorted(scr.keys())}")
+
         check(req("/api/pair-status", {"token": "inventado"}).get("expired") is True,
               "un token desconocido hace que la pantalla pida otro codigo")
     finally:

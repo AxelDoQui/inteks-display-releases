@@ -405,6 +405,9 @@ PORT = port_to_use
 init_file(SCREENS_FILE, {})
 init_file(CONTENT_FILE, {"items": [], "screens": {}})
 
+# La limpieza del registro se hace más abajo, en cuanto load_json/save_json
+# existen. Aquí arriba todavía no están definidas.
+
 sse_clients = {}  # screen_id -> [wfile, ...]
 sse_lock = threading.Lock()
 file_lock = threading.RLock()  # serializa lectura/escritura de los JSON (ThreadingHTTPServer)
@@ -656,6 +659,30 @@ def save_json(path, data):
                 if os.path.exists(tmp): os.remove(tmp)
             except Exception: pass
             raise
+
+def _limpiar_pantalla_fantasma():
+    """Quita el 'admin' que las versiones anteriores inscribían como pantalla.
+
+    El panel escucha los avisos por SSE con screen=admin. El servidor le dejaba
+    pasar —debe hacerlo— pero además lo apuntaba en screens.json, así que el
+    panel salía en su propia lista como una tele que nadie ha enchufado nunca.
+    Ya no se apunta; esto se lleva el que quedó de instalaciones anteriores.
+
+    Va aquí, y no junto a los init_file de arriba, porque load_json y save_json
+    todavía no existen en ese punto del archivo.
+    """
+    try:
+        screens = load_json(SCREENS_FILE)
+        if "admin" in screens:
+            del screens["admin"]
+            save_json(SCREENS_FILE, screens)
+            log("  [limpieza] retirada la pantalla fantasma 'admin' del registro")
+    except Exception as e:
+        # Nada de tragarse esto en silencio: si la limpieza falla, el panel
+        # sigue apareciendo en su propia lista y hay que poder saber por qué.
+        log(f"  [limpieza] no se pudo retirar 'admin' del registro: {e}")
+
+_limpiar_pantalla_fantasma()
 
 def get_ip():
     try:
@@ -961,27 +988,38 @@ class Handler(BaseHTTPRequestHandler):
             with sse_lock:
                 if sid not in sse_clients: sse_clients[sid] = []
                 sse_clients[sid].append(self.wfile)
-            # Registrar/actualizar la pantalla en el registro
-            if sid not in screens:
-                screens[sid] = {"id": sid, "connected": True, "last_seen": time.time()}
-            else:
-                screens[sid]["connected"] = True; screens[sid]["last_seen"] = time.time()
-            save_json(SCREENS_FILE, screens)
+            # Registrar/actualizar la pantalla en el registro.
+            #
+            # 'admin' NO es una pantalla: es el panel, que escucha por aquí para
+            # enterarse de los cambios. Se le deja escuchar (arriba) pero no se
+            # le inscribe, o aparecería en su propia lista de pantallas como una
+            # tele fantasma que nadie ha enchufado nunca.
+            if sid != "admin":
+                if sid not in screens:
+                    screens[sid] = {"id": sid, "connected": True, "last_seen": time.time()}
+                else:
+                    screens[sid]["connected"] = True; screens[sid]["last_seen"] = time.time()
+                save_json(SCREENS_FILE, screens)
             try:
                 self.wfile.write(b"data: connected\n\n"); self.wfile.flush()
                 while True:
                     time.sleep(10)
                     self.wfile.write(b": ping\n\n"); self.wfile.flush()
+                    # Solo se escribe si hay algo que escribir. Antes se
+                    # reescribía screens.json cada 10 s por cada cliente
+                    # conectado, aunque no cambiara nada.
                     screens = load_json(SCREENS_FILE)
-                    if sid in screens: screens[sid]["last_seen"] = time.time()
-                    save_json(SCREENS_FILE, screens)
+                    if sid in screens:
+                        screens[sid]["last_seen"] = time.time()
+                        save_json(SCREENS_FILE, screens)
             except:
                 with sse_lock:
                     if sid in sse_clients and self.wfile in sse_clients[sid]:
                         sse_clients[sid].remove(self.wfile)
                 screens = load_json(SCREENS_FILE)
-                if sid in screens: screens[sid]["connected"] = False
-                save_json(SCREENS_FILE, screens)
+                if sid in screens:
+                    screens[sid]["connected"] = False
+                    save_json(SCREENS_FILE, screens)
             return
 
         # ── Servir uploads (con soporte de HTTP Range -> vídeo en streaming + seeking)
