@@ -626,6 +626,39 @@ def expandir_paquetes(playlist, content):
             salida.append(copia)
     return salida
 
+def filtrar_vigentes(playlist, hoy):
+    """Quita lo caducado y lo que aún no ha empezado.
+
+    Las fechas van en las claves `desde` y `hasta` de cada elemento, en formato
+    YYYY-MM-DD, y ambas son inclusivas: el último día todavía se ve. Comparar
+    cadenas ISO funciona porque ese formato ordena igual como texto que como
+    fecha; nada de parsear.
+
+    Regla de oro: si el filtro se lo lleva TODO, se devuelve la lista sin
+    filtrar. Una promo vieja en el escaparate es malo, pero un escaparate
+    apagado es peor y encima no se distingue de una avería.
+    """
+    def valida(f):
+        f = str(f or "").strip()
+        # Una fecha mal escrita se ignora en vez de esconder contenido sin que
+        # nadie sepa por qué.
+        return f if (len(f) == 10 and f[4] == "-" and f[7] == "-"
+                     and f[:4].isdigit() and f[5:7].isdigit()
+                     and f[8:].isdigit()) else ""
+
+    def vigente(it):
+        if not isinstance(it, dict):
+            return True
+        desde, hasta = valida(it.get("desde")), valida(it.get("hasta"))
+        if desde and hoy < desde: return False
+        if hasta and hoy > hasta: return False
+        return True
+
+    out = [it for it in (playlist or []) if vigente(it)]
+    if not out and playlist:
+        return list(playlist)
+    return out
+
 def notify_unlink(screen_id):
     """Le dice a la pantalla que olvide quién era, sin borrar su configuración.
 
@@ -982,7 +1015,12 @@ class Handler(BaseHTTPRequestHandler):
             playlist = []
             # Los paquetes se resuelven aquí, en el único sitio por el que pasan
             # todas las pantallas. Lo que sale por esta puerta ya son contenidos.
-            resuelta = expandir_paquetes(scr.get("playlist", []), content)
+            # Primero se expanden los paquetes y DESPUÉS se filtra por fechas:
+            # así una promo caducada que vive dentro de un paquete también
+            # desaparece. Al revés, el paquete entraría entero sin mirar.
+            resuelta = filtrar_vigentes(
+                expandir_paquetes(scr.get("playlist", []), content),
+                time.strftime("%Y-%m-%d"))
             if mode == "wall":
                 partner = scr.get("partner","")
                 wall_pos = scr.get("wall_pos","left")

@@ -1121,7 +1121,9 @@ function renderScreens(){
       <div class="sc-body">
         ${partnerInfo}
         <div class="sc-url" id="url-${sid}">—</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">${contarPlaylist(pl)} elemento(s)</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">${contarPlaylist(pl)} elemento(s)${
+          (pl.length && vigentesHoy(pl)===0)
+            ? ' · <span style="color:#f0a050">todo caducado, se sigue mostrando</span>' : ''}</div>
         <div class="sc-actions">
           <button class="btn btn-ghost btn-sm" onclick="openPlModal('${sid}')"><i class="fa-solid fa-list"></i> Playlist</button>
           <button class="btn btn-a2 btn-sm" onclick="openScheduleModal('${sid}')"><i class="fa-regular fa-clock"></i> Horario</button>
@@ -1672,7 +1674,17 @@ function renderPlList(sid){
     const durControl = item.type==="video"
       ? `<span class="dur-inp" style="display:inline-flex;align-items:center;justify-content:center;opacity:.6" title="El vídeo usa su propia duración"><i class="fa-solid fa-film"></i> auto</span>`
       : `<input class="dur-inp" type="number" min="1" max="3600" value="${item.duration||8}" onchange="updDur('${sid}',${i},this.value)">`;
-    el.innerHTML=`<span class="pl-handle"><i class="fa-solid fa-grip-vertical"></i></span><div class="pl-thumb">${thumb}</div><div class="pl-info"><div class="pl-name">${item.name}</div><span class="pl-tbadge ${tc}">${item.type.toUpperCase()}</span></div>${durControl}<button class="btn btn-danger btn-sm" onclick="rmFromPl('${sid}',${i})"><i class="fa-solid fa-xmark"></i></button>`;
+    // Vigencia: vacio = sin limite. El servidor filtra al servir la playlist;
+    // aqui solo se editan las fechas y se marca lo que ya no se ve.
+    const hoyISO=new Date().toISOString().slice(0,10);
+    const fuera=(item.desde&&hoyISO<item.desde)||(item.hasta&&hoyISO>item.hasta);
+    if(fuera) el.style.opacity=".5";
+    const fechas=`<input type="date" class="dur-inp" style="width:118px" value="${item.desde||''}" `+
+      `onchange="updVigencia('${sid}',${i},'desde',this.value)" title="Empieza a verse (vacío = ya)">`+
+      `<input type="date" class="dur-inp" style="width:118px" value="${item.hasta||''}" `+
+      `onchange="updVigencia('${sid}',${i},'hasta',this.value)" title="Deja de verse (vacío = nunca)">`;
+    const marca=fuera?'<span class="pl-tbadge" style="background:rgba(240,160,80,.14);color:#f0a050">fuera de fechas</span>':'';
+    el.innerHTML=`<span class="pl-handle"><i class="fa-solid fa-grip-vertical"></i></span><div class="pl-thumb">${thumb}</div><div class="pl-info"><div class="pl-name">${item.name}</div><span class="pl-tbadge ${tc}">${item.type.toUpperCase()}</span>${marca}</div>${fechas}${durControl}<button class="btn btn-danger btn-sm" onclick="rmFromPl('${sid}',${i})"><i class="fa-solid fa-xmark"></i></button>`;
     el.addEventListener("dragstart",()=>{dragSrc=i;setTimeout(()=>el.classList.add("dragging"),0);});
     el.addEventListener("dragend",()=>el.classList.remove("dragging"));
     el.addEventListener("dragover",e=>{e.preventDefault();el.classList.add("drag-over");});
@@ -1683,6 +1695,26 @@ function renderPlList(sid){
     c.appendChild(el);
   });
 }
+function updVigencia(sid,i,campo,valor){
+  const pl=(content.screens[sid]||{}).playlist||[];
+  if(!pl[i]) return;
+  pl[i][campo]=valor||"";
+  renderPlList(sid);
+}
+
+// Cuantos elementos de una playlist estan vigentes hoy. Se usa para avisar en
+// la tarjeta de la pantalla; el servidor hace su propio filtro al servirla.
+function vigentesHoy(pl){
+  const hoy=new Date().toISOString().slice(0,10);
+  const ok=f=>{const s=String(f||"").trim(); return /^\d{4}-\d{2}-\d{2}$/.test(s)?s:"";};
+  return (pl||[]).filter(it=>{
+    const d=ok(it.desde), h=ok(it.hasta);
+    if(d&&hoy<d) return false;
+    if(h&&hoy>h) return false;
+    return true;
+  }).length;
+}
+
 function renderPlLib(sid){
   const c=document.getElementById("plm-lib");
   const items=content.items||[];
