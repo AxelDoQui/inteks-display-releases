@@ -120,7 +120,7 @@ def main():
             pass
     with open(os.path.join(ASSETS, "icon.ico"), "wb") as f:
         f.write(ico(imagenes))
-    # PNG sueltos: bandeja de Electron y usos varios
+    # PNG sueltos: favicon de respaldo y usos varios
     for n in (32, 256):
         with open(os.path.join(ASSETS, f"icon-{n}.png"), "wb") as f:
             f.write(dict(imagenes)[n] if False else png(n, dibujar(n)))

@@ -1,13 +1,9 @@
 {
   "name": "inteks-display",
   "version": "1.0.0",
-  "description": "Sistema de cartelería digital profesional",
-  "main": "electron/main.js",
+  "description": "Sistema de carteleria digital profesional",
   "scripts": {
-    "start": "electron .",
-    "dev": "electron . --dev",
-    "test": "node --test tests/*.test.js",
-    "pack": "electron-packager . InTeks_Display --platform=win32 --arch=x64 --out=dist --overwrite --icon=assets/icon.ico --ignore=node_modules --ignore=dist --ignore=installer"
+    "test": "node --test tests/*.test.js"
   },
   "keywords": [
     "digital",
@@ -15,9 +11,5 @@
   ],
   "author": "InTeks Solutions",
   "license": "MIT",
-  "type": "commonjs",
-  "devDependencies": {
-    "electron": "^28.3.3",
-    "electron-packager": "^17.1.2"
-  }
+  "type": "commonjs"
 }

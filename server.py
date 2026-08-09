@@ -1461,9 +1461,10 @@ class Handler(BaseHTTPRequestHandler):
             ok()
             def _restart():
                 time.sleep(0.7)
-                # Si Electron nos gestiona, salir y dejar que su watchdog relance (evita doble proceso)
-                if os.environ.get("SIGNALOS_MANAGED"):
-                    os._exit(3)
+                # Aquí había una salida especial para cuando Electron gestionaba
+                # el proceso y su watchdog lo relanzaba. Esa vía se abandonó: hoy
+                # solo existe la tarea programada, que ya reinicia sola si el
+                # proceso se cae.
                 try:
                     os.execv(sys.executable, [sys.executable] + sys.argv)
                 except Exception:
