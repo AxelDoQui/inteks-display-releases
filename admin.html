@@ -742,6 +742,7 @@ JPY  Yen        162.5"></textarea>
         <span id="set-update" style="margin-left:8px"></span></div>
       <div>Puerto en uso: <strong id="set-current-port" style="color:var(--text)">—</strong></div>
       <div>IP del portátil: <strong id="set-current-ip" style="color:var(--text)">—</strong></div>
+      <div>Disco: <strong id="set-disk" style="color:var(--text)">—</strong></div>
     </div>
     <div style="display:flex;gap:8px">
       <button class="btn btn-accent" onclick="saveSettings()"><i class="fa-solid fa-floppy-disk"></i> Guardar cambios</button>
@@ -3259,6 +3260,15 @@ async function loadServerInfo(){
       // instalaciones es adivinar que codigo tiene delante cada una.
       const elV=document.getElementById("set-version");
       if(elV) elV.textContent=info.version||"desconocida";
+      // Aviso de disco. Solo se pinta en rojo cuando de verdad urge: un
+      // indicador siempre encendido deja de leerse a la semana.
+      const elD=document.getElementById("set-disk");
+      if(elD&&info.disk){
+        const d=info.disk;
+        elD.textContent=`${d.pct_usado}% usado · ${(d.libre_mb/1024).toFixed(1)} GB libres`;
+        elD.style.color=d.aviso?"#f05050":"var(--text)";
+        if(d.aviso) elD.textContent+=" ⚠ queda poco: fallarán las subidas";
+      }
       comprobarActualizacion(false);
     }
   }catch(e){console.error("Error loading server info",e);}

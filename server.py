@@ -684,6 +684,31 @@ def _limpiar_pantalla_fantasma():
 
 _limpiar_pantalla_fantasma()
 
+DISCO_AVISO_PCT = 90
+
+def estado_disco():
+    """Espacio en la unidad donde viven los datos.
+
+    Cuando el disco de la tienda se llena fallan las subidas y puede fallar la
+    escritura de content.json, que es como perder la configuración. No hay
+    ningún síntoma hasta que ya pasó, así que conviene avisar antes.
+
+    Se mira DATA_DIR y no la carpeta del programa: los vídeos y las imágenes
+    son lo que crece, y viven ahí.
+    """
+    try:
+        uso = shutil.disk_usage(DATA_DIR)
+    except OSError:
+        return {"libre_mb": 0, "total_mb": 0, "pct_usado": 0, "aviso": False,
+                "error": "no se pudo leer el disco"}
+    pct = round((uso.used / uso.total) * 100) if uso.total else 0
+    return {
+        "libre_mb": round(uso.free / (1024 * 1024)),
+        "total_mb": round(uso.total / (1024 * 1024)),
+        "pct_usado": pct,
+        "aviso": pct >= DISCO_AVISO_PCT,
+    }
+
 def get_ip():
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -872,7 +897,8 @@ class Handler(BaseHTTPRequestHandler):
                 "mdns_name": config.get("mdns_name", "signage"),
                 "player_url": url_for("/player.html", host=ip),
                 "pair_url": url_for("/pair"),               # nombre amigable (signage.local)
-                "pair_url_ip": url_for("/pair", host=ip)    # respaldo por IP (siempre funciona)
+                "pair_url_ip": url_for("/pair", host=ip),   # respaldo por IP (siempre funciona)
+                "disk": estado_disco()
             }
             body = json.dumps(info).encode()
             self.send_response(200); self.send_header("Content-Type","application/json")
@@ -1589,6 +1615,12 @@ if __name__ == "__main__":
     log("="*56)
     log(f"  PIN de enlace:   {pin_state['pin']} (válido 10 min)")
     log("="*56)
+    _disco = estado_disco()
+    if _disco.get("aviso"):
+        log(f"  AVISO: disco al {_disco['pct_usado']}% "
+            f"({_disco['libre_mb']} MB libres). Si se llena, fallaran las "
+            f"subidas y puede corromperse la configuracion.")
+        log("="*56)
     log("  Ctrl+C para detener\n")
     try: srv.serve_forever()
     except KeyboardInterrupt: log("\nDetenido.")
