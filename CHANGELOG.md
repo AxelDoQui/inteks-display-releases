@@ -8,6 +8,30 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.2 — 2026-08-09
+
+### Nuevo
+
+- **Avisos al móvil por Telegram**: pantalla caída dentro de su horario,
+  pantalla que vuelve, y tablero de divisas sin actualizar. Se configura en
+  Ajustes y hay un botón para mandarse un mensaje de prueba. Cada aviso se
+  manda una sola vez.
+- **Vigencia por fechas**: cada contenido de una playlist puede tener fecha de
+  inicio y de fin, y entra y sale solo. Si todo caduca, se sigue mostrando lo
+  último antes que dejar el escaparate en negro.
+- **Duplicar una pantalla** con toda su configuración, para montar la segunda
+  caja sin rehacer nada.
+- **Aviso de disco casi lleno** en Ajustes.
+
+### Corregido
+
+- Guardar los ajustes **borraba el resto de `config.json`**: el nombre mDNS, la
+  dirección de actualizaciones y, a partir de ahora, el token de avisos. Y
+  enviar algo que no fuera un objeto escribía basura en el archivo y se llevaba
+  la configuración entera.
+
+---
+
 ## 1.0.1 — 2026-08-09
 
 Primera versión con el intérprete de Python incluido. **El equipo de destino ya

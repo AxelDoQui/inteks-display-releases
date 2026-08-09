@@ -189,3 +189,20 @@ test("un día de la semana abierto sin horas vale para todo el día", () => {
   const s = { lunes: { enabled: true } };
   assert.strictEqual(isActiveAt({ day: LUNES, hour: 3, minute: 0 }, { schedule: s }), true);
 });
+
+// ── Corpus compartido con Python ───────────────────────────────────────────
+// La misma lógica vive en player.html (decide si pintar) y en server.py
+// (decide si avisar de una pantalla caída). Duplicarla es inevitable —son dos
+// lenguajes— pero que se separen no. Estos casos los ejecutan las dos suites:
+// tests/test_horario_python.py lee este mismo archivo.
+const CORPUS = require("./casos-horario.json");
+
+for (const caso of CORPUS.casos) {
+  test(`[corpus] ${caso.nombre}`, () => {
+    const at = {
+      day: caso.cuando.dia, hour: caso.cuando.hora, minute: caso.cuando.minuto,
+      year: caso.cuando.anio, month: caso.cuando.mes - 1, date: caso.cuando.dia_mes,
+    };
+    assert.strictEqual(isActiveAt(at, { schedule: caso.horario }), caso.activa);
+  });
+}

@@ -1,0 +1,73 @@
+{
+  "_comentario": "Casos de horario que DEBEN dar el mismo resultado en player.html (JS) y en server.py (Python). La logica esta duplicada por necesidad: el player decide si pintar y el servidor decide si avisar de una pantalla caida. Este archivo es lo que impide que se separen. dia: 0=domingo..6=sabado. mes: 1=enero.",
+  "casos": [
+    {"nombre": "diurno dentro del intervalo",
+     "cuando": {"dia": 1, "hora": 12, "minuto": 0, "anio": 2026, "mes": 6, "dia_mes": 15},
+     "horario": {"lunes": {"enabled": true, "start": "08:00", "end": "20:00"}},
+     "activa": true},
+
+    {"nombre": "diurno antes de abrir",
+     "cuando": {"dia": 1, "hora": 7, "minuto": 59, "anio": 2026, "mes": 6, "dia_mes": 15},
+     "horario": {"lunes": {"enabled": true, "start": "08:00", "end": "20:00"}},
+     "activa": false},
+
+    {"nombre": "nocturno antes de medianoche",
+     "cuando": {"dia": 1, "hora": 23, "minuto": 30, "anio": 2026, "mes": 6, "dia_mes": 15},
+     "horario": {"lunes": {"enabled": true, "start": "22:00", "end": "02:00"}},
+     "activa": true},
+
+    {"nombre": "nocturno despues de medianoche",
+     "cuando": {"dia": 1, "hora": 1, "minuto": 0, "anio": 2026, "mes": 6, "dia_mes": 15},
+     "horario": {"lunes": {"enabled": true, "start": "22:00", "end": "02:00"}},
+     "activa": true},
+
+    {"nombre": "nocturno a mediodia",
+     "cuando": {"dia": 1, "hora": 12, "minuto": 0, "anio": 2026, "mes": 6, "dia_mes": 15},
+     "horario": {"lunes": {"enabled": true, "start": "22:00", "end": "02:00"}},
+     "activa": false},
+
+    {"nombre": "dia deshabilitado",
+     "cuando": {"dia": 1, "hora": 12, "minuto": 0, "anio": 2026, "mes": 6, "dia_mes": 15},
+     "horario": {"lunes": {"enabled": false, "start": "08:00", "end": "20:00"}},
+     "activa": false},
+
+    {"nombre": "dia abierto sin horas vale todo el dia",
+     "cuando": {"dia": 1, "hora": 3, "minuto": 0, "anio": 2026, "mes": 6, "dia_mes": 15},
+     "horario": {"lunes": {"enabled": true}},
+     "activa": true},
+
+    {"nombre": "sin horario configurado siempre activa",
+     "cuando": {"dia": 1, "hora": 4, "minuto": 0, "anio": 2026, "mes": 6, "dia_mes": 15},
+     "horario": null,
+     "activa": true},
+
+    {"nombre": "festivo cerrado manda sobre el dia de la semana",
+     "cuando": {"dia": 1, "hora": 12, "minuto": 0, "anio": 2026, "mes": 12, "dia_mes": 25},
+     "horario": {"lunes": {"enabled": true, "start": "08:00", "end": "20:00"},
+                 "holidays": [{"date": "2026-12-25", "enabled": false}]},
+     "activa": false},
+
+    {"nombre": "festivo con horario reducido: dentro",
+     "cuando": {"dia": 1, "hora": 11, "minuto": 0, "anio": 2026, "mes": 12, "dia_mes": 24},
+     "horario": {"lunes": {"enabled": true, "start": "08:00", "end": "20:00"},
+                 "holidays": [{"date": "2026-12-24", "enabled": true, "start": "09:00", "end": "14:00"}]},
+     "activa": true},
+
+    {"nombre": "festivo con horario reducido: fuera",
+     "cuando": {"dia": 1, "hora": 17, "minuto": 0, "anio": 2026, "mes": 12, "dia_mes": 24},
+     "horario": {"lunes": {"enabled": true, "start": "08:00", "end": "20:00"},
+                 "holidays": [{"date": "2026-12-24", "enabled": true, "start": "09:00", "end": "14:00"}]},
+     "activa": false},
+
+    {"nombre": "festivo abre un domingo normalmente cerrado",
+     "cuando": {"dia": 0, "hora": 11, "minuto": 0, "anio": 2026, "mes": 12, "dia_mes": 27},
+     "horario": {"lunes": {"enabled": true, "start": "08:00", "end": "20:00"},
+                 "holidays": [{"date": "2026-12-27", "enabled": true, "start": "10:00", "end": "14:00"}]},
+     "activa": true},
+
+    {"nombre": "solo festivos configurados: el resto del anio sigue encendido",
+     "cuando": {"dia": 1, "hora": 4, "minuto": 0, "anio": 2026, "mes": 6, "dia_mes": 15},
+     "horario": {"holidays": [{"date": "2026-12-25", "enabled": false}]},
+     "activa": true}
+  ]
+}

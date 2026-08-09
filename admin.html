@@ -742,6 +742,7 @@ JPY  Yen        162.5"></textarea>
         <span id="set-update" style="margin-left:8px"></span></div>
       <div>Puerto en uso: <strong id="set-current-port" style="color:var(--text)">—</strong></div>
       <div>IP del portátil: <strong id="set-current-ip" style="color:var(--text)">—</strong></div>
+      <div>Disco: <strong id="set-disk" style="color:var(--text)">—</strong></div>
     </div>
     <div style="display:flex;gap:8px">
       <button class="btn btn-accent" onclick="saveSettings()"><i class="fa-solid fa-floppy-disk"></i> Guardar cambios</button>
@@ -772,6 +773,33 @@ JPY  Yen        162.5"></textarea>
         <input type="file" id="restore-file" accept=".zip" class="finput" style="flex:1;min-width:220px;padding:6px">
         <button class="btn btn-a4" onclick="restaurarCopia()"><i class="fa-solid fa-upload"></i> Restaurar</button>
       </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Avisos al móvil (Telegram)</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6">
+      Avisa cuando una pantalla se cae <strong style="color:var(--text)">dentro de su horario</strong>,
+      cuando vuelve, y cuando un tablero de divisas lleva demasiado sin actualizarse.
+      Cada aviso se manda una sola vez.<br>
+      Para activarlo: habla con <strong style="color:var(--text)">@BotFather</strong> en Telegram,
+      crea un bot y pega aquí su token. El <em>chat ID</em> te lo da
+      <strong style="color:var(--text)">@userinfobot</strong>.
+    </p>
+    <div class="form-row">
+      <div class="fg"><label class="flabel">Token del bot</label><input class="finput" id="set-tg-token" placeholder="123456:ABC-DEF..."></div>
+      <div class="fg"><label class="flabel">Chat ID</label><input class="finput" id="set-tg-chat" placeholder="123456789"></div>
+    </div>
+    <div class="form-row full">
+      <div class="fg"><label class="flabel">Avisar tras (minutos sin responder)</label><input class="finput" id="set-tg-min" type="number" min="1" max="1440" value="15" style="width:120px"></div>
+    </div>
+    <p style="font-size:11px;color:#f0a050;margin:4px 0 12px">
+      El token se guarda en config.json, que <strong>sí</strong> va dentro de la copia de
+      seguridad. Trata ese archivo como una contraseña.
+    </p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-accent" onclick="guardarAvisos()"><i class="fa-solid fa-floppy-disk"></i> Guardar avisos</button>
+      <button class="btn btn-ghost" onclick="probarAvisos()"><i class="fa-solid fa-paper-plane"></i> Enviar mensaje de prueba</button>
     </div>
   </div>
 
@@ -1044,6 +1072,37 @@ function contarPlaylist(pl){
   },0);
 }
 
+// ── Duplicar una pantalla ──────────────────────────────────────────────────
+// Montar la segunda caja de una tienda obligaba a rehacer a mano la playlist,
+// el horario, la rotacion y la transicion.
+function clonarConfigPantalla(cfg){
+  // Copia profunda. Sin ella, editar la playlist de la nueva editaria tambien
+  // la de la original: mismo array, dos nombres. Es el fallo mas facil de
+  // cometer aqui y el mas dificil de ver despues.
+  const c=JSON.parse(JSON.stringify(cfg||{}));
+  // Lo que ata esta pantalla a un televisor o a otra pantalla NO se copia.
+  delete c.connected; delete c.last_seen; delete c.id;
+  delete c.partner; delete c.wall_pos;
+  c.mode="independent";
+  if(!Array.isArray(c.playlist)) c.playlist=[];
+  return c;
+}
+// ── fin del clonado ────────────────────────────────────────────────────────
+
+async function duplicarPantalla(sid){
+  const origen=(content.screens||{})[sid];
+  if(!origen){ toast("Esa pantalla no tiene nada que copiar",true); return; }
+  const nombre=(prompt("Nombre de la pantalla nueva:", sid+" (copia)")||"").trim();
+  if(!nombre) return;
+  const existentes=new Set([...Object.keys(regScreens||{}),
+                            ...Object.keys(content.screens||{})]);
+  if(existentes.has(nombre)){ toast(`Ya existe una pantalla llamada «${nombre}»`,true); return; }
+  content.screens[nombre]=clonarConfigPantalla(origen);
+  await saveScreensConfig();
+  renderScreens(); updateStats();
+  toast(`«${nombre}» creada como copia de «${sid}» ✓`);
+}
+
 // ── Screens
 function renderScreens(){
   const grid=document.getElementById("screens-grid");
@@ -1089,12 +1148,15 @@ function renderScreens(){
       <div class="sc-body">
         ${partnerInfo}
         <div class="sc-url" id="url-${sid}">—</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">${contarPlaylist(pl)} elemento(s)</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">${contarPlaylist(pl)} elemento(s)${
+          (pl.length && vigentesHoy(pl)===0)
+            ? ' · <span style="color:#f0a050">todo caducado, se sigue mostrando</span>' : ''}</div>
         <div class="sc-actions">
           <button class="btn btn-ghost btn-sm" onclick="openPlModal('${sid}')"><i class="fa-solid fa-list"></i> Playlist</button>
           <button class="btn btn-a2 btn-sm" onclick="openScheduleModal('${sid}')"><i class="fa-regular fa-clock"></i> Horario</button>
           ${rotBtn}
           ${isWall?`<button class="btn btn-sm btn-danger" onclick="unlinkWall('${sid}')"><i class="fa-solid fa-link-slash"></i> Wall</button>`:''}
+          <button class="btn btn-ghost btn-sm" onclick="duplicarPantalla('${sid}')" title="Crear otra pantalla igual que esta"><i class="fa-solid fa-clone"></i></button>
           <button class="btn btn-ghost btn-sm" onclick="copiarEnlace('${sid}')" title="Copiar el enlace directo de esta pantalla"><i class="fa-solid fa-copy"></i></button>
           <button class="btn btn-a4 btn-sm" onclick="desenlazar('${sid}')" title="Soltar el televisor sin borrar la pantalla"><i class="fa-solid fa-link-slash"></i></button>
           <button class="btn btn-danger btn-sm" onclick="deleteScreen('${sid}')" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
@@ -1639,7 +1701,17 @@ function renderPlList(sid){
     const durControl = item.type==="video"
       ? `<span class="dur-inp" style="display:inline-flex;align-items:center;justify-content:center;opacity:.6" title="El vídeo usa su propia duración"><i class="fa-solid fa-film"></i> auto</span>`
       : `<input class="dur-inp" type="number" min="1" max="3600" value="${item.duration||8}" onchange="updDur('${sid}',${i},this.value)">`;
-    el.innerHTML=`<span class="pl-handle"><i class="fa-solid fa-grip-vertical"></i></span><div class="pl-thumb">${thumb}</div><div class="pl-info"><div class="pl-name">${item.name}</div><span class="pl-tbadge ${tc}">${item.type.toUpperCase()}</span></div>${durControl}<button class="btn btn-danger btn-sm" onclick="rmFromPl('${sid}',${i})"><i class="fa-solid fa-xmark"></i></button>`;
+    // Vigencia: vacio = sin limite. El servidor filtra al servir la playlist;
+    // aqui solo se editan las fechas y se marca lo que ya no se ve.
+    const hoyISO=new Date().toISOString().slice(0,10);
+    const fuera=(item.desde&&hoyISO<item.desde)||(item.hasta&&hoyISO>item.hasta);
+    if(fuera) el.style.opacity=".5";
+    const fechas=`<input type="date" class="dur-inp" style="width:118px" value="${item.desde||''}" `+
+      `onchange="updVigencia('${sid}',${i},'desde',this.value)" title="Empieza a verse (vacío = ya)">`+
+      `<input type="date" class="dur-inp" style="width:118px" value="${item.hasta||''}" `+
+      `onchange="updVigencia('${sid}',${i},'hasta',this.value)" title="Deja de verse (vacío = nunca)">`;
+    const marca=fuera?'<span class="pl-tbadge" style="background:rgba(240,160,80,.14);color:#f0a050">fuera de fechas</span>':'';
+    el.innerHTML=`<span class="pl-handle"><i class="fa-solid fa-grip-vertical"></i></span><div class="pl-thumb">${thumb}</div><div class="pl-info"><div class="pl-name">${item.name}</div><span class="pl-tbadge ${tc}">${item.type.toUpperCase()}</span>${marca}</div>${fechas}${durControl}<button class="btn btn-danger btn-sm" onclick="rmFromPl('${sid}',${i})"><i class="fa-solid fa-xmark"></i></button>`;
     el.addEventListener("dragstart",()=>{dragSrc=i;setTimeout(()=>el.classList.add("dragging"),0);});
     el.addEventListener("dragend",()=>el.classList.remove("dragging"));
     el.addEventListener("dragover",e=>{e.preventDefault();el.classList.add("drag-over");});
@@ -1650,6 +1722,26 @@ function renderPlList(sid){
     c.appendChild(el);
   });
 }
+function updVigencia(sid,i,campo,valor){
+  const pl=(content.screens[sid]||{}).playlist||[];
+  if(!pl[i]) return;
+  pl[i][campo]=valor||"";
+  renderPlList(sid);
+}
+
+// Cuantos elementos de una playlist estan vigentes hoy. Se usa para avisar en
+// la tarjeta de la pantalla; el servidor hace su propio filtro al servirla.
+function vigentesHoy(pl){
+  const hoy=new Date().toISOString().slice(0,10);
+  const ok=f=>{const s=String(f||"").trim(); return /^\d{4}-\d{2}-\d{2}$/.test(s)?s:"";};
+  return (pl||[]).filter(it=>{
+    const d=ok(it.desde), h=ok(it.hasta);
+    if(d&&hoy<d) return false;
+    if(h&&hoy>h) return false;
+    return true;
+  }).length;
+}
+
 function renderPlLib(sid){
   const c=document.getElementById("plm-lib");
   const items=content.items||[];
@@ -3259,6 +3351,15 @@ async function loadServerInfo(){
       // instalaciones es adivinar que codigo tiene delante cada una.
       const elV=document.getElementById("set-version");
       if(elV) elV.textContent=info.version||"desconocida";
+      // Aviso de disco. Solo se pinta en rojo cuando de verdad urge: un
+      // indicador siempre encendido deja de leerse a la semana.
+      const elD=document.getElementById("set-disk");
+      if(elD&&info.disk){
+        const d=info.disk;
+        elD.textContent=`${d.pct_usado}% usado · ${(d.libre_mb/1024).toFixed(1)} GB libres`;
+        elD.style.color=d.aviso?"#f05050":"var(--text)";
+        if(d.aviso) elD.textContent+=" ⚠ queda poco: fallarán las subidas";
+      }
       comprobarActualizacion(false);
     }
   }catch(e){console.error("Error loading server info",e);}
@@ -3273,6 +3374,9 @@ async function loadSettings(){
       document.getElementById("set-fallback").value=cfg.port_fallback||8081;
       document.getElementById("set-name").value=cfg.installation_name||"InTeks Display";
       document.getElementById("set-autostart").checked=!!cfg.autostart;
+      document.getElementById("set-tg-token").value=cfg.telegram_token||"";
+      document.getElementById("set-tg-chat").value=cfg.telegram_chat_id||"";
+      document.getElementById("set-tg-min").value=cfg.alert_offline_min||15;
     }
   }catch(e){console.error("Error loading settings",e);}
   // Token de API (para la extensión)
@@ -3317,6 +3421,33 @@ function copyToClipboard(text, msg){
     console.error(e);
   });
 }
+// Los avisos se guardan aparte de los ajustes del servidor: cambiar el token
+// no obliga a reiniciar, y mezclarlos invitaria a hacerlo. Ahora /api/config
+// fusiona, asi que mandar solo estas tres claves no borra las demas.
+async function guardarAvisos(){
+  const cfg={
+    telegram_token:document.getElementById("set-tg-token").value.trim(),
+    telegram_chat_id:document.getElementById("set-tg-chat").value.trim(),
+    alert_offline_min:parseInt(document.getElementById("set-tg-min").value)||15
+  };
+  try{
+    const r=await fetch("/api/config",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)});
+    toast(r.ok?"Avisos guardados ✓":"No se pudieron guardar",!r.ok);
+  }catch(e){ toast("Error al guardar los avisos",true); }
+}
+
+async function probarAvisos(){
+  toast("Enviando…");
+  try{
+    const r=await fetch("/api/alert-test",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:"{}"});
+    const d=await r.json();
+    toast(d.enviado ? "Enviado ✓ — mira el móvil"
+                    : "No salió. Revisa el token y el chat ID.", !d.enviado);
+  }catch(e){ toast("Error al enviar la prueba",true); }
+}
+
 async function saveSettings(){
   const cfg={
     port:parseInt(document.getElementById("set-port").value),
