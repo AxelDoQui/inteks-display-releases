@@ -1,0 +1,223 @@
+# InTeks Display — manual de uso
+
+Para el día a día en una tienda. Para instalar por primera vez, ver
+[README_INSTALLER.md](README_INSTALLER.md).
+
+---
+
+## Lo básico
+
+**Abrir el panel:** el acceso directo «InTeks Display» del escritorio. Se abre
+en su propia ventana, sin barra de direcciones.
+
+**El servidor arranca solo** al encender el equipo, como tarea programada y sin
+ventana, para que nadie pueda cerrarlo por error. No hace falta iniciar sesión
+en Windows.
+
+**Si algo va mal**, el registro está en
+`C:\ProgramData\InTeks Display\server.log`. Que ese archivo exista es la señal
+de que la instalación fue bien.
+
+---
+
+## Enlazar un televisor
+
+1. En el televisor, abre `http://signage.local` (o `http://LA-IP-DEL-PC`).
+2. La pantalla muestra un **código de cuatro cifras**.
+3. En el panel → **Pantallas** → «Esperando para enlazar», escribe el nombre y
+   pulsa **Enlazar**.
+
+El nombre se pone desde el ordenador a propósito: teclear con el mando de un
+televisor es lento y se equivoca uno.
+
+**Si el televisor ya estaba enlazado** y abres esa misma dirección, te avisa
+(«Ya enlazada como…») y vuelve solo a su contenido en seis segundos. Cualquier
+tecla del mando para la cuenta atrás si querías reenlazarlo.
+
+**Si perdió su identidad** (algunos televisores borran su memoria al apagarse),
+enseñará un código otra vez. En el panel, en lugar de escribir un nombre nuevo,
+usa el desplegable **«reenlazar a: …»** y elige la pantalla que era: recupera su
+playlist, su horario y su rotación tal cual.
+
+**Para reenlazar a propósito** sin ir al televisor: botón **Desenlazar** en la
+tarjeta de la pantalla. No borra nada, solo suelta el aparato.
+
+**Televisores que borran todo al apagarse:** usa el botón de **copiar enlace
+directo** y pega esa dirección como página de inicio del televisor. Así la
+identidad viaja en la URL y ningún borrado la alcanza.
+
+---
+
+## Contenido
+
+### Librería y playlists
+
+Sube imágenes y vídeos a la **Librería**, y arrástralos a la **Playlist** de
+cada pantalla. Cada elemento tiene su duración; los vídeos usan la suya propia.
+
+### Paquetes
+
+Un paquete es un grupo de contenidos que se añade de una vez. **Es un grupo
+vivo**: si lo editas, todas las pantallas que lo usan cambian al momento, sin
+tocarlas. En la playlist aparece como un bloque con borde naranja.
+
+Al borrar un paquete que está en uso, sus contenidos se quedan sueltos en esas
+playlists: no se pierde nada, pero dejan de actualizarse juntos.
+
+### Fechas de vigencia
+
+Cada contenido puede tener fecha de inicio y de fin (**se ve del … al …**).
+Vacío = sin límite. Una promo entra y sale sola.
+
+Si **todo** el contenido de una pantalla ha caducado, se sigue mostrando lo que
+hay y la tarjeta lo avisa. Una promo vieja en el escaparate es malo; un
+escaparate apagado es peor y no se distingue de una avería.
+
+### Transiciones y orden
+
+En la **Playlist** de cada pantalla, arriba:
+
+- **Transición**: fundido, deslizar, zoom o corte seco, con su duración.
+- **Orden aleatorio**: baraja cada vuelta y nunca repite el último de la
+  vuelta anterior.
+
+Un tipo por pantalla, para todos sus pases.
+
+---
+
+## Tipos de cambio
+
+El módulo de divisas se edita en la sección **Divisas**. Puedes elegir país y
+moneda de un buscador, fijar el orden arrastrando, poner logo, colores y un
+mensaje al pie.
+
+### La fecha del tablero es la de las tasas
+
+El tablero muestra **cuándo se actualizaron las tasas**, no la fecha de hoy.
+Pasado el plazo (24 h por defecto, ajustable, 0 lo desactiva) esa fecha
+**parpadea despacio**: lo ve el personal al pasar sin montar un cartel delante
+del cliente. En el panel se lee más claro: «actualizado hace 3 días ⚠».
+
+### La extensión de Chrome
+
+Actualiza las tasas desde la web de Western Union o Ria sin teclear nada.
+Se instala una vez por equipo (menú Inicio → «Instalar extensión de divisas»)
+y necesita el **token de la API**, que está en Ajustes.
+
+**La extensión respeta el orden** que hayas fijado en el panel. Las divisas
+nuevas que detecte se añaden al final.
+
+---
+
+## Horarios
+
+En **Horario** de cada pantalla: días de la semana con su franja, o modo 24/7.
+
+**Festivos:** fechas concretas que mandan sobre el día de la semana. Sirven
+igual para cerrar en Navidad que para abrir un domingo de rebajas. Deja las
+horas vacías para todo el día.
+
+Si configuras **solo festivos** y ningún día, el resto del año la pantalla sigue
+encendida.
+
+---
+
+## Avisos al móvil (Telegram)
+
+Avisa cuando una pantalla se cae dentro de su horario, cuando vuelve, y cuando
+un tablero de divisas lleva demasiado sin actualizarse.
+
+**Configurarlo:**
+
+1. En Telegram, habla con **@BotFather** → `/newbot` → copia el token.
+2. Habla con **@userinfobot** → copia tu `Id`.
+3. **Escríbele algo a tu bot.** Telegram no deja que un bot inicie la
+   conversación; sin este paso falla con «chat not found».
+4. Ajustes → pega los dos → **Guardar avisos** → **Enviar mensaje de prueba**.
+
+**Pantalla caída:** un aviso al caer y otro al volver. Solo dentro del horario
+de esa pantalla, para que no suene de madrugada.
+
+**Tasas viejas:** es un recordatorio, no un aviso suelto. Se configura desde qué
+hora, hasta qué hora y cada cuánto insistir (9:00 a 22:00 cada hora, por
+defecto). Pasada la hora de fin se calla aunque sigan viejas. Con «repetir cada
+0 horas» queda un único aviso al día.
+
+> El token se guarda en `config.json`, que **sí** entra en la copia de
+> seguridad. Trátala como una contraseña.
+
+---
+
+## Copia de seguridad
+
+En **Ajustes → Copia de seguridad**.
+
+| | Qué lleva |
+|---|---|
+| **Copia completa** | Configuración + todas las imágenes y vídeos |
+| **Solo configuración** | Los cuatro JSON. Cabe en un correo, pero **sin logos ni imágenes** |
+
+**Qué viaja:** pantallas y playlists, librería, paquetes, módulos de divisas con
+sus tasas y su sello de fecha, horarios y festivos, rotación, transición, orden
+aleatorio, fechas de vigencia, puerto, nombre de instalación y el token de
+Telegram.
+
+**Qué NO viaja:** la contraseña del panel, el token de la extensión, el secreto
+de sesión y el PIN. Es a propósito: un archivo que va por correo o en un
+pendrive no puede llevar dentro la llave de casa.
+
+### Montar otra tienda a partir de una copia
+
+1. Instala en el equipo nuevo y **crea la contraseña**.
+2. Restaura la copia (**completa**, o los logos faltarán).
+3. **Cambia el «Nombre de instalación»** en Ajustes. Si no, las dos tiendas
+   avisarán al mismo chat de Telegram firmando igual y no sabrás cuál es cuál.
+4. Borra las pantallas que vengan de la otra tienda y no existan aquí.
+5. Empareja los televisores. Si les pones los mismos nombres, heredan playlist
+   y horario tal cual.
+6. Reconfigura la extensión de Chrome con el token del equipo nuevo.
+7. **Actualiza las tasas.** La copia trae las de la otra tienda con su fecha
+   original, y el tablero las marcará como viejas desde el primer minuto.
+
+---
+
+## Cuando algo falla
+
+**Olvidaste la contraseña del panel.** En la carpeta del programa (*Archivos de
+programa → InTeks Display*), ejecuta **`restablecer-contrasena.bat`**. Borra
+solo la contraseña; el token de la extensión no se toca. Vuelve al panel y crea
+una nueva **en ese momento**: mientras no haya contraseña, cualquiera que llegue
+al servidor desde la red puede crear una.
+
+No hay recuperación por la red a propósito: eso no sería recuperación, sería una
+puerta trasera para cualquiera conectado al wifi de la tienda.
+
+**Una pantalla no muestra nada.** Mira si aparece «en línea» en el panel. Si no,
+comprueba que el televisor tiene red y que el servidor responde
+(`http://LA-IP/admin.html` desde otro equipo).
+
+**El escaparate se queda con contenido viejo.** Las pantallas guardan lo último
+reproducido y las imágenes en el propio televisor, así que aguantan sin
+servidor. Si el servidor lleva rato caído, aparece un punto tenue en una
+esquina.
+
+**El disco se está llenando.** Ajustes lo avisa a partir del 90 %. Cuando se
+llena fallan las subidas y puede corromperse la configuración: borra vídeos
+antiguos de la librería.
+
+**Actualizar el programa.** Ejecuta el instalador nuevo encima. Para el servidor
+antes de copiar nada y conserva pantallas, contenido y contraseña. La versión
+instalada se ve en Ajustes.
+
+---
+
+## Dónde está cada cosa
+
+| | |
+|---|---|
+| Programa | `C:\Program Files\InTeks Display\` |
+| Datos, subidas y registro | `C:\ProgramData\InTeks Display\` |
+| Registro de errores | `…\InTeks Display\server.log` |
+| Extensión de Chrome | `C:\Program Files\InTeks Display\extension\` |
+
+Los datos **no** se borran al desinstalar.
