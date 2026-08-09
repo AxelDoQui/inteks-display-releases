@@ -79,7 +79,15 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .pl-editor{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:14px;margin-top:14px;min-width:0}
 /* En ventanas estrechas, una columna debajo de otra en vez de recortarse */
 @media (max-width:700px){ .pl-editor{grid-template-columns:minmax(0,1fr)} }
-.pl-item{display:flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--b);border-radius:var(--r);padding:9px 10px;cursor:grab;transition:border-color .15s;margin-bottom:5px}
+/* flex-wrap para que las fechas de vigencia bajen a su propia linea. Sin esto
+   comparten fila con el nombre y, como .pl-info tiene min-width:0, lo aplastan
+   hasta cero: el nombre del contenido desaparecia del todo. */
+.pl-item{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--b);border-radius:var(--r);padding:9px 10px;cursor:grab;transition:border-color .15s;margin-bottom:5px}
+/* Segunda linea, siempre completa. Con etiquetas: dos campos de fecha a secas
+   no dicen cual es el principio y cual el final. */
+.pl-fechas{flex:0 0 100%;display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  font-size:10px;color:var(--muted);margin-top:2px;padding-top:6px;border-top:1px dashed var(--b)}
+.pl-fechas input{width:118px}
 .pl-item:hover{border-color:var(--b2)}
 .pl-item.drag-over{border-color:var(--a2)}
 .pl-item.dragging{opacity:.3}
@@ -1706,12 +1714,14 @@ function renderPlList(sid){
     const hoyISO=new Date().toISOString().slice(0,10);
     const fuera=(item.desde&&hoyISO<item.desde)||(item.hasta&&hoyISO>item.hasta);
     if(fuera) el.style.opacity=".5";
-    const fechas=`<input type="date" class="dur-inp" style="width:118px" value="${item.desde||''}" `+
-      `onchange="updVigencia('${sid}',${i},'desde',this.value)" title="Empieza a verse (vacío = ya)">`+
-      `<input type="date" class="dur-inp" style="width:118px" value="${item.hasta||''}" `+
-      `onchange="updVigencia('${sid}',${i},'hasta',this.value)" title="Deja de verse (vacío = nunca)">`;
+    const fechas=`<div class="pl-fechas"><span>se ve del</span>`+
+      `<input type="date" class="dur-inp" value="${item.desde||''}" `+
+      `onchange="updVigencia('${sid}',${i},'desde',this.value)"><span>al</span>`+
+      `<input type="date" class="dur-inp" value="${item.hasta||''}" `+
+      `onchange="updVigencia('${sid}',${i},'hasta',this.value)">`+
+      `<span style="opacity:.7">vacío = sin límite</span></div>`;
     const marca=fuera?'<span class="pl-tbadge" style="background:rgba(240,160,80,.14);color:#f0a050">fuera de fechas</span>':'';
-    el.innerHTML=`<span class="pl-handle"><i class="fa-solid fa-grip-vertical"></i></span><div class="pl-thumb">${thumb}</div><div class="pl-info"><div class="pl-name">${item.name}</div><span class="pl-tbadge ${tc}">${item.type.toUpperCase()}</span>${marca}</div>${fechas}${durControl}<button class="btn btn-danger btn-sm" onclick="rmFromPl('${sid}',${i})"><i class="fa-solid fa-xmark"></i></button>`;
+    el.innerHTML=`<span class="pl-handle"><i class="fa-solid fa-grip-vertical"></i></span><div class="pl-thumb">${thumb}</div><div class="pl-info"><div class="pl-name">${item.name}</div><span class="pl-tbadge ${tc}">${item.type.toUpperCase()}</span>${marca}</div>${durControl}<button class="btn btn-danger btn-sm" onclick="rmFromPl('${sid}',${i})"><i class="fa-solid fa-xmark"></i></button>${fechas}`;
     el.addEventListener("dragstart",()=>{dragSrc=i;setTimeout(()=>el.classList.add("dragging"),0);});
     el.addEventListener("dragend",()=>el.classList.remove("dragging"));
     el.addEventListener("dragover",e=>{e.preventDefault();el.classList.add("drag-over");});

@@ -9,7 +9,7 @@ Enlazar:  http://signage.local/pair     (nombre mDNS, configurable en config.jso
 import json, os, base64, mimetypes, threading, time, socket, sys, random, struct
 import hmac, hashlib, secrets, shutil, io, zipfile
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, unquote
 import urllib.request
 
 # ── Programa y datos van SEPARADOS ─────────────────────────────────────────
@@ -889,6 +889,27 @@ def _limpiar_pantalla_fantasma():
 
 _limpiar_pantalla_fantasma()
 
+def ruta_decodificada(ruta):
+    """Deshace el porcentaje-encoding de la ruta pedida.
+
+    urlparse() NO decodifica. Sin esto, el navegador pide
+    «/uploads/Tarifas%20sujetas…mp4» y el servidor busca en disco un archivo
+    cuyo nombre contenga literalmente «%20»: no existe, y devuelve 404 sin
+    decir por qué. Cualquier archivo con espacios o acentos era invisible —el
+    vídeo no se reproducía y su miniatura salía negra— mientras que los
+    «0000_1.png» funcionaban de casualidad, por no llevar ningún carácter que
+    necesite codificarse.
+
+    Decodificar mete «../» por la puerta de atrás (%2e%2e%2f), pero los dos
+    manejadores de archivos comprueban la ruta YA RESUELTA con realpath contra
+    su carpeta base, así que el intento se queda fuera igual. Hay tests que lo
+    fijan, incluidas las variantes codificadas.
+    """
+    try:
+        return unquote(ruta, errors="surrogatepass")
+    except Exception:
+        return ruta
+
 DISCO_AVISO_PCT = 90
 
 def estado_disco():
@@ -1062,7 +1083,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
-        path = parsed.path
+        path = ruta_decodificada(parsed.path)
         qs = parse_qs(parsed.query)
 
         # ── API: estado de autenticación (público; lo usa login.html)
@@ -1369,7 +1390,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
-        path = parsed.path
+        path = ruta_decodificada(parsed.path)
         length = int(self.headers.get("Content-Length",0))
         # Techo de seguridad: el cuerpo se carga ENTERO en memoria, así que un
         # envío gigante (una restauración con vídeos, una subida equivocada)
