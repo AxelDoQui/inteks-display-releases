@@ -1489,7 +1489,18 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/config":
             try:
                 d = json.loads(body)
-                save_json(CONFIG_FILE, d)
+                if not isinstance(d, dict):
+                    # Sin esto, mandar una lista escribia una lista en
+                    # config.json y se llevaba por delante la configuracion
+                    # entera: puerto, nombre mDNS, todo.
+                    jresp(400, {"ok": False, "error": "Configuración no válida"}); return
+                # Fusionar, NO reemplazar. El formulario de Ajustes solo conoce
+                # cinco claves; si se guardara el cuerpo tal cual, todo lo demás
+                # —mdns_name, update_url, el token de avisos— desaparecería en
+                # silencio la primera vez que alguien pulsa Guardar.
+                actual = load_json(CONFIG_FILE)
+                actual.update(d)
+                save_json(CONFIG_FILE, actual)
                 ok()
             except Exception as e: err(e)
             return
