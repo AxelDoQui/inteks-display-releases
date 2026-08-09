@@ -56,9 +56,20 @@ if (-not $AppDir -or -not (Test-Path (Join-Path $AppDir "server.py"))) {
     exit 1
 }
 
-# pythonw.exe suele estar junto a python.exe. Se busca por PATH y, si no,
-# en las rutas habituales de instalación.
-$pythonw = (Get-Command pythonw.exe -ErrorAction SilentlyContinue).Source
+# El interprete que viene DENTRO de la instalacion manda sobre cualquier otro.
+# Asi el servidor no depende de lo que el cliente tenga instalado ni de que
+# alguien actualice o desinstale "su" Python un martes por la tarde y se lleve
+# por delante el escaparate.
+$pythonw = $null
+$propio = Join-Path $AppDir "vendor\python\pythonw.exe"
+if (Test-Path $propio) {
+    $pythonw = $propio
+    Write-Host "Usando el Python incluido en la instalacion."
+}
+# Respaldo para instalaciones antiguas, anteriores a incluir el interprete.
+if (-not $pythonw) {
+    $pythonw = (Get-Command pythonw.exe -ErrorAction SilentlyContinue).Source
+}
 if (-not $pythonw) {
     $py = (Get-Command python.exe -ErrorAction SilentlyContinue).Source
     if ($py) { $cand = Join-Path (Split-Path $py) "pythonw.exe"; if (Test-Path $cand) { $pythonw = $cand } }
@@ -68,7 +79,7 @@ if (-not $pythonw) {
                Select-Object -First 1 -ExpandProperty FullName
 }
 if (-not $pythonw) {
-    Write-Host "ERROR: no se encuentra pythonw.exe. Instala Python 3.10+ marcando 'Add to PATH'." -ForegroundColor Red
+    Write-Host "ERROR: no se encuentra pythonw.exe ni el interprete incluido en '$propio'." -ForegroundColor Red
     exit 1
 }
 

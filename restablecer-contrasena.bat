@@ -10,9 +10,10 @@ REM  seria recuperacion, seria una puerta trasera que cualquiera conectado al
 REM  wifi de la tienda podria usar. La prueba de identidad es estar aqui.
 REM ─────────────────────────────────────────────────────────────────────────
 
-REM Misma busqueda que registrar-tarea.ps1: PATH primero, luego el lanzador py,
-REM y por ultimo las rutas habituales de instalacion.
+REM Igual que registrar-tarea.ps1: manda el interprete que viene DENTRO de la
+REM instalacion. Asi esto funciona aunque el equipo no tenga Python propio.
 set "PY="
+if exist "%~dp0vendor\python\python.exe" set "PY=%~dp0vendor\python\python.exe"
 for %%C in (python.exe) do if not defined PY set "PY=%%~$PATH:C"
 if not defined PY (
     where py >nul 2>&1 && set "PY=py"
@@ -25,9 +26,10 @@ if not defined PY (
 
 if not defined PY (
     echo.
-    echo   No se encuentra Python en este equipo.
-    echo   InTeks Display lo necesita para funcionar: instalalo desde
-    echo   https://www.python.org/downloads/ y vuelve a ejecutar esto.
+    echo   No se encuentra Python, ni siquiera el que viene con el programa.
+    echo   Deberia estar en:
+    echo     %~dp0vendor\python\python.exe
+    echo   Si no esta, reinstala InTeks Display.
     echo.
     pause
     exit /b 1

@@ -1,3 +1,10 @@
+; El interprete embebido no va en git (son ~21 MB de binarios de python.org).
+; Si falta, mejor abortar aqui con un mensaje claro que sacar un instalador que
+; parece bueno y luego no arranca en el PC de un cliente.
+#if !FileExists(AddBackslash(SourcePath) + "..\vendor\python\pythonw.exe")
+  #error Falta vendor\python. Ejecuta primero: powershell -ExecutionPolicy Bypass -File tools\descargar-python.ps1
+#endif
+
 [Setup]
 AppName=InTeks Display
 AppVersion=1.0.0

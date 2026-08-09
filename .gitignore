@@ -21,6 +21,9 @@ uploads/
 dist/
 # 21 MB, se reconstruye con `npm install`.
 node_modules/
+# Python embebido: ~21 MB de binarios de python.org, no código nuestro.
+# Se rehace con `powershell -File tools\descargar-python.ps1`.
+vendor/python/
 __pycache__/
 *.pyc
 
