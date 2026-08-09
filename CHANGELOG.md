@@ -8,6 +8,21 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.3 — 2026-08-09
+
+### Corregido
+
+- **Los archivos con espacios o acentos en el nombre daban 404.** Un vídeo
+  llamado «Tarifas sujetas a cambios…» no se reproducía y su miniatura salía
+  negra, sin ningún mensaje. El servidor no deshacía el codificado de la URL,
+  así que buscaba en disco un archivo con `%20` en el nombre. Las imágenes
+  funcionaban de casualidad, por llamarse `0000_1.png`.
+- La fila de la playlist se descuadraba con los campos de fecha: aplastaban el
+  nombre del contenido hasta hacerlo desaparecer. Ahora van en su propia línea
+  y con etiquetas.
+
+---
+
 ## 1.0.2 — 2026-08-09
 
 ### Nuevo
