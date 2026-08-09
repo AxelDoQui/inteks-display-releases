@@ -777,6 +777,33 @@ JPY  Yen        162.5"></textarea>
   </div>
 
   <div class="card">
+    <div class="card-title">Avisos al móvil (Telegram)</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6">
+      Avisa cuando una pantalla se cae <strong style="color:var(--text)">dentro de su horario</strong>,
+      cuando vuelve, y cuando un tablero de divisas lleva demasiado sin actualizarse.
+      Cada aviso se manda una sola vez.<br>
+      Para activarlo: habla con <strong style="color:var(--text)">@BotFather</strong> en Telegram,
+      crea un bot y pega aquí su token. El <em>chat ID</em> te lo da
+      <strong style="color:var(--text)">@userinfobot</strong>.
+    </p>
+    <div class="form-row">
+      <div class="fg"><label class="flabel">Token del bot</label><input class="finput" id="set-tg-token" placeholder="123456:ABC-DEF..."></div>
+      <div class="fg"><label class="flabel">Chat ID</label><input class="finput" id="set-tg-chat" placeholder="123456789"></div>
+    </div>
+    <div class="form-row full">
+      <div class="fg"><label class="flabel">Avisar tras (minutos sin responder)</label><input class="finput" id="set-tg-min" type="number" min="1" max="1440" value="15" style="width:120px"></div>
+    </div>
+    <p style="font-size:11px;color:#f0a050;margin:4px 0 12px">
+      El token se guarda en config.json, que <strong>sí</strong> va dentro de la copia de
+      seguridad. Trata ese archivo como una contraseña.
+    </p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-accent" onclick="guardarAvisos()"><i class="fa-solid fa-floppy-disk"></i> Guardar avisos</button>
+      <button class="btn btn-ghost" onclick="probarAvisos()"><i class="fa-solid fa-paper-plane"></i> Enviar mensaje de prueba</button>
+    </div>
+  </div>
+
+  <div class="card">
     <div class="card-title">Opciones avanzadas</div>
     <div style="margin-bottom:12px">
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
@@ -3347,6 +3374,9 @@ async function loadSettings(){
       document.getElementById("set-fallback").value=cfg.port_fallback||8081;
       document.getElementById("set-name").value=cfg.installation_name||"InTeks Display";
       document.getElementById("set-autostart").checked=!!cfg.autostart;
+      document.getElementById("set-tg-token").value=cfg.telegram_token||"";
+      document.getElementById("set-tg-chat").value=cfg.telegram_chat_id||"";
+      document.getElementById("set-tg-min").value=cfg.alert_offline_min||15;
     }
   }catch(e){console.error("Error loading settings",e);}
   // Token de API (para la extensión)
@@ -3391,6 +3421,33 @@ function copyToClipboard(text, msg){
     console.error(e);
   });
 }
+// Los avisos se guardan aparte de los ajustes del servidor: cambiar el token
+// no obliga a reiniciar, y mezclarlos invitaria a hacerlo. Ahora /api/config
+// fusiona, asi que mandar solo estas tres claves no borra las demas.
+async function guardarAvisos(){
+  const cfg={
+    telegram_token:document.getElementById("set-tg-token").value.trim(),
+    telegram_chat_id:document.getElementById("set-tg-chat").value.trim(),
+    alert_offline_min:parseInt(document.getElementById("set-tg-min").value)||15
+  };
+  try{
+    const r=await fetch("/api/config",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)});
+    toast(r.ok?"Avisos guardados ✓":"No se pudieron guardar",!r.ok);
+  }catch(e){ toast("Error al guardar los avisos",true); }
+}
+
+async function probarAvisos(){
+  toast("Enviando…");
+  try{
+    const r=await fetch("/api/alert-test",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:"{}"});
+    const d=await r.json();
+    toast(d.enviado ? "Enviado ✓ — mira el móvil"
+                    : "No salió. Revisa el token y el chat ID.", !d.enviado);
+  }catch(e){ toast("Error al enviar la prueba",true); }
+}
+
 async function saveSettings(){
   const cfg={
     port:parseInt(document.getElementById("set-port").value),

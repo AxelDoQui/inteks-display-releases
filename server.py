@@ -702,6 +702,135 @@ def pantalla_activa(cfg, ahora):
         return inicio <= actual <= fin
     return actual >= inicio or actual <= fin   # cruza medianoche
 
+# ── Avisos ─────────────────────────────────────────────────────────────────
+# El servidor sabe qué pantallas están conectadas y desde cuándo, pero esa
+# información solo existe si alguien mira el panel, y nadie lo mira. Si un
+# televisor pierde corriente un sábado a las 9, te enteras el lunes.
+#
+# Cada aviso se manda UNA vez. Un mensaje por minuto durante el fin de semana
+# se convierte en ruido y se deja de leer, que es lo mismo que no avisar.
+TELEGRAM_API = "https://api.telegram.org/bot{token}/sendMessage"
+ALERT_OFFLINE_MIN_DEFECTO = 15
+_alertas = set()          # avisos ya enviados: {("caida", "Escaparate"), ...}
+_alertas_lock = threading.Lock()
+
+def enviar_telegram(texto):
+    """Manda un mensaje. Devuelve True si salió. NUNCA lanza.
+
+    Que Telegram esté caído, sin cobertura o mal configurado no puede tumbar el
+    servidor de una tienda: lo que está en juego es un aviso, no el escaparate.
+    """
+    cfg = load_config()
+    token = str(cfg.get("telegram_token", "") or "").strip()
+    chat = str(cfg.get("telegram_chat_id", "") or "").strip()
+    if not token or not chat:
+        return False
+    try:
+        datos = json.dumps({"chat_id": chat, "text": texto}).encode()
+        req = urllib.request.Request(
+            TELEGRAM_API.format(token=token), data=datos,
+            headers={"Content-Type": "application/json",
+                     "User-Agent": f"InTeks-Display/{APP_VERSION}"},
+            method="POST")
+        with urllib.request.urlopen(req, timeout=8) as r:
+            r.read(2048)
+        return True
+    except Exception as e:
+        log(f"  [avisos] no se pudo enviar: {e}")
+        return False
+
+def _nombre_instalacion():
+    return str(load_config().get("installation_name", "") or "InTeks Display")
+
+def revisar_avisos():
+    """Una pasada del vigilante. Devuelve la lista de avisos enviados."""
+    enviados = []
+    try:
+        cfg = load_config()
+        if not str(cfg.get("telegram_token", "") or "").strip():
+            return enviados                     # apagado: no se habla con nadie
+        try:
+            minutos = max(1, int(cfg.get("alert_offline_min", ALERT_OFFLINE_MIN_DEFECTO)))
+        except Exception:
+            minutos = ALERT_OFFLINE_MIN_DEFECTO
+
+        sitio = _nombre_instalacion()
+        ahora_ts = time.time()
+        ahora_tm = time.localtime(ahora_ts)
+        screens = load_json(SCREENS_FILE)
+        content = load_json(CONTENT_FILE)
+        pantallas = content.get("screens", {})
+
+        for sid, reg in screens.items():
+            if sid == "admin":
+                continue                        # el panel no es una pantalla
+            debe_estar = pantalla_activa(pantallas.get(sid, {}), ahora_tm)
+            visto = reg.get("last_seen") or 0
+            caida = (not reg.get("connected")) and (ahora_ts - visto) > minutos * 60
+            clave = ("caida", sid)
+            with _alertas_lock:
+                ya_avisada = clave in _alertas
+
+            if caida and debe_estar and not ya_avisada:
+                if enviar_telegram(
+                        f"⚠ {sitio}\n\nLa pantalla «{sid}» lleva más de "
+                        f"{minutos} min sin responder, y debería estar encendida."):
+                    with _alertas_lock:
+                        _alertas.add(clave)
+                    enviados.append(clave)
+            elif not caida and ya_avisada:
+                if enviar_telegram(f"✅ {sitio}\n\nLa pantalla «{sid}» ha vuelto."):
+                    with _alertas_lock:
+                        _alertas.discard(clave)
+                    enviados.append(("vuelve", sid))
+
+        # ── Tasas caducadas ────────────────────────────────────────────────
+        # Se miran las playlists ya expandidas: un módulo de divisas puede venir
+        # dentro de un paquete y ahí también cuenta.
+        vistos = set()
+        for sid, cfg_p in pantallas.items():
+            for it in expandir_paquetes(cfg_p.get("playlist", []), content):
+                if not isinstance(it, dict) or it.get("type") != "fx":
+                    continue
+                mid = it.get("id") or it.get("name") or "fx"
+                if mid in vistos:
+                    continue
+                vistos.add(mid)
+                horas = it.get("stale_hours")
+                try:
+                    horas = 24.0 if horas in (None, "") else float(horas)
+                    ts = float(it.get("updated_at") or 0)
+                except (TypeError, ValueError):
+                    continue
+                if not horas or not ts:
+                    continue
+                clave = ("tasas", mid)
+                caducado = (ahora_ts - ts) > horas * 3600
+                with _alertas_lock:
+                    ya = clave in _alertas
+                if caducado and not ya:
+                    dias = int((ahora_ts - ts) // 86400)
+                    cuanto = f"{dias} día(s)" if dias else "más del plazo"
+                    if enviar_telegram(
+                            f"⚠ {sitio}\n\nEl tablero «{it.get('name') or mid}» "
+                            f"lleva {cuanto} sin actualizarse."):
+                        with _alertas_lock:
+                            _alertas.add(clave)
+                        enviados.append(clave)
+                elif not caducado and ya:
+                    with _alertas_lock:
+                        _alertas.discard(clave)
+    except Exception as e:
+        # El vigilante no puede matar al servidor pase lo que pase.
+        log(f"  [avisos] error al revisar: {e}")
+    return enviados
+
+def _vigilante():
+    """Hilo de fondo. Una pasada por minuto."""
+    while True:
+        time.sleep(60)
+        revisar_avisos()
+
 def notify_unlink(screen_id):
     """Le dice a la pantalla que olvide quién era, sin borrar su configuración.
 
@@ -1476,6 +1605,16 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e: err(e)
             return
 
+        # ── Mandar un mensaje de prueba, para saber si los avisos funcionan
+        if path == "/api/alert-test":
+            try:
+                enviado = enviar_telegram(
+                    f"🔔 {_nombre_instalacion()}\n\n"
+                    "Prueba de avisos. Si lees esto, está bien configurado.")
+                ok({"enviado": bool(enviado)})
+            except Exception as e: err(e)
+            return
+
         # ── Restaurar una copia de seguridad (el cuerpo es el zip en crudo)
         if path == "/api/restore":
             try:
@@ -1696,6 +1835,11 @@ if __name__ == "__main__":
     log("="*56)
     log(f"  PIN de enlace:   {pin_state['pin']} (válido 10 min)")
     log("="*56)
+    # Vigilante de avisos. Solo cuando el programa se ejecuta de verdad: si
+    # arrancara al importar server.py, los tests que lo importan tendrian un
+    # hilo suelto mandando mensajes por su cuenta.
+    threading.Thread(target=_vigilante, daemon=True).start()
+
     _disco = estado_disco()
     if _disco.get("aviso"):
         log(f"  AVISO: disco al {_disco['pct_usado']}% "
