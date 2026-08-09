@@ -28,10 +28,12 @@ function loadResiliencia(localStorageStub) {
     localStorage: localStorageStub || { getItem: () => null, setItem() {}, removeItem() {} },
     playlist: [], screenConfig: null, screenSchedule: null,
     rebuildSlides() {}, showSlide() {}, JSON, Date,
-    // restoreFromCache llama a esto para bajarse las imagenes al televisor.
-    // Aqui no interesa (no hay IndexedDB en Node) pero sin el stub el bloque
-    // revienta con ReferenceError y no se probaria la cache, que es el tema.
+    // restoreFromCache llama a estas dos: una baja las imagenes al televisor
+    // y la otra aplica el tipo de transicion al DOM. Ninguna interesa aqui
+    // (no hay IndexedDB ni DOM en Node) pero sin los stubs el bloque revienta
+    // con ReferenceError y no se probaria la cache, que es el tema.
     sincronizarMedios() {},
+    aplicarTransicion() {},
   };
   vm.createContext(ctx);
   vm.runInContext(src.slice(from, to) + "\n;__ms = OFFLINE_AFTER_MS;", ctx);

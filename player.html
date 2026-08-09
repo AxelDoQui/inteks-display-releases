@@ -12,8 +12,28 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 #player{width:100vw;height:100vh;position:fixed;top:0;left:0;transform-origin:top left;background:#000;overflow:hidden}
 
 /* ── Slides normales */
-.slide{position:absolute;inset:0;opacity:0;transition:opacity 1s ease-in-out;display:flex;align-items:center;justify-content:center;background:#000}
+.slide{position:absolute;inset:0;opacity:0;display:flex;align-items:center;justify-content:center;background:#000;
+  transition:opacity var(--trans-ms,1000ms) ease-in-out, transform var(--trans-ms,1000ms) ease-in-out}
 .slide.active{opacity:1}
+
+/* ── Transiciones. Solo opacity y transform: son las unicas que la GPU compone
+   sin repintar, y en un Android TV barato lo demas da tirones.
+   Las diapositivas viven DENTRO de #player, que es quien lleva la rotacion, asi
+   que translateX se ve horizontal aunque la tele este en vertical: el eje X del
+   contenido es lo que el espectador percibe como horizontal. */
+.slide.sin-transicion{transition:none}
+
+#player.tr-none .slide{transition:none}
+
+#player.tr-zoom .slide{transform:scale(1.06)}
+#player.tr-zoom .slide.active{transform:scale(1)}
+#player.tr-zoom .slide.leaving{transform:scale(.96)}
+
+/* Hace falta .leaving para distinguir "la que se va" de "las que esperan": sin
+   eso las dos irian al mismo lado y se cruzarian al reves. */
+#player.tr-slide .slide{transform:translateX(100%)}
+#player.tr-slide .slide.active{transform:translateX(0)}
+#player.tr-slide .slide.leaving{transform:translateX(-100%);opacity:1}
 .slide img{width:100%;height:100%;object-fit:contain}
 .slide video{width:100%;height:100%;object-fit:contain;background:#000}
 .slide iframe{width:100%;height:100%;border:none;background:#fff}
@@ -205,6 +225,46 @@ if(URL_ROTATION!==null) applyRotation(URL_ROTATION);
 
 let playlist=[],current=0,timer=null,screenSchedule=null,screenConfig=null;
 
+// ── Transiciones entre diapositivas ────────────────────────────────────────
+// Ya había un fundido de 1 s metido en el CSS de .slide, pero no se podía
+// elegir ni ajustar. Ahora el tipo y la duración van por pantalla: un
+// escaparate y una pantalla de caja piden ritmos distintos.
+//
+// Solo se animan opacity y transform. Son las dos únicas propiedades que la GPU
+// compone sin repintar; cualquier otra cosa da tirones en un Android TV barato,
+// que es el hardware donde esto acaba corriendo.
+var TRANS_TIPOS = {fade:"tr-fade", slide:"tr-slide", zoom:"tr-zoom", none:"tr-none"};
+var TRANS_MS_DEFECTO = 1000;
+var TRANS_MS_MAX = 2000;      // por encima, la pantalla vive en transición
+
+function claseTransicion(cfg){
+  var t = (cfg||{}).transition;
+  // Un tipo desconocido —de una copia de otra versión, o de un JSON tocado a
+  // mano— cae al fundido. Nunca puede dejar una pantalla que no se ve.
+  return TRANS_TIPOS[t] || TRANS_TIPOS.fade;
+}
+
+function duracionTransicion(cfg){
+  cfg = cfg || {};
+  if(cfg.transition === "none") return 0;
+  var ms = cfg.transition_ms;
+  if(ms === undefined || ms === null || ms === "") return TRANS_MS_DEFECTO;
+  ms = parseFloat(ms);
+  if(isNaN(ms)) return TRANS_MS_DEFECTO;
+  return Math.max(0, Math.min(TRANS_MS_MAX, ms));
+}
+// ── fin de las transiciones ────────────────────────────────────────────────
+
+// Lleva el tipo y la duración al DOM. Va aparte del núcleo puro de arriba
+// porque toca el documento y eso no se puede probar en Node.
+function aplicarTransicion(cfg){
+  const p=document.getElementById("player");
+  if(!p) return;
+  p.classList.remove("tr-fade","tr-slide","tr-zoom","tr-none");
+  p.classList.add(claseTransicion(cfg));
+  p.style.setProperty("--trans-ms", duracionTransicion(cfg)+"ms");
+}
+
 // ── Medios guardados en el televisor ───────────────────────────────────────
 // El texto, las divisas, el clima y el ticker ya aguantan sin servidor, pero
 // las imágenes y los vídeos dependían de la caché del navegador: si el PC del
@@ -395,6 +455,7 @@ function restoreFromCache(){
   screenConfig=d.config||null;
   screenSchedule=(d.config&&d.config.schedule)||null;   // sin esto se encendería fuera de horario
   playlist=d.playlist;
+  aplicarTransicion(screenConfig);   // la caché también recuerda cómo transiciona
   rebuildSlides();
   showSlide(0);
   // Arranque en frío con el servidor caído: aquí es donde de verdad importa
@@ -493,6 +554,7 @@ async function loadPlaylist(){
     }
     screenSchedule=d.config?.schedule||null;
     screenConfig=d.config||null;
+    aplicarTransicion(screenConfig);
     lastContact=Date.now();
     updateScreenStatus();
     if(changed){playlist=d.playlist;rebuildSlides();if(playlist.length)showSlide(0);}
@@ -797,12 +859,48 @@ function startProgress(ms){
   }));
 }
 
+let limpiezaSalida=null;
+
 function showSlide(idx){
   const slides=document.querySelectorAll(".slide");
   if(!slides.length)return;
-  slides.forEach(s=>{s.classList.remove("active");const v=s.querySelector("video");if(v){v.pause();v.currentTime=0;}});
   current=((idx%slides.length)+slides.length)%slides.length;
-  const slide=slides[current];slide.classList.add("active");
+  const slide=slides[current];
+  const saliente=document.querySelector(".slide.active");
+  const trMs=duracionTransicion(screenConfig);
+
+  // Las que ni entran ni salen se apagan en seco: no se ven de todos modos.
+  slides.forEach(s=>{
+    if(s===saliente||s===slide) return;
+    s.classList.remove("active","leaving");
+    const v=s.querySelector("video");
+    if(v){v.pause();v.currentTime=0;}
+  });
+
+  // Con una sola diapositiva no hay transición que hacer, y montarla dejaría
+  // la pantalla parpadeando cada vez que se reinicia el ciclo.
+  if(saliente&&saliente!==slide){
+    clearTimeout(limpiezaSalida);
+    saliente.classList.remove("active");
+    saliente.classList.add("leaving");
+    limpiezaSalida=setTimeout(()=>{
+      // El vídeo que sale se corta al TERMINAR la transición, no al empezar.
+      // Antes se pausaba y rebobinaba de golpe y se quedaba congelado a medio
+      // fundido, a la vista.
+      const v=saliente.querySelector("video");
+      if(v){v.pause();v.currentTime=0;}
+      // Quitar .leaving devuelve la diapositiva a su posición de espera. Sin
+      // cortar la transición antes, ese salto se animaría: se vería volver
+      // cruzando la pantalla, ya invisible pero moviéndose. El reflow es
+      // obligatorio; sin él el navegador agrupa los tres cambios y no sirve.
+      saliente.classList.add("sin-transicion");
+      saliente.classList.remove("leaving");
+      void saliente.offsetWidth;
+      saliente.classList.remove("sin-transicion");
+    }, trMs);
+  }
+  slide.classList.remove("leaving");
+  slide.classList.add("active");
   const isVideo=!!slide.querySelector("video");
   const fx=slide.querySelector(".mod-fx");
   const ms=(parseFloat(slide.dataset.dur)||8)*1000;
