@@ -94,7 +94,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .pl-handle{color:var(--muted);opacity:.35;font-size:13px}
 .pl-thumb{width:56px;height:36px;border-radius:4px;background:#000;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:16px}
 .pl-thumb img,.pl-thumb video{width:100%;height:100%;object-fit:cover}
-.pl-info{flex:1;min-width:0}
+/* flex-basis 140px y no 0: con basis 0 el nombre es lo PRIMERO que se encoge y
+   acaba en cero mientras los controles conservan su ancho entero. Con una base
+   real compite de tu a tu y, al haber flex-wrap, lo que sobra baja de linea en
+   vez de aplastar el nombre. min-width:0 sigue haciendo falta para los puntos
+   suspensivos. */
+.pl-info{flex:1 1 140px;min-width:0}
 .pl-name{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pl-tbadge{font-size:9px;font-family:'Space Mono',monospace;padding:1px 5px;border-radius:3px}
 .tb-image{background:rgba(255,127,0,.1);color:var(--accent)}
@@ -1707,7 +1712,9 @@ function renderPlList(sid){
     else if(item.type==="video")thumb=`<video src="${item.src}" muted preload="metadata"></video>`;
     const tc=`tb-${item.type}`;
     const durControl = item.type==="video"
-      ? `<span class="dur-inp" style="display:inline-flex;align-items:center;justify-content:center;opacity:.6" title="El vídeo usa su propia duración"><i class="fa-solid fa-film"></i> auto</span>`
+      // width:auto porque .dur-inp mide 46px, pensados para un numero de tres
+      // cifras. "auto" con su icono necesita mas y salia recortado.
+      ? `<span class="dur-inp" style="width:auto;min-width:46px;padding:3px 7px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;justify-content:center;opacity:.6" title="El vídeo usa su propia duración"><i class="fa-solid fa-film"></i>auto</span>`
       : `<input class="dur-inp" type="number" min="1" max="3600" value="${item.duration||8}" onchange="updDur('${sid}',${i},this.value)">`;
     // Vigencia: vacio = sin limite. El servidor filtra al servir la playlist;
     // aqui solo se editan las fechas y se marca lo que ya no se ve.

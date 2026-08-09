@@ -8,6 +8,18 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.4 — 2026-08-09
+
+### Corregido
+
+- La insignia **«auto»** de los vídeos salía recortada: usaba el ancho fijo de
+  46 px pensado para un número de tres cifras.
+- El nombre del contenido podía aplastarse hasta desaparecer cuando la columna
+  de la playlist iba estrecha. Ahora los controles bajan de línea antes que
+  comerse el nombre.
+
+---
+
 ## 1.0.3 — 2026-08-09
 
 ### Corregido
