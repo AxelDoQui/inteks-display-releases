@@ -28,6 +28,10 @@ function loadResiliencia(localStorageStub) {
     localStorage: localStorageStub || { getItem: () => null, setItem() {}, removeItem() {} },
     playlist: [], screenConfig: null, screenSchedule: null,
     rebuildSlides() {}, showSlide() {}, JSON, Date,
+    // restoreFromCache llama a esto para bajarse las imagenes al televisor.
+    // Aqui no interesa (no hay IndexedDB en Node) pero sin el stub el bloque
+    // revienta con ReferenceError y no se probaria la cache, que es el tema.
+    sincronizarMedios() {},
   };
   vm.createContext(ctx);
   vm.runInContext(src.slice(from, to) + "\n;__ms = OFFLINE_AFTER_MS;", ctx);

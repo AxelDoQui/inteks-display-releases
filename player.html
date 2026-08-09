@@ -205,6 +205,136 @@ if(URL_ROTATION!==null) applyRotation(URL_ROTATION);
 
 let playlist=[],current=0,timer=null,screenSchedule=null,screenConfig=null;
 
+// ── Medios guardados en el televisor ───────────────────────────────────────
+// El texto, las divisas, el clima y el ticker ya aguantan sin servidor, pero
+// las imágenes y los vídeos dependían de la caché del navegador: si el PC del
+// servidor está apagado y el televisor arranca en frío, el escaparate se queda
+// vacío.
+//
+// La solución de manual (service worker) exige HTTPS, y montar un túnel en cada
+// tienda es una dependencia externa que no compensa. IndexedDB funciona en la
+// red local tal cual, sobre http y sin depender de nadie.
+//
+// Este trozo es el núcleo, y es puro a propósito: decide QUÉ se guarda, QUÉ URL
+// se pinta y QUÉ se suelta. Todo lo que toca IndexedDB va aparte, más abajo,
+// porque eso no se puede probar en Node.
+function esMedioCacheable(item){
+  if(!item) return false;
+  if(item.type!=="image" && item.type!=="video") return false;
+  // Solo lo que sirve nuestro propio servidor. Una imagen remota puede ser
+  // enorme, cambiar sola o no dejarse descargar por CORS.
+  return String(item.src||"").indexOf("/uploads/")===0;
+}
+
+function mediosDePlaylist(pl){
+  var out=[], vistos={};
+  (pl||[]).forEach(function(it){
+    if(esMedioCacheable(it) && !vistos[it.src]){ vistos[it.src]=1; out.push(it.src); }
+  });
+  return out;
+}
+
+function urlDeMedio(src, mapa){
+  // Nunca se deja de pintar por no tener copia: la red es el respaldo.
+  return (mapa && mapa[src]) ? mapa[src] : src;
+}
+
+function sobrantes(mapa, usados){
+  // Un player de señalización está semanas encendido. Sin soltar las URL de
+  // objeto, cada cambio de playlist deja memoria retenida para siempre.
+  var fuera=[], enUso={};
+  (usados||[]).forEach(function(s){ enUso[s]=1; });
+  Object.keys(mapa||{}).forEach(function(s){ if(!enUso[s]) fuera.push(s); });
+  return fuera;
+}
+// ── fin del nucleo de medios ───────────────────────────────────────────────
+
+// Pegamento con IndexedDB. NO está cubierto por tests: en Node no hay
+// IndexedDB. Por eso todo lo que decide algo vive arriba, en el núcleo puro, y
+// aquí solo queda guardar, leer y soltar.
+//
+// Ninguna de estas funciones lanza: si el televisor no tiene IndexedDB, o se
+// queda sin espacio, o falla la descarga, se sigue tirando de red. Perder la
+// caché es una molestia; que el escaparate se quede en negro, no.
+const MEDIOS_DB="inteks_medios", MEDIOS_STORE="archivos";
+let mediosLocales={};              // src -> blob: URL
+
+function abrirDB(){
+  return new Promise(function(res){
+    try{
+      const req=indexedDB.open(MEDIOS_DB,1);
+      req.onupgradeneeded=function(){
+        const db=req.result;
+        if(!db.objectStoreNames.contains(MEDIOS_STORE)) db.createObjectStore(MEDIOS_STORE);
+      };
+      req.onsuccess=function(){ res(req.result); };
+      req.onerror=function(){ res(null); };
+    }catch(e){ res(null); }
+  });
+}
+
+function idbLeer(db,clave){
+  return new Promise(function(res){
+    try{
+      const p=db.transaction(MEDIOS_STORE,"readonly").objectStore(MEDIOS_STORE).get(clave);
+      p.onsuccess=function(){ res(p.result||null); };
+      p.onerror=function(){ res(null); };
+    }catch(e){ res(null); }
+  });
+}
+
+function idbGuardar(db,clave,blob){
+  return new Promise(function(res){
+    try{
+      const p=db.transaction(MEDIOS_STORE,"readwrite").objectStore(MEDIOS_STORE).put(blob,clave);
+      p.onsuccess=function(){ res(true); };
+      // Lo normal aquí es quedarse sin cuota: los TV dan poco espacio. No es un
+      // error que haya que anunciar, simplemente ese archivo irá por red.
+      p.onerror=function(){ res(false); };
+    }catch(e){ res(false); }
+  });
+}
+
+function idbBorrar(db,clave){
+  try{ db.transaction(MEDIOS_STORE,"readwrite").objectStore(MEDIOS_STORE).delete(clave); }
+  catch(e){}
+}
+
+async function sincronizarMedios(){
+  if(PREVIEW) return;              // la previa del admin no llena el disco de nadie
+  if(typeof indexedDB==="undefined") return;
+  const db=await abrirDB();
+  if(!db) return;
+
+  const usados=mediosDePlaylist(playlist);
+
+  // Soltar lo que ya no está en la playlist, en memoria y en disco.
+  sobrantes(mediosLocales,usados).forEach(function(src){
+    try{ URL.revokeObjectURL(mediosLocales[src]); }catch(e){}
+    delete mediosLocales[src];
+    idbBorrar(db,src);
+  });
+
+  let nuevos=0;
+  for(const src of usados){
+    if(mediosLocales[src]) continue;
+    let blob=await idbLeer(db,src);
+    if(!blob){
+      try{
+        const r=await fetch(src,{cache:"no-store"});
+        if(!r.ok) continue;
+        blob=await r.blob();
+        await idbGuardar(db,src,blob);
+        nuevos++;
+      }catch(e){ continue; }      // sin servidor: ya se cogerá la próxima vez
+    }
+    try{ mediosLocales[src]=URL.createObjectURL(blob); }catch(e){}
+  }
+  // Repintar solo si hemos ganado copias nuevas, para que las diapositivas
+  // pasen a usarlas sin esperar al siguiente cambio de playlist.
+  if(nuevos) rebuildSlides();
+}
+
 // ── Frescura de las tasas ──────────────────────────────────────────────────
 // El tablero mostraba SIEMPRE la fecha de hoy, sacada del reloj del navegador.
 // Unas tasas de hace tres días salían con la fecha de hoy al lado: el propio
@@ -267,6 +397,9 @@ function restoreFromCache(){
   playlist=d.playlist;
   rebuildSlides();
   showSlide(0);
+  // Arranque en frío con el servidor caído: aquí es donde de verdad importa
+  // tener las imágenes guardadas en el propio televisor.
+  sincronizarMedios();
   return true;
 }
 
@@ -364,6 +497,9 @@ async function loadPlaylist(){
     updateScreenStatus();
     if(changed){playlist=d.playlist;rebuildSlides();if(playlist.length)showSlide(0);}
     saveCache();
+    // Descargar al televisor lo que aún no tenga. Va sin await a propósito: la
+    // pantalla ya está pintando desde la red y esto es trabajo de fondo.
+    sincronizarMedios();
   }catch(e){
     // Servidor caído. Lo que ya está en pantalla se queda; solo si arrancamos
     // sin nada que mostrar se tira de lo guardado en el dispositivo.
@@ -608,7 +744,9 @@ function rebuildSlides(){
 
     if(item.type==="video"){
       const v=document.createElement("video");
-      v.src=item.src;v.muted=true;v.playsInline=true;v.preload="auto";
+      // Si hay copia guardada en el televisor se usa esa; si no, la del
+      // servidor. Nunca se deja de pintar por no tener copia.
+      v.src=urlDeMedio(item.src,mediosLocales);v.muted=true;v.playsInline=true;v.preload="auto";
       slide.appendChild(v);
     } else if(item.type==="url"){
       const fr=document.createElement("iframe");
@@ -642,7 +780,9 @@ function rebuildSlides(){
     } else if(item.type==="countdown"){
       slide.appendChild(buildCountdownSlide(item));
     } else {
-      const img=document.createElement("img");img.src=item.src;slide.appendChild(img);
+      const img=document.createElement("img");
+      img.src=urlDeMedio(item.src,mediosLocales);
+      slide.appendChild(img);
     }
     player.appendChild(slide);
   });
