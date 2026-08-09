@@ -38,6 +38,22 @@ Name: "startupicon"; Description: "Iniciar InTeks Display automáticamente al en
 ; {commonappdata} y server.py los trae al arrancar.
 Type: filesandordirs; Name: "{commonpf}\SignalOS Pro"
 
+; El interprete embebido se borra entero en vez de reemplazarse archivo a
+; archivo. Reemplazar DLL una a una deja la puerta abierta a mezclar dos
+; versiones de Python si algo falla a mitad, y ese Frankenstein no arranca.
+; Aqui ya no hay nada agarrandolas: PrepareToInstall paro el servidor antes.
+Type: filesandordirs; Name: "{app}\vendor\python"
+
+; OJO con lo que NO se borra aqui. Las primeras versiones escribian los datos
+; dentro de Archivos de programa (admin.json, content.json, screens.json,
+; uploads\...). Siguen ahi en equipos que vienen de aquella epoca, y
+; migrar_datos_antiguos() los trae a {commonappdata} la primera vez que arranca
+; el servidor nuevo. [InstallDelete] corre ANTES de todo eso, asi que borrarlos
+; aqui seria borrarle al cliente sus pantallas y su contrasena justo antes de
+; que nadie los haya leido. Se quedan; los recoge la migracion.
+; El registro si se puede tirar: es un log, no configuracion.
+Type: files; Name: "{app}\server.log"
+
 [Registry]
 ; Solo HKLM. La version mas antigua tambien escribia en HKCU, pero borrarlo
 ; desde aqui no serviria: el instalador corre elevado, asi que HKCU seria el
@@ -89,6 +105,9 @@ Source: "..\vendor\*"; DestDir: "{app}\vendor"; Flags: ignoreversion recursesubd
 Source: "..\inteks-extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "instalar-extension.html"; DestDir: "{app}"; Flags: ignoreversion
 Source: "registrar-tarea.ps1"; DestDir: "{app}"; Flags: ignoreversion
+; Este NO se instala: se extrae a la carpeta temporal y se ejecuta antes de
+; copiar nada. Ver [Code] / PrepareToInstall.
+Source: "parar-servidor.ps1"; Flags: dontcopy
 
 ; NO empaquetar nunca:
 ;   content.json / screens.json  -> server.py los crea vacíos al arrancar
@@ -121,3 +140,31 @@ Filename: "{app}\abrir-panel.bat"; Description: "Abrir el panel de administracio
 Filename: "powershell.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\registrar-tarea.ps1"" -Quitar"; \
   Flags: runhidden waituntilterminated; RunOnceId: "QuitarTareaInTeks Display"
+
+[Code]
+{ Parar el servidor ANTES de copiar un solo archivo.
+
+  registrar-tarea.ps1 tambien lo para, pero se ejecuta en [Run], al FINAL de la
+  instalacion. Desde que el interprete de Python va DENTRO de la instalacion,
+  ese servidor vivo tiene agarradas sus propias DLL y la copia falla:
+
+      vendor\python\libcrypto-3.dll
+      DeleteFile fallo; codigo 5. Acceso denegado.
+
+  El instalador se pisaba a si mismo. PrepareToInstall corre antes de que Inno
+  toque el disco, que es el unico momento en que esto sirve de algo. }
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Code: Integer;
+begin
+  Result := '';
+  ExtractTemporaryFile('parar-servidor.ps1');
+  { Si esto falla no se aborta la instalacion: en un equipo limpio no hay nada
+    que parar, y un error aqui no puede impedir instalar por primera vez.
+    Si de verdad habia algo agarrando un archivo, Inno lo dira igualmente. }
+  Exec('powershell.exe',
+       '-NoProfile -ExecutionPolicy Bypass -File "' +
+         ExpandConstant('{tmp}\parar-servidor.ps1') +
+         '" -AppDir "' + ExpandConstant('{app}') + '"',
+       '', SW_HIDE, ewWaitUntilTerminated, Code);
+end;
