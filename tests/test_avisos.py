@@ -62,8 +62,13 @@ def main():
     srv.TELEGRAM_API = f"http://127.0.0.1:{FAKE_PORT}/bot{{token}}/sendMessage"
 
     cfg = srv.load_json(srv.CONFIG_FILE)
+    # Franja de 24 h a proposito: sin esto, la comprobacion de extremo a
+    # extremo de las tasas dependeria de la hora a la que se ejecuten los
+    # tests y fallaria de noche. La franja se prueba aparte, con horas fijas.
     cfg.update({"telegram_token": "123:ABC", "telegram_chat_id": "999",
-                "alert_offline_min": 15})
+                "alert_offline_min": 15,
+                "alert_tasas_desde": "00:00", "alert_tasas_hasta": "23:59",
+                "alert_tasas_cada_h": 1})
     srv.save_json(srv.CONFIG_FILE, cfg)
 
     ahora = time.time()
@@ -128,6 +133,49 @@ def main():
         enviados.clear()
         srv.revisar_avisos()
         check(enviados == [], "y no lo repite cada minuto")
+
+        # ── Recordatorios de tasas: cuando toca insistir ───────────────────
+        # Una pantalla caida es un SUCESO: avisas una vez y otra al volver.
+        # Unas tasas viejas son una TAREA PENDIENTE: sigue ahi hasta que
+        # alguien la haga, y un solo aviso a las 9 se pierde entre las
+        # notificaciones del dia. Por eso se recuerda cada X horas, dentro de
+        # una franja, en vez de una sola vez.
+        def alas(h, m=0):
+            return time.struct_time((2026, 8, 10, h, m, 0, 0, 1, -1))
+
+        HORA = 3600
+
+        check(srv.toca_recordar(alas(9), 0, "09:00", "22:00", 1) is True,
+              "a las 9:00, sin haber avisado nunca, toca")
+        check(srv.toca_recordar(alas(8, 59), 0, "09:00", "22:00", 1) is False,
+              "un minuto antes de las 9 todavia no")
+        check(srv.toca_recordar(alas(22, 1), 0, "09:00", "22:00", 1) is False,
+              "pasadas las 22:00 se calla, aunque siga caducado")
+        check(srv.toca_recordar(alas(3), 0, "09:00", "22:00", 1) is False,
+              "de madrugada no molesta")
+
+        base = time.mktime(alas(9))
+        check(srv.toca_recordar(alas(9, 30), base, "09:00", "22:00", 1) is False,
+              "media hora despues del ultimo aviso todavia no repite")
+        check(srv.toca_recordar(alas(10), base, "09:00", "22:00", 1) is True,
+              "una hora despues si repite")
+        check(srv.toca_recordar(alas(11, 59), base, "09:00", "22:00", 3) is False,
+              "con cada 3 horas, a las 11:59 aun no")
+        check(srv.toca_recordar(alas(12), base, "09:00", "22:00", 3) is True,
+              "y a las 12:00 clavadas si: han pasado las 3 horas justas")
+
+        # Con 0 horas: un unico aviso al dia, no un recordatorio cada minuto.
+        check(srv.toca_recordar(alas(11), base, "09:00", "22:00", 0) is False,
+              "con repeticion 0, no insiste el mismo dia")
+        ayer = base - 24 * HORA
+        check(srv.toca_recordar(alas(9), ayer, "09:00", "22:00", 0) is True,
+              "pero al dia siguiente vuelve a avisar")
+
+        # Franja que cruza medianoche, como un bar que cierra a las 2.
+        check(srv.toca_recordar(alas(1), 0, "22:00", "02:00", 1) is True,
+              "una franja que cruza medianoche funciona")
+        check(srv.toca_recordar(alas(12), 0, "22:00", "02:00", 1) is False,
+              "y fuera de ella se calla")
 
         # ── Sin token no se contacta con nadie ─────────────────────────────
         cfg = srv.load_json(srv.CONFIG_FILE)

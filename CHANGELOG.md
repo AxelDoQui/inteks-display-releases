@@ -8,6 +8,23 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.6 — 2026-08-09
+
+### Nuevo
+
+- **El aviso de tasas viejas ahora es un recordatorio**, no una notificación
+  suelta. Se configura desde qué hora, hasta qué hora y cada cuánto insistir
+  (por defecto: de 9:00 a 22:00, cada hora). Con «repetir cada 0 horas» se
+  queda en un único aviso al día.
+- Pasada la hora de fin **se calla**, aunque las tasas sigan viejas.
+
+### Corregido
+
+- Un reinicio del servidor de madrugada podía disparar el aviso de tasas en ese
+  momento: el estado vivía en memoria. Ahora se guarda en disco.
+
+---
+
 ## 1.0.5 — 2026-08-09
 
 ### Nuevo

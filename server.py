@@ -22,7 +22,7 @@ import urllib.request
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.5"
+APP_VERSION = "1.0.6"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -739,6 +739,64 @@ def enviar_telegram(texto):
         log(f"  [avisos] no se pudo enviar: {e}")
         return False
 
+RECORDATORIOS_FILE = os.path.join(DATA_DIR, "avisos.json")
+
+def _leer_recordatorios():
+    """Cuándo se recordó por última vez cada tablero. {id_modulo: epoch}
+
+    Va a disco y no en memoria: si el equipo se reinicia a las 4 de la mañana,
+    un estado en memoria se perdería y el vigilante mandaría el recordatorio
+    ahí mismo. Es un archivo diminuto y no entra en la copia de seguridad —es
+    estado de este equipo, no configuración.
+    """
+    d = load_json(RECORDATORIOS_FILE)
+    return d.get("tasas", {}) if isinstance(d, dict) else {}
+
+def _guardar_recordatorios(tasas):
+    try:
+        save_json(RECORDATORIOS_FILE, {"tasas": tasas})
+    except Exception as e:
+        log(f"  [avisos] no se pudo guardar el estado: {e}")
+
+ALERT_TASAS_DESDE = "09:00"
+ALERT_TASAS_HASTA = "22:00"
+ALERT_TASAS_CADA_H = 1
+
+def _en_franja(actual, inicio, fin):
+    """¿Está `actual` («HH:MM») dentro de la franja? Admite cruzar medianoche."""
+    if inicio <= fin:
+        return inicio <= actual <= fin
+    return actual >= inicio or actual <= fin
+
+def toca_recordar(ahora_tm, ultimo_ts, inicio, fin, cada_horas):
+    """¿Toca insistir ahora con unas tasas viejas?
+
+    Las tasas viejas no son un suceso, son una tarea pendiente: siguen ahí
+    hasta que alguien las actualice, y un solo aviso a las 9 de la mañana se
+    pierde entre las notificaciones del día. Por eso se recuerda cada X horas
+    dentro de una franja, en vez de una única vez.
+
+    Y por eso hay franja: insistir a las tres de la madrugada no consigue que
+    nadie actualice nada, solo que se silencien los avisos para siempre.
+    """
+    actual = time.strftime("%H:%M", ahora_tm)
+    if not _en_franja(actual, inicio, fin):
+        return False
+    if not ultimo_ts:
+        return True                          # nunca avisado de esto
+    ahora_ts = time.mktime(ahora_tm)
+    try:
+        cada = float(cada_horas)
+    except (TypeError, ValueError):
+        cada = ALERT_TASAS_CADA_H
+    if cada <= 0:
+        # Un único aviso al día: se compara el día del calendario, no las horas
+        # transcurridas, para que a las 9 de la mañana siguiente vuelva a sonar
+        # aunque el de ayer fuera a las 21:00.
+        return time.strftime("%Y-%m-%d", ahora_tm) != \
+               time.strftime("%Y-%m-%d", time.localtime(ultimo_ts))
+    return (ahora_ts - ultimo_ts) >= cada * 3600
+
 def _nombre_instalacion():
     return str(load_config().get("installation_name", "") or "InTeks Display")
 
@@ -787,6 +845,11 @@ def revisar_avisos():
         # ── Tasas caducadas ────────────────────────────────────────────────
         # Se miran las playlists ya expandidas: un módulo de divisas puede venir
         # dentro de un paquete y ahí también cuenta.
+        desde = str(cfg.get("alert_tasas_desde", "") or ALERT_TASAS_DESDE)
+        hasta = str(cfg.get("alert_tasas_hasta", "") or ALERT_TASAS_HASTA)
+        cada_h = cfg.get("alert_tasas_cada_h", ALERT_TASAS_CADA_H)
+        recordatorios = _leer_recordatorios()
+
         vistos = set()
         for sid, cfg_p in pantallas.items():
             for it in expandir_paquetes(cfg_p.get("playlist", []), content):
@@ -804,22 +867,24 @@ def revisar_avisos():
                     continue
                 if not horas or not ts:
                     continue
-                clave = ("tasas", mid)
                 caducado = (ahora_ts - ts) > horas * 3600
-                with _alertas_lock:
-                    ya = clave in _alertas
-                if caducado and not ya:
-                    dias = int((ahora_ts - ts) // 86400)
-                    cuanto = f"{dias} día(s)" if dias else "más del plazo"
-                    if enviar_telegram(
-                            f"⚠ {sitio}\n\nEl tablero «{it.get('name') or mid}» "
-                            f"lleva {cuanto} sin actualizarse."):
-                        with _alertas_lock:
-                            _alertas.add(clave)
-                        enviados.append(clave)
-                elif not caducado and ya:
-                    with _alertas_lock:
-                        _alertas.discard(clave)
+                if not caducado:
+                    # Ya se actualizaron: se olvida para que la próxima vez que
+                    # caduquen vuelva a avisar desde cero.
+                    if recordatorios.pop(mid, None) is not None:
+                        _guardar_recordatorios(recordatorios)
+                    continue
+                if not toca_recordar(ahora_tm, recordatorios.get(mid, 0),
+                                     desde, hasta, cada_h):
+                    continue
+                dias = int((ahora_ts - ts) // 86400)
+                cuanto = f"{dias} día(s)" if dias else "más del plazo"
+                if enviar_telegram(
+                        f"⚠ {sitio}\n\nEl tablero «{it.get('name') or mid}» "
+                        f"lleva {cuanto} sin actualizarse."):
+                    recordatorios[mid] = ahora_ts
+                    _guardar_recordatorios(recordatorios)
+                    enviados.append(("tasas", mid))
     except Exception as e:
         # El vigilante no puede matar al servidor pase lo que pase.
         log(f"  [avisos] error al revisar: {e}")

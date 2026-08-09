@@ -804,7 +804,21 @@ JPY  Yen        162.5"></textarea>
       <div class="fg"><label class="flabel">Chat ID</label><input class="finput" id="set-tg-chat" placeholder="123456789"></div>
     </div>
     <div class="form-row full">
-      <div class="fg"><label class="flabel">Avisar tras (minutos sin responder)</label><input class="finput" id="set-tg-min" type="number" min="1" max="1440" value="15" style="width:120px"></div>
+      <div class="fg"><label class="flabel">Pantalla caída: avisar tras (minutos sin responder)</label><input class="finput" id="set-tg-min" type="number" min="1" max="1440" value="15" style="width:120px"></div>
+    </div>
+
+    <div style="border-top:1px solid var(--b);padding-top:12px;margin-bottom:4px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:'Space Mono',monospace;letter-spacing:1px">RECORDATORIO DE TASAS VIEJAS</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">
+        Una pantalla caída se avisa una vez; unas tasas viejas siguen ahí hasta que
+        alguien las actualice, así que se recuerdan hasta que se hagan.
+        Pon <strong style="color:var(--text)">0</strong> en «repetir» para un único aviso al día.
+      </p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+        <div class="fg"><label class="flabel">Desde</label><input class="finput" id="set-tg-desde" type="time" value="09:00" style="width:120px"></div>
+        <div class="fg"><label class="flabel">Hasta</label><input class="finput" id="set-tg-hasta" type="time" value="22:00" style="width:120px"></div>
+        <div class="fg"><label class="flabel">Repetir cada (horas)</label><input class="finput" id="set-tg-cada" type="number" min="0" max="24" step="1" value="1" style="width:120px"></div>
+      </div>
     </div>
     <p style="font-size:11px;color:#f0a050;margin:4px 0 12px">
       El token se guarda en config.json, que <strong>sí</strong> va dentro de la copia de
@@ -3402,6 +3416,10 @@ async function loadSettings(){
       document.getElementById("set-tg-token").value=cfg.telegram_token||"";
       document.getElementById("set-tg-chat").value=cfg.telegram_chat_id||"";
       document.getElementById("set-tg-min").value=cfg.alert_offline_min||15;
+      document.getElementById("set-tg-desde").value=cfg.alert_tasas_desde||"09:00";
+      document.getElementById("set-tg-hasta").value=cfg.alert_tasas_hasta||"22:00";
+      document.getElementById("set-tg-cada").value=
+        (cfg.alert_tasas_cada_h===undefined||cfg.alert_tasas_cada_h===null)?1:cfg.alert_tasas_cada_h;
     }
   }catch(e){console.error("Error loading settings",e);}
   // Token de API (para la extensión)
@@ -3453,7 +3471,15 @@ async function guardarAvisos(){
   const cfg={
     telegram_token:document.getElementById("set-tg-token").value.trim(),
     telegram_chat_id:document.getElementById("set-tg-chat").value.trim(),
-    alert_offline_min:parseInt(document.getElementById("set-tg-min").value)||15
+    alert_offline_min:parseInt(document.getElementById("set-tg-min").value)||15,
+    alert_tasas_desde:document.getElementById("set-tg-desde").value||"09:00",
+    alert_tasas_hasta:document.getElementById("set-tg-hasta").value||"22:00",
+    // 0 es un valor valido (un unico aviso al dia), asi que nada de ||1 aqui:
+    // convertiria el 0 en 1 y el usuario no podria elegirlo nunca.
+    alert_tasas_cada_h:(function(){
+      const v=parseFloat(document.getElementById("set-tg-cada").value);
+      return isNaN(v)?1:Math.max(0,Math.min(24,v));
+    })()
   };
   try{
     const r=await fetch("/api/config",{method:"POST",
