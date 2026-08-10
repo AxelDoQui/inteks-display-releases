@@ -365,20 +365,20 @@ desenchufado unos segundos, para forzar el camino del 409.
 
 ### Subir la versión: 1.0.9 → 1.0.10
 
-**No hay comando ni script.** La versión vive en cuatro sitios que no se hablan
-entre sí, y hay que editarlos a mano:
+**Hay un script. Úsalo, no edites a mano:**
 
-| Archivo | Qué |
-|---|---|
-| `server.py:25` | `APP_VERSION = "1.0.10"` |
-| `installer/setup.iss` | `AppVersion=1.0.10` |
-| `installer/setup.iss` | `OutputBaseFilename=..._v1.0.10` |
-| `package.json:3` | `"version": "1.0.10"` |
+```
+powershell -ExecutionPolicy Bypass -File tools\subir-version.ps1 1.0.10
+```
 
-`tests/version-sync.test.js` comprueba que los cuatro coinciden — si te dejas
-uno, `npm test` te lo dice. **Súbela antes de compilar el instalador, sin
-excepciones**: si no, se acumulan `.exe` con el mismo nombre y contenido distinto,
-y el soporte se convierte en adivinanza.
+Cambia de una vez las cuatro ediciones que viven en tres archivos que no se
+hablan entre sí: `server.py` (`APP_VERSION`), `installer/setup.iss` (dos veces —
+`AppVersion` y `OutputBaseFilename`) y `package.json`. `tests/version-sync.test.js`
+vigila que coincidan; el script existe para que nunca lleguen a discrepar.
+
+**Súbela antes de compilar el instalador, sin excepciones.** Ya pasó una vez que
+en un solo día salieron cinco builds llamados 1.0.0 y no había forma de saber
+cuál tenía instalado cada equipo.
 
 ---
 
