@@ -115,6 +115,34 @@ paga notablemente más, avisa con ⚠ sin cambiar tu elección.
 
 ---
 
+## Usar el panel desde otro ordenador
+
+El panel no es un programa instalado: es una página que sirve el equipo donde
+corre InTeks Display. Desde cualquier otro ordenador de la misma red se abre en
+
+    http://signage.local/admin.html
+
+con la misma contraseña. Los dos paneles se refrescan solos, así que lo que
+hagas en uno aparece en el otro sin recargar nada.
+
+Para la extensión de Chrome en ese segundo equipo, rellena el campo **Servidor**
+del panel lateral con esa misma dirección (`http://signage.local`) y pega el
+token de la API que está en Ajustes.
+
+**Si el otro ordenador no lo encuentra**, casi siempre es el cortafuegos de
+Windows del equipo servidor: el instalador no crea la regla. Hay que permitir
+el puerto de InTeks Display para redes privadas. Si `signage.local` tampoco
+responde, prueba con la IP del equipo servidor, que aparece en la pantalla
+negra del servidor al arrancar.
+
+**Qué pasa si dos personas tocan el panel a la vez.** Manda quien guarde
+primero. El segundo recibe el aviso «otro equipo cambió algo, repite lo último
+que hiciste» y su panel se pone al día solo. Se pierde esa última acción suya
+—hay que repetirla— pero nunca se borra en silencio lo que hizo el otro, que es
+lo que pasaba antes.
+
+---
+
 ## Horarios
 
 En **Horario** de cada pantalla: días de la semana con su franja, o modo 24/7.

@@ -149,11 +149,26 @@ vacía.
 | Archivo | Contenido | ¿Se versiona? |
 |---|---|---|
 | `config.json` | puerto, alternativo, nombre mDNS, autoarranque | Sí, es la plantilla por defecto |
-| `content.json` | items, pantallas, paquetes | No — lo crea vacío `init_file` |
+| `content.json` | items, pantallas, paquetes, `rev` | No — lo crea vacío `init_file` |
 | `screens.json` | registro de pantallas vistas | No — ídem |
 | `admin.json` | salt, hash de contraseña, secret de sesión, api_token | **No — secretos** |
 | `pin.json` | PIN activo, intentos fallidos, bloqueo | **No — secreto** |
 | `uploads/` | archivos subidos | No |
+
+**`content.json` solo se escribe por `contenido_en_edicion()`** (`server.py`).
+Es un gestor de contexto que lee, deja modificar y guarda **sin soltar el
+`file_lock` en medio**: el hueco entre `load_json` y `save_json` era una carrera
+real, no teórica —de veinte subidas simultáneas sobrevivían seis—. Además sube
+`rev` en cada escritura, y como es el único camino que escribe el archivo,
+ningún manejador nuevo puede olvidarse de subirlo. Si añades un endpoint que
+toque `content.json`, úsalo; no vuelvas a `load_json`/`save_json` sueltos.
+
+Dos trampas al usarlo: salir con `return` desde dentro del `with` **sí** guarda
+(solo una excepción aborta la escritura), así que las validaciones que puedan
+rechazar la petición van *antes* de abrir el guardián; y en una escritura
+condicional hay que entrar solo cuando vayas a mutar de verdad, porque subir
+`rev` sin cambiar nada invalida a los paneles abiertos y les provoca un 409
+espurio.
 
 ## Estilo visual del admin
 
@@ -205,6 +220,16 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
    cada 4h) que no explican por sí solas un cierre tan rápido y regular.
    Investigación en pausa a la espera de una prueba de control (una web
    cualquiera en el mismo navegador) que aísle si es del TV o de la página.
+4. **Preservar ediciones a medias durante un repintado** — `admin.html` hace
+   `es.onmessage=()=>loadAll()`, que reconstruye la interfaz ante cualquier
+   aviso SSE y se lleva por delante lo que hubiera a medio escribir. Es un
+   comportamiento anterior a la sincronización de dos paneles, no introducido
+   por ella. Para que muerda hay que estar tecleando en un equipo en el mismo
+   instante en que otro publica, y una sola persona no tiene dos pares de
+   manos. Se arregla el día que haya dos empleados editando a la vez; el
+   arreglo de raíz es guardado granular por entidad (`/api/items/<id>`), que
+   hoy es desproporcionado: `saveContentLocal()` se llama desde doce sitios de
+   un `admin.html` de 214 KB.
 
 ## Gotchas de despliegue
 

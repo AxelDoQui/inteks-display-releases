@@ -130,6 +130,35 @@ def main():
         check(adm.get("api_token") == TOKEN and adm.get("pwd_hash") == "no-deberia-viajar",
               "restaurar NO pisa las credenciales de este equipo")
 
+        # ── El contador de revision al restaurar ───────────────────────────
+        # La copia trae el rev de OTRA instalacion. Si coincidiera con el que
+        # tiene un panel abierto aqui, ese panel podria escribir encima de lo
+        # recien restaurado creyendose al dia. Por eso el contador solo crece:
+        # rev = max(el de aqui, el de la copia) + 1.
+        def copia_con_rev(rev):
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w") as zf:
+                zf.writestr("inteks-backup.json",
+                            json.dumps({"app": "InTeks Display", "created_at": 1}))
+                zf.writestr("content.json", json.dumps(
+                    {"items": [{"id": "it_1", "name": "Cartel", "type": "image",
+                                "src": "/uploads/cartel.png"}],
+                     "packages": [], "screens": {}, "rev": rev}))
+            return buf.getvalue()
+
+        local = int(json.load(open(cpath)).get("rev", 0))
+        post_raw("/api/restore", copia_con_rev(local + 50))
+        tras_alta = int(json.load(open(cpath)).get("rev", 0))
+        check(tras_alta > local + 50,
+              f"si la copia trae un rev mas alto, el de aqui lo supera "
+              f"(aqui {local}, copia {local + 50} -> queda {tras_alta})")
+
+        post_raw("/api/restore", copia_con_rev(0))
+        tras_baja = int(json.load(open(cpath)).get("rev", 0))
+        check(tras_baja > tras_alta,
+              f"y si la copia trae uno mas bajo, el contador no retrocede "
+              f"(aqui {tras_alta}, copia 0 -> queda {tras_baja})")
+
         # ── Que no se cuele nada raro ──────────────────────────────────────
         try:
             post_raw("/api/restore", b"esto no es un zip")

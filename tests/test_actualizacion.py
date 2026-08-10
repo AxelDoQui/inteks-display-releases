@@ -129,11 +129,31 @@ def main():
         check(d.get("update_available") is False,
               "una version publicada mas vieja no cuenta como actualizacion")
 
-        # 1.0.10 es mas nueva que 1.0.9, aunque como texto sea "menor".
-        respuesta_falsa["cuerpo"] = b'{"version":"1.0.10"}'
-        d = consultar(PORT + 1)
-        check(d.get("update_available") is True,
-              f"1.0.10 se entiende como mas nueva que 1.0.x -> {d}")
+        # ── La trampa clasica: comparar versiones como TEXTO ────────────────
+        # "1.0.10" es alfabeticamente MENOR que "1.0.9", asi que un servidor que
+        # comparase textos no anunciaria justo la actualizacion mas esperada.
+        #
+        # Esto se construye a partir de la version instalada y no con numeros
+        # fijos: antes decia b'{"version":"1.0.10"}' y la prueba se cayo sola el
+        # dia que el programa llego a la 1.0.10, porque su premisa -que la
+        # instalada era anterior- dejo de ser cierta.
+        mayor, menor, parche = (int(x) for x in d["current"].split("."))
+
+        respuesta_falsa["cuerpo"] = json.dumps(
+            {"version": f"{mayor}.{menor}.{parche + 1}"}).encode()
+        d2 = consultar(PORT + 1)
+        check(d2.get("update_available") is True,
+              f"un parche mas alto es una actualizacion -> {d2}")
+
+        # Y al reves: con el parche en dos digitos, uno de un solo digito
+        # PARECE mayor en alfabetico ("...9" > "...10") pero es mas viejo.
+        if parche >= 10 and str(parche)[0] < "9":
+            respuesta_falsa["cuerpo"] = json.dumps(
+                {"version": f"{mayor}.{menor}.9"}).encode()
+            d2 = consultar(PORT + 1)
+            check(d2.get("update_available") is False,
+                  f"...9 parece mayor que ...{parche} como texto, pero es mas "
+                  f"vieja y no se anuncia -> {d2}")
 
         # ── Que un fallo de red no rompa el panel ──────────────────────────
         respuesta_falsa["codigo"] = 500

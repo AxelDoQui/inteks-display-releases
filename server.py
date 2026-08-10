@@ -7,7 +7,7 @@ Player:   http://TU_IP/player.html?screen=NOMBRE
 Enlazar:  http://signage.local/pair     (nombre mDNS, configurable en config.json)
 """
 import json, os, base64, mimetypes, threading, time, socket, sys, random, struct
-import hmac, hashlib, secrets, shutil, io, zipfile
+import hmac, hashlib, secrets, shutil, io, zipfile, contextlib
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, unquote
 import urllib.request
@@ -22,7 +22,7 @@ import urllib.request
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.9"
+APP_VERSION = "1.0.10"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -403,7 +403,7 @@ if not port_to_use:
 PORT = port_to_use
 
 init_file(SCREENS_FILE, {})
-init_file(CONTENT_FILE, {"items": [], "screens": {}})
+init_file(CONTENT_FILE, {"items": [], "screens": {}, "rev": 0})
 
 # La limpieza del registro se hace más abajo, en cuanto load_json/save_json
 # existen. Aquí arriba todavía no están definidas.
@@ -563,6 +563,14 @@ def restaurar_backup(datos):
     if ficha.get("app") != "InTeks Display":
         return False, "Ese zip no es una copia de InTeks Display."
 
+    # El rev que había aquí antes de volcar nada. La copia trae el suyo, de otra
+    # instalación, y si por casualidad coincidiera con el de un panel abierto ese
+    # panel podría escribir encima de lo recién restaurado creyéndose al día.
+    try:
+        rev_local = int(load_json(CONTENT_FILE).get("rev", 0))
+    except Exception:
+        rev_local = 0
+
     escritos, saltados = 0, 0
     for nombre in z.namelist():
         if nombre == BACKUP_FICHA:
@@ -576,6 +584,17 @@ def restaurar_backup(datos):
         with z.open(nombre) as origen, open(destino, "wb") as salida:
             shutil.copyfileobj(origen, salida)
         escritos += 1
+    # El contador solo puede crecer: así ningún panel que estuviera abierto antes
+    # de la restauración puede tener un rev que el servidor acepte como válido.
+    try:
+        with file_lock:
+            content = load_json(CONTENT_FILE)
+            if content:
+                content["rev"] = max(rev_local, int(content.get("rev", 0))) + 1
+                save_json(CONTENT_FILE, content)
+    except Exception as e:
+        log(f"  [copia] no se pudo ajustar rev tras restaurar: {e}")
+
     log(f"  [copia] restaurados {escritos} archivo(s)"
         + (f", {saltados} descartado(s)" if saltados else ""))
     return True, f"{escritos} archivo(s) restaurados"
@@ -930,6 +949,59 @@ def save_json(path, data):
             except Exception: pass
             raise
 
+class RevConflicto(Exception):
+    """El panel intentó guardar con una foto que ya no es la actual.
+
+    Se lanza desde dentro de contenido_en_edicion() para abortar la escritura:
+    la excepción atraviesa el yield y el guardián no llega a guardar nada. Es la
+    única forma de comprobar y decidir sin soltar el lock en medio, que es
+    justo el hueco que este cambio existe para cerrar.
+    """
+    def __init__(self, actual): self.actual = actual
+
+@contextlib.contextmanager
+def contenido_en_edicion():
+    """Lee, deja modificar y guarda content.json sin soltar el lock en medio.
+
+    El hueco entre load_json y save_json era la carrera: dos peticiones
+    simultáneas (una subida y las tasas de la extensión, por ejemplo) leían la
+    misma foto y la segunda escribía encima de la primera. Medido antes de
+    existir esto: de 20 subidas a la vez sobrevivían 6.
+
+    Funciona sin tocar load_json ni save_json porque file_lock es un RLock:
+    las adquisiciones de dentro se vuelven anidamientos inofensivos en el mismo
+    hilo. Con un Lock() normal esto se bloquearía a sí mismo.
+
+    Sube 'rev' en cada escritura. Como es el único camino que escribe el
+    archivo, ningún manejador futuro puede olvidarse de subirlo.
+
+    Si el cuerpo lanza, la excepción atraviesa el yield y NO se guarda nada.
+    Ojo: salir con 'return' desde dentro del with sí guarda.
+    """
+    with file_lock:
+        content = load_json(CONTENT_FILE)
+        yield content
+        content["rev"] = int(content.get("rev", 0)) + 1
+        save_json(CONTENT_FILE, content)
+
+def _migrar_rev():
+    """Añade 'rev' al content.json que viene de una versión anterior.
+
+    Sin esto, la comprobación optimista de POST /api/content deja el panel en
+    bucle: carga un contenido sin rev, guarda sin rev, recibe 409
+    rev_stale_client, recarga, y vuelve a empezar. Dejaría el panel inutilizable
+    en toda instalación actualizada desde 1.0.9, que son todas.
+    """
+    try:
+        with file_lock:
+            content = load_json(CONTENT_FILE)
+            if content and "rev" not in content:
+                content["rev"] = 0
+                save_json(CONTENT_FILE, content)
+                log("  [contenido] migrado: se añade rev 0 (venía de una versión anterior)")
+    except Exception as e:
+        log(f"  [contenido] no se pudo migrar rev: {e}")
+
 def _limpiar_pantalla_fantasma():
     """Quita el 'admin' que las versiones anteriores inscribían como pantalla.
 
@@ -953,6 +1025,7 @@ def _limpiar_pantalla_fantasma():
         log(f"  [limpieza] no se pudo retirar 'admin' del registro: {e}")
 
 _limpiar_pantalla_fantasma()
+_migrar_rev()
 
 def ruta_decodificada(ruta):
     """Deshace el porcentaje-encoding de la ruta pedida.
@@ -1611,9 +1684,12 @@ class Handler(BaseHTTPRequestHandler):
                 save_json(SCREENS_FILE, screens)
                 # setdefault y no asignación: al reenlazar, la configuración que
                 # ya estuviera ahí se queda como está. Es todo el sentido del modo.
-                content.setdefault("screens", {}).setdefault(
-                    nombre, {"mode": "independent", "playlist": []})
-                save_json(CONTENT_FILE, content)
+                # El guardián se abre aquí y no arriba a propósito: entre la
+                # lectura y este punto hay cuatro 'return' de validación, y
+                # envolverlos subiría rev en un emparejamiento rechazado.
+                with contenido_en_edicion() as content:
+                    content.setdefault("screens", {}).setdefault(
+                        nombre, {"mode": "independent", "playlist": []})
                 verbo = "reenlazada" if modo == "reenlazar" else "enlazada"
                 log(f"  [enlace] pantalla '{nombre}' {verbo} con el código {code}")
                 ok({"screen_name": nombre, "modo": modo})
@@ -1631,11 +1707,10 @@ class Handler(BaseHTTPRequestHandler):
                 idx = len(os.listdir(UPLOAD_DIR))
                 filename = f"{idx:04d}_{name}"
                 with open(os.path.join(UPLOAD_DIR, filename),"wb") as f: f.write(raw)
-                content = load_json(CONTENT_FILE)
                 item = {"id": filename, "name": name, "type": d["type"],
                         "src": f"/uploads/{filename}", "size": len(raw)}
-                content.setdefault("items",[]).append(item)
-                save_json(CONTENT_FILE, content)
+                with contenido_en_edicion() as content:
+                    content.setdefault("items",[]).append(item)
                 ok({"item": item})
             except Exception as e: err(e)
             return
@@ -1644,11 +1719,29 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/content":
             try:
                 d = json.loads(body)
-                content = load_json(CONTENT_FILE)
-                if isinstance(d.get("items"), list): content["items"] = d["items"]
-                if isinstance(d.get("screens"), dict): content["screens"] = d["screens"]
-                if isinstance(d.get("packages"), list): content["packages"] = d["packages"]
-                save_json(CONTENT_FILE, content)
+                enviado = d.get("rev")
+                try:
+                    with contenido_en_edicion() as content:
+                        # La comprobación va DENTRO del guardián: si se hiciera
+                        # fuera, entre comprobar y escribir cabría la escritura
+                        # del otro equipo, que es el hueco que esto cierra.
+                        actual = int(content.get("rev", 0))
+                        if enviado is None or int(enviado) != actual:
+                            raise RevConflicto(actual)
+                        if isinstance(d.get("items"), list): content["items"] = d["items"]
+                        if isinstance(d.get("screens"), dict): content["screens"] = d["screens"]
+                        if isinstance(d.get("packages"), list): content["packages"] = d["packages"]
+                except RevConflicto as c:
+                    if enviado is None:
+                        # Pestaña con un admin.html cacheado de antes de esta
+                        # versión: no puede colarse saltándose la comprobación.
+                        # Al recibir esto el panel recarga y se cura solo.
+                        log("  [contenido] guardado rechazado: el panel no manda rev "
+                            "(admin.html cacheado de una version anterior)")
+                        jresp(409, {"ok": False, "error": "rev_stale_client"}); return
+                    log(f"  [contenido] guardado rechazado: el panel traia rev {enviado}, "
+                        f"en disco hay {c.actual}")
+                    jresp(409, {"ok": False, "error": "rev_conflict", "rev": c.actual}); return
                 notify_all()
                 ok()
             except Exception as e: err(e)
@@ -1658,9 +1751,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/screens/config":
             try:
                 d = json.loads(body)
-                content = load_json(CONTENT_FILE)
-                content["screens"] = d
-                save_json(CONTENT_FILE, content)
+                with contenido_en_edicion() as content:
+                    content["screens"] = d
                 # Notificar a todas las pantallas afectadas
                 for sid in d.keys(): notify_screen(sid)
                 ok()
@@ -1678,10 +1770,12 @@ class Handler(BaseHTTPRequestHandler):
                     del screens[sid]
                     save_json(SCREENS_FILE, screens)
                 # Quitar de la configuración de contenido (content.json -> screens)
-                content = load_json(CONTENT_FILE)
-                if sid in content.get("screens", {}):
-                    del content["screens"][sid]
-                    save_json(CONTENT_FILE, content)
+                # Solo se entra al guardián si hay algo que quitar: subir rev en un
+                # borrado que no borra nada invalidaría a los paneles abiertos y les
+                # provocaría un 409 espurio en su siguiente guardado.
+                if sid in load_json(CONTENT_FILE).get("screens", {}):
+                    with contenido_en_edicion() as content:
+                        content.get("screens", {}).pop(sid, None)
                 # Avisar a la tablet de esa pantalla para que se desconecte (vuelva a emparejar)
                 notify_deleted(sid)
                 # Soltar cualquier conexión SSE asociada a esa pantalla
@@ -1746,52 +1840,56 @@ class Handler(BaseHTTPRequestHandler):
                 updated_at = time.time()
                 if not rows:
                     err("rows requerido y no puede estar vacío"); return
-                content = load_json(CONTENT_FILE)
-                screens = content.get("screens", {})
-                targets = screen_ids if screen_ids else list(screens.keys())
                 updated_screens = []
-                touched_ids = set()
-                for sid in targets:
-                    if sid not in screens: continue
-                    playlist = screens[sid].get("playlist", [])
-                    fx_found = False
-                    for item in playlist:
-                        if item.get("type") == "fx":
-                            touched_ids.add(item.get("id"))
-                            # Actualizar SOLO las tasas y lo que venga explícito.
-                            # Antes se pisaban siempre título y moneda base, así que
-                            # cada envío desde la extensión borraba lo que el usuario
-                            # había configurado en el admin.
+                with contenido_en_edicion() as content:
+                    screens = content.get("screens", {})
+                    targets = screen_ids if screen_ids else list(screens.keys())
+                    touched_ids = set()
+                    for sid in targets:
+                        if sid not in screens: continue
+                        playlist = screens[sid].get("playlist", [])
+                        fx_found = False
+                        for item in playlist:
+                            if item.get("type") == "fx":
+                                touched_ids.add(item.get("id"))
+                                # Actualizar SOLO las tasas y lo que venga explícito.
+                                # Antes se pisaban siempre título y moneda base, así que
+                                # cada envío desde la extensión borraba lo que el usuario
+                                # había configurado en el admin.
+                                item["rows"] = fusionar_filas(item.get("rows"), rows)
+                                if title: item["title"] = title
+                                if base_currency: item["base_currency"] = base_currency
+                                item["updated_at"] = updated_at
+                                fx_found = True
+                        if not fx_found:
+                            # Módulo nuevo: aquí sí hacen falta valores por defecto.
+                            new_title = title or "Tipos de cambio"
+                            playlist.append({
+                                "id": f"fx_{int(updated_at)}", "name": new_title, "type": "fx",
+                                "title": new_title, "base_currency": base_currency or "EUR", "rows": rows,
+                                "duration": 15, "bg": "#07182b", "color": "#ffffff", "updated_at": updated_at
+                            })
+                        screens[sid]["playlist"] = playlist
+                        updated_screens.append(sid)
+                    # Sincronizar la copia de la LIBRERÍA de los módulos tocados.
+                    # El contenido vive duplicado: content["items"] es la librería y
+                    # cada playlist guarda su propia copia. El admin propaga de la
+                    # librería hacia las pantallas al guardar, así que si la librería
+                    # se queda con las tasas viejas, la primera edición en el admin
+                    # deshace silenciosamente lo que acaba de hacer la extensión.
+                    for item in content.get("items", []):
+                        if item.get("type") == "fx" and item.get("id") in touched_ids:
                             item["rows"] = fusionar_filas(item.get("rows"), rows)
                             if title: item["title"] = title
                             if base_currency: item["base_currency"] = base_currency
                             item["updated_at"] = updated_at
-                            fx_found = True
-                    if not fx_found:
-                        # Módulo nuevo: aquí sí hacen falta valores por defecto.
-                        new_title = title or "Tipos de cambio"
-                        playlist.append({
-                            "id": f"fx_{int(updated_at)}", "name": new_title, "type": "fx",
-                            "title": new_title, "base_currency": base_currency or "EUR", "rows": rows,
-                            "duration": 15, "bg": "#07182b", "color": "#ffffff", "updated_at": updated_at
-                        })
-                    screens[sid]["playlist"] = playlist
-                    updated_screens.append(sid)
-                # Sincronizar la copia de la LIBRERÍA de los módulos tocados.
-                # El contenido vive duplicado: content["items"] es la librería y
-                # cada playlist guarda su propia copia. El admin propaga de la
-                # librería hacia las pantallas al guardar, así que si la librería
-                # se queda con las tasas viejas, la primera edición en el admin
-                # deshace silenciosamente lo que acaba de hacer la extensión.
-                for item in content.get("items", []):
-                    if item.get("type") == "fx" and item.get("id") in touched_ids:
-                        item["rows"] = fusionar_filas(item.get("rows"), rows)
-                        if title: item["title"] = title
-                        if base_currency: item["base_currency"] = base_currency
-                        item["updated_at"] = updated_at
-                content["screens"] = screens
-                save_json(CONTENT_FILE, content)
+                    content["screens"] = screens
                 for sid in updated_screens: notify_screen(sid)
+                # El panel escucha en sse_clients["admin"], y "admin" nunca está en
+                # updated_screens porque está excluido del registro de pantallas. Sin
+                # esta línea el panel no se entera de las tasas nuevas y, al guardar
+                # cualquier cosa, sube su copia caducada encima.
+                notify_screen("admin")
                 ok({"updated_screens": updated_screens, "rows_count": len(rows)})
             except Exception as e: err(e)
             return
@@ -1801,17 +1899,16 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 d = json.loads(body)
                 item_id = d["id"]
-                content = load_json(CONTENT_FILE)
-                item = next((i for i in content.get("items",[]) if i["id"]==item_id), None)
-                if item:
-                    # Sólo los archivos subidos tienen 'src'; los módulos (fx, weather, qr...) no
-                    fp = item.get("src", "").lstrip("/")
-                    if fp and os.path.exists(fp): os.remove(fp)
-                content["items"] = [i for i in content.get("items",[]) if i["id"]!=item_id]
-                # Eliminar de todas las playlists de pantallas
-                for sid, scr in content.get("screens",{}).items():
-                    scr["playlist"] = [p for p in scr.get("playlist",[]) if p.get("id")!=item_id]
-                save_json(CONTENT_FILE, content)
+                with contenido_en_edicion() as content:
+                    item = next((i for i in content.get("items",[]) if i["id"]==item_id), None)
+                    if item:
+                        # Sólo los archivos subidos tienen 'src'; los módulos (fx, weather, qr...) no
+                        fp = item.get("src", "").lstrip("/")
+                        if fp and os.path.exists(fp): os.remove(fp)
+                    content["items"] = [i for i in content.get("items",[]) if i["id"]!=item_id]
+                    # Eliminar de todas las playlists de pantallas
+                    for sid, scr in content.get("screens",{}).items():
+                        scr["playlist"] = [p for p in scr.get("playlist",[]) if p.get("id")!=item_id]
                 notify_all()
                 ok()
             except Exception as e: err(e)
@@ -1877,17 +1974,16 @@ class Handler(BaseHTTPRequestHandler):
                 save_json(SCREENS_FILE, screens)
 
                 # Crear config inicial para la pantalla
-                content = load_json(CONTENT_FILE)
-                if not content.get("screens"):
-                    content["screens"] = {}
-                if screen_name not in content["screens"]:
-                    content["screens"][screen_name] = {
-                        "mode": "independent",
-                        "playlist": [],
-                        "vertical": False,
-                        "schedule": {}
-                    }
-                save_json(CONTENT_FILE, content)
+                with contenido_en_edicion() as content:
+                    if not content.get("screens"):
+                        content["screens"] = {}
+                    if screen_name not in content["screens"]:
+                        content["screens"][screen_name] = {
+                            "mode": "independent",
+                            "playlist": [],
+                            "vertical": False,
+                            "schedule": {}
+                        }
 
                 # Notificar a todas las conexiones SSE
                 notify_all()

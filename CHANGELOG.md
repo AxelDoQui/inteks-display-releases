@@ -8,6 +8,36 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.10 — 2026-08-10
+
+### Corregido
+
+- **Dos ordenadores usando el panel ya no se pisan.** Si actualizabas las tasas
+  con la extensión desde un PC y en otro tenías el panel abierto, ese panel no
+  se enteraba: al tocar cualquier cosa subía su copia vieja y **las tasas recién
+  puestas desaparecían sin aviso ni error**. Ahora el panel recibe el aviso y se
+  refresca solo.
+
+- **Se perdían cambios al guardar dos cosas a la vez.** El servidor leía el
+  archivo, lo modificaba y lo volvía a escribir, y en el hueco entre leer y
+  escribir cabía otra petición. Medido con veinte subidas simultáneas:
+  **sobrevivían seis**. Afectaba a subir archivos, borrarlos, actualizar tasas y
+  enlazar pantallas. Ahora ninguna escritura puede colarse en medio de otra.
+
+### Por dentro
+
+- `content.json` lleva un número de revisión que sube en cada escritura. Si el
+  panel intenta guardar con una foto que ya no es la actual, el servidor lo
+  rechaza y el panel avisa —«otro equipo cambió algo, repite lo último que
+  hiciste»— en vez de destruir en silencio el trabajo del otro equipo. Se pierde
+  la última acción propia, que es el mal menor.
+- Las instalaciones que vienen de una versión anterior se migran solas al
+  arrancar.
+- Restaurar una copia deja el contador por encima del que traía, para que ningún
+  panel abierto de antes pueda escribir encima de lo recién restaurado.
+
+---
+
 ## 1.0.9 — 2026-08-10
 
 ### Nuevo

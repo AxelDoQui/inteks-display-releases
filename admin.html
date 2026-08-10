@@ -3070,7 +3070,24 @@ async function restaurarCopia(){
 }
 
 async function saveContentLocal(){
-  await fetch("/api/content",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(content)});
+  // content lleva dentro el 'rev' con el que se cargó, porque GET /api/content
+  // devuelve el archivo entero. El servidor lo compara con el que hay en disco:
+  // si otro equipo escribió en medio, rebota con 409 en vez de dejar que este
+  // panel suba su copia caducada encima.
+  const r=await fetch("/api/content",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(content)});
+
+  if(r.status===409){
+    const d=await r.json().catch(()=>({}));
+    // Pestaña con un admin.html cacheado de antes de esta versión: no manda rev.
+    // Recargar trae el admin.html nuevo y se cura sola.
+    if(d.error==="rev_stale_client"){location.reload();return;}
+    // Se pierde la última acción, y hay que decirlo: es la contrapartida
+    // deliberada de no destruir en silencio lo que hizo el otro equipo.
+    toast("Otro equipo cambió algo. Recargado — repite lo último que hiciste.",true);
+    await loadAll();
+    return;
+  }
+  if(!r.ok){toast("No se pudo guardar.",true);return;}
 }
 function openPlayer(){window.open(`/player.html?screen=pantalla1`,"_blank");}
 
