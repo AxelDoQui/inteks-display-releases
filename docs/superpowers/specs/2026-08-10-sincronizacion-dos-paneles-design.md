@@ -93,6 +93,18 @@ fichero, porque es visible al depurar, viaja en las copias de seguridad y se
 puede afirmar en una prueba sin depender de la resolución del reloj del sistema
 de archivos.
 
+**Migración obligatoria.** El `content.json` de una instalación de 1.0.9 no
+tiene `rev`. Sin migrarlo, la comprobación ③ entra en un bucle infinito: el
+panel carga un contenido sin `rev`, guarda sin `rev`, recibe
+`409 rev_stale_client`, recarga, y vuelve a empezar — el panel queda
+inutilizable en toda instalación actualizada. Así que al arrancar, si
+`content.json` existe y no tiene `rev`, se le añade `rev: 0` y se guarda.
+
+Va junto a `_limpiar_pantalla_fantasma()` (`server.py:933-955`), que existe
+precisamente para esto: arreglar al arrancar los archivos que vienen de una
+versión anterior. Y `init_file` (`server.py:406`) pasa a crear los nuevos con
+`{"items": [], "screens": {}, "rev": 0}`.
+
 ### ② Un solo punto de escritura
 
 Los ocho `save_json(CONTENT_FILE, …)` repartidos por los manejadores (líneas
@@ -246,6 +258,7 @@ de `ThreadingHTTPServer` y un simulacro no los reproduce.
 | 4 | Guardar sin `rev` → `409 rev_stale_client` | La pestaña cacheada de una versión anterior |
 | 5 | `fx-update` emite `update:admin` por SSE | La pieza ④. Se abre `/api/events?screen=admin` en un hilo y se lee el stream |
 | 6 | 20 hilos mezclando subidas y `fx-update`: al final están todos los items | La prueba que justifica ②. Hoy falla; con el guardián pasa |
+| 7 | Arrancar sobre un `content.json` de 1.0.9 (sin `rev`): el `GET` ya devuelve `rev` y el primer guardado da `200` | La migración. Sin ella el panel entra en bucle de recargas y queda inutilizable en toda instalación actualizada |
 
 La 6 conviene escribirla **antes** del arreglo y verla fallar: es la única que
 demuestra que el hueco entre `load_json` y `save_json` era un fallo real y no
