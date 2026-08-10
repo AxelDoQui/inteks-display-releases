@@ -1,6 +1,6 @@
 # InTeks Display — Contexto para Claude Code
 
-> Actualizado: 7 de agosto de 2026. Este documento describe el estado **real** del
+> Actualizado: 10 de agosto de 2026. Este documento describe el estado **real** del
 > código. Si algo aquí no cuadra con lo que ves en los archivos, gana el código:
 > avísalo y se corrige el documento.
 
@@ -71,6 +71,14 @@ videowall en dos pantallas (`wall_mode` + `wall_pos`, que recorta la imagen con
 `object-position` a izquierda o derecha), horario con imagen de standby, barra
 de progreso y refresco del clima cada 15 minutos.
 
+**Resiliencia sin servidor:** el contenido nunca fuerza una recarga de la
+página (llega por SSE, `connectSSE()`, y repinta solo); lo último reproducido
+se cachea en IndexedDB (imágenes/vídeos) y localStorage (playlist/config) para
+sobrevivir a un arranque en frío sin servidor. Aparte de eso hay una recarga de
+seguridad cada 4 horas (`RELOAD_SEGURIDAD_MS`), pensada para navegadores de TV
+con poca memoria (el de LG webOS es un caso documentado por el propio soporte
+de LG) — segura porque la caché ya deja algo pintado antes de que llegue.
+
 **Modo vista previa** — `player.html?preview=1`, sin `?screen=`. No conecta el
 SSE, no se registra como pantalla y no aplica el horario. Renderiza el item que
 le inyecta el admin por `postMessage` (`preview-item`) y devuelve cuántas
@@ -88,6 +96,18 @@ Manifest V3. Detecta tablas de tipos de cambio en cualquier web y las envía a
 InTeks Display con un clic, vía `POST /api/fx-update` autenticado con el token de API
 que se copia desde *Ajustes → Seguridad*. Sirve también en remoto a través del
 túnel de Cloudflare.
+
+**Varios agentes de pago por moneda (Ria y similares):** `scanPage()` agrupa
+las filas detectadas por código de moneda; cuando hay más de un candidato
+(`agentOpciones`), `elegirAgente()` decide con la lista de preferencia del
+usuario (`chrome.storage.local.agentPrefs`, `{COP:["Davivienda",...]}`) — la
+tasa más alta no siempre es la correcta (ver comentario de `elegirAgente` en
+`parser.js`). El panel lateral ofrece un `<select>` con todos los candidatos
+para elegir con un clic en vez de escribir el nombre a mano, y avisa
+(`agentAlternativa`) cuando otro paga notablemente más sin cambiar la
+elección. `extractRate`/`extractAgent` comparten `findRateMatch()`, que busca
+el número desde el final del texto — necesario porque un nombre de agente con
+dígitos ("4-72 Servici", real en Ria) se confundía con la tasa.
 
 ### Empaquetado
 
@@ -172,10 +192,27 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
 
 ## Pendiente
 
-1. **Modo festivos** — fechas concretas con horario distinto al del día de la
-   semana. Sin implementar.
-2. **Asistente de primer arranque para el puerto** — `config.json` mantiene
+1. **Asistente de primer arranque para el puerto** — `config.json` mantiene
    `first_run: true` pero nadie lo lee. El único flujo de "primera vez" que
    existe es el de contraseña, en `login.html`.
-3. **Unificar las dos rutas de distribución** (Python vs Electron) o decidir
+2. **Unificar las dos rutas de distribución** (Python vs Electron) o decidir
    explícitamente cuál se abandona.
+3. **Cierre del navegador en TVs LG (webOS) sin causa clara** — un caso real
+   en campo: el navegador integrado se cierra cada ~2 minutos incluso con una
+   playlist de solo imágenes. Se descartaron protector de pantalla, ahorro de
+   energía, HDMI-CEC/SimpLink y domótica. Se aplicaron dos mitigaciones del
+   lado del código (fuga de reconexión SSE arreglada, recarga de seguridad
+   cada 4h) que no explican por sí solas un cierre tan rápido y regular.
+   Investigación en pausa a la espera de una prueba de control (una web
+   cualquiera en el mismo navegador) que aísle si es del TV o de la página.
+
+## Gotchas de despliegue
+
+- **Windows Firewall bloquea el acceso desde otros dispositivos por
+  defecto.** El servidor escucha en `0.0.0.0` sin problema, pero sin una
+  regla de entrada explícita para el puerto usado (80/9000 típicamente), un
+  TV o tablet en la misma red se queda cargando indefinidamente (no da error,
+  simplemente no responde) aunque el PC vea al servidor perfectamente por
+  `localhost`. El instalador no crea esta regla. Se soluciona con:
+  `New-NetFirewallRule -DisplayName "InTeks Display (HTTP)" -Direction Inbound -Protocol TCP -LocalPort 80,9000 -Action Allow -Profile Private`
+  (requiere PowerShell como administrador).

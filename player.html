@@ -456,8 +456,13 @@ function fechaTasas(item, ahoraMs){
 
 // ── Resiliencia sin servidor ───────────────────────────────────────────────
 // Una pantalla de señalización no puede quedarse en negro porque el servidor se
-// reinicie. Tres reglas: la página nunca se recarga sola, lo último reproducido
-// queda guardado en el dispositivo, y un corte solo se señala si es prolongado.
+// reinicie. Tres reglas: el CONTENIDO nunca fuerza una recarga de la página
+// (las actualizaciones llegan por SSE y repintan solo, ver connectSSE), lo
+// último reproducido queda guardado en el dispositivo, y un corte solo se
+// señala si es prolongado. La recarga de seguridad de más abajo (RELOAD_
+// SEGURIDAD_MS) no es una excepción a esto: no la dispara el contenido ni el
+// estado del servidor, así que si cae justo en ese instante, restoreFromCache()
+// hace el mismo papel que al encender la pantalla.
 const OFFLINE_AFTER_MS=120000;                     // 2 min sin contacto = corte
 const CACHE_KEY="signalos_cache_"+SCREEN_ID;
 let lastContact=Date.now();
@@ -643,7 +648,12 @@ function connectSSE(){
       reloadTimer=setTimeout(loadPlaylist, 500);   // agrupa ráfagas de cambios
     }
   };
-  es.onerror=()=>setTimeout(connectSSE,4000);
+  // Se cierra la conexión vieja antes de programar una nueva. Sin esto, cada
+  // corte de WiFi (mucho más frecuente en un televisor que en un PC) dejaba
+  // la conexión anterior abierta reintentando sola por su cuenta además de la
+  // nueva: con las horas se acumulaban conexiones SSE zombis hasta que el
+  // navegador del TV, con poca memoria, se quedaba sin recursos y se cerraba.
+  es.onerror=()=>{ es.close(); setTimeout(connectSSE,4000); };
 }
 
 // Banderas como imágenes (flagcdn) — Windows no renderiza emojis de banderas.
@@ -1121,6 +1131,18 @@ if(PREVIEW){
   // pantalla, esto es la diferencia entre mostrar contenido o quedarse en negro.
   restoreFromCache();
   connectSSE(); loadPlaylist();
+
+  // Recarga de seguridad. El navegador de algunas Smart TV -el de LG webOS es
+  // un caso documentado por el propio soporte de LG- cierra la página entera
+  // cuando la memoria acumulada por llevar horas abierta supera lo que el TV
+  // puede procesar. No es un fallo de esta página: es un límite del navegador
+  // del televisor, y el cierre que hace el sistema operativo es más brusco que
+  // una recarga controlada -a veces ni siquiera vuelve a abrirse solo-.
+  // Es seguro adelantarse con una recarga propia: restoreFromCache() dejó
+  // pintado algo desde el primer instante, así que si el servidor estuviera
+  // caído justo cuando toca recargar, la pantalla no se queda en negro.
+  const RELOAD_SEGURIDAD_MS=4*60*60*1000;   // 4 horas
+  setTimeout(()=>location.reload(), RELOAD_SEGURIDAD_MS);
 }
 setInterval(()=>{ if(SCREEN_ID && !PREVIEW) loadPlaylist(); },15000);
 

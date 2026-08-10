@@ -23,9 +23,13 @@ function toggleSidebar(force) {
   else { stopAutoScan(); }
 }
 
-function scanAndUpdate() {
+async function scanAndUpdate() {
   let detected = [];
-  try { detected = window.SignalosParser.scanPage(); } catch (e) {}
+  try {
+    let prefs = {};
+    try { prefs = (await chrome.storage.local.get('agentPrefs')).agentPrefs || {}; } catch (e) {}
+    detected = window.SignalosParser.scanPage(prefs);
+  } catch (e) {}
   if (sidebarFrame && sidebarVisible && sidebarFrame.contentWindow) {
     sidebarFrame.contentWindow.postMessage({
       type: 'SIGNALOS_DETECTED', rows: detected,

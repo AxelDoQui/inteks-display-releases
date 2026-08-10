@@ -42,7 +42,17 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .fx-hint{font-size:10px;color:#7a8ca3;padding:6px 2px 2px;line-height:1.5}
 .empty-msg{padding:16px 14px;color:var(--muted);font-size:11px;text-align:center}
 
+/* Agente elegido en filas con varios candidatos (Ria y similares) */
+.fx-agent{font-size:9px;color:var(--accent);font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fx-alt{color:#f0a050;cursor:help}
+/* Selector de agente cuando hay más de un candidato para la misma moneda */
+.fx-agent-select{width:100%;margin-top:2px;background:var(--s2);border:1px solid var(--b);border-radius:4px;color:var(--accent);font-size:9px;font-family:monospace;padding:2px 3px;max-width:150px}
+.fx-agent-select:focus{outline:none;border-color:var(--accent)}
+
 .manual-form{padding:6px 14px 10px;flex-shrink:0}
+.agent-prefs-input{width:100%;min-height:48px;background:var(--s2);border:1px solid var(--b);border-radius:5px;color:var(--text);padding:6px 7px;font-size:11px;font-family:monospace;resize:vertical}
+.agent-prefs-input:focus{outline:none;border-color:var(--accent)}
+.agent-prefs-save{width:100%;margin-top:5px}
 .manual-row{display:flex;gap:5px;align-items:center}
 .input-flag{width:42px;text-align:center;font-size:16px}
 .input-code{width:48px;font-family:monospace;text-transform:uppercase}

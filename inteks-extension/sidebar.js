@@ -5,6 +5,25 @@ let savedModules = [];   // módulos de divisas que ya existen en el admin
 let serverUrl = 'http://localhost';   // puerto 80 por defecto (InTeks Display); configurable
 let apiToken = '';                    // token de API (Ajustes del admin); requerido si hay contraseña
 let screens = [];
+let agentPrefs = {};                  // { COP: ["Davivienda","Bancolombia"], ... } — ver elegirAgente() en parser.js
+
+// "COP: Davivienda, Bancolombia" por línea -> { COP: ["Davivienda","Bancolombia"] }.
+// Ria ofrece varios agentes de pago por país y el que más paga no siempre es
+// el correcto (ver elegirAgente() en parser.js); esta lista es lo que decide
+// cuál usar cuando una moneda trae más de un candidato.
+function parseAgentPrefs(text) {
+  const out = {};
+  String(text || '').split('\n').forEach(linea => {
+    const m = linea.match(/^\s*([A-Za-z]{3})\s*:\s*(.+)$/);
+    if (!m) return;
+    const nombres = m[2].split(',').map(s => s.trim()).filter(Boolean);
+    if (nombres.length) out[m[1].toUpperCase()] = nombres;
+  });
+  return out;
+}
+function stringifyAgentPrefs(prefs) {
+  return Object.keys(prefs || {}).map(c => `${c}: ${prefs[c].join(', ')}`).join('\n');
+}
 
 // Cabeceras con el token de API para los endpoints protegidos del servidor.
 function authHeaders(extra) {
@@ -25,12 +44,34 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadConfig() {
   try {
-    const data = await chrome.storage.local.get(['serverUrl', 'apiToken']);
+    const data = await chrome.storage.local.get(['serverUrl', 'apiToken', 'agentPrefs']);
     if (data.serverUrl) serverUrl = data.serverUrl;
     if (data.apiToken) apiToken = data.apiToken;
+    if (data.agentPrefs) agentPrefs = data.agentPrefs;
   } catch (e) {}
   document.getElementById('server-url').value = serverUrl;
   document.getElementById('api-token').value = apiToken;
+  document.getElementById('agent-prefs').value = stringifyAgentPrefs(agentPrefs);
+}
+
+async function saveAgentPrefs() {
+  agentPrefs = parseAgentPrefs(document.getElementById('agent-prefs').value);
+  try { await chrome.storage.local.set({ agentPrefs }); } catch (e) {}
+  // Re-escanear con las preferencias nuevas ya guardadas.
+  window.parent.postMessage({ type: 'SIGNALOS_RESCAN' }, '*');
+}
+
+// Elegir un agente con un clic desde «Detectado en esta página», en vez de
+// tener que escribir su nombre a mano en el cuadro de preferencias. Se pone
+// el primero de la lista para esa moneda -manda sobre los demás- y se
+// conservan los que ya hubiera como respaldo si ese agente deja de aparecer.
+async function elegirAgentePreferido(code, agentName) {
+  if (!agentName) return;
+  const resto = (agentPrefs[code] || []).filter(a => a !== agentName);
+  agentPrefs[code] = [agentName, ...resto];
+  try { await chrome.storage.local.set({ agentPrefs }); } catch (e) {}
+  document.getElementById('agent-prefs').value = stringifyAgentPrefs(agentPrefs);
+  window.parent.postMessage({ type: 'SIGNALOS_RESCAN' }, '*');
 }
 
 async function checkConnection() {
@@ -152,13 +193,35 @@ function renderDetected() {
     const isSel = selectedRows.find(r => r.code === row.code);
     const el = document.createElement('div');
     el.className = 'fx-row' + (isSel ? ' selected' : '');
+    // Solo aparece cuando la página trae varios agentes de pago para la misma
+    // moneda (típico de Ria). Con más de un candidato, un <select> deja elegir
+    // el preferido con un clic -se guarda solo, sin tener que escribir el
+    // nombre a mano en «Agente preferido»-. Con uno solo, o sin agente, se
+    // enseña el aviso de siempre. mejorAlternativa nunca cambia la elección,
+    // solo avisa; ver elegirAgente() en parser.js.
+    let agentLine = '';
+    if (row.agentOpciones && row.agentOpciones.length > 1) {
+      const opts = row.agentOpciones.map(o => {
+        const val = (o.agent || '').replace(/"/g, '&quot;');
+        const sel = o.agent === row.agent ? ' selected' : '';
+        return `<option value="${val}"${sel}>${o.agent || '?'} — ${o.rate}</option>`;
+      }).join('');
+      agentLine = `<select class="fx-agent-select" title="Varios agentes de pago para esta moneda: elige el preferido">${opts}</select>`;
+    } else if (row.agent) {
+      agentLine = `<div class="fx-agent" title="${
+          row.agentMotivo === 'preferencia' ? 'Agente preferido' : 'Sin preferencia configurada: se tomó la tasa más alta'
+        }">${row.agent}${row.agentAlternativa
+          ? ` · <span class="fx-alt" title="${row.agentAlternativa.agent} paga ${row.agentAlternativa.diffPct}% más">⚠ hay mejor tasa</span>`
+          : ''}</div>`;
+    }
     el.innerHTML = `
       <input type="checkbox" ${isSel ? 'checked' : ''}>
       <span class="fx-flag">${row.flag}</span>
-      <div class="fx-info"><div class="fx-code">${row.code}</div><div class="fx-name">${row.country}</div></div>
+      <div class="fx-info"><div class="fx-code">${row.code}</div><div class="fx-name">${row.country}</div>${agentLine}</div>
       <input type="text" class="fx-rate-input" value="${row.rate}">`;
     const chk = el.querySelector('input[type=checkbox]');
     const rateInp = el.querySelector('.fx-rate-input');
+    const agentSel = el.querySelector('.fx-agent-select');
     chk.addEventListener('change', (ev) => {
       if (ev.target.checked) addToSelected({ ...row, rate: rateInp.value });
       else removeFromSelected(row.code);
@@ -168,6 +231,10 @@ function renderDetected() {
       if (s) s.rate = ev.target.value;
       row.rate = ev.target.value;
     });
+    if (agentSel) {
+      agentSel.addEventListener('click', (ev) => ev.stopPropagation());
+      agentSel.addEventListener('change', (ev) => elegirAgentePreferido(row.code, ev.target.value));
+    }
     list.appendChild(el);
   });
 }
@@ -279,6 +346,7 @@ function setupEventListeners() {
   document.getElementById('send-btn').addEventListener('click', enviarAServidor);
   document.getElementById('m-add').addEventListener('click', addManual);
   document.getElementById('save-config').addEventListener('click', saveConfig);
+  document.getElementById('save-agent-prefs').addEventListener('click', saveAgentPrefs);
   document.getElementById('module-select').addEventListener('change', pickModule);
   document.getElementById('rescan-btn').addEventListener('click', () => window.parent.postMessage({ type: 'SIGNALOS_RESCAN' }, '*'));
   document.getElementById('close-btn').addEventListener('click', () => window.parent.postMessage({ type: 'SIGNALOS_CLOSE' }, '*'));

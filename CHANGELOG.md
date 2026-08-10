@@ -8,6 +8,61 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.9 — 2026-08-10
+
+### Nuevo
+
+- **La extensión de Chrome elige el agente de pago de Ria.** Cuando una
+  moneda trae varios agentes (Bancolombia, Davivienda, 4-72...), el panel
+  lateral ofrece un desplegable con todos y su tasa: se elige el preferido
+  con un clic, sin escribirlo a mano. Se guarda solo y avisa cuando otro
+  agente paga notablemente más, sin cambiar la elección.
+
+### Corregido
+
+- La extensión **confundía dígitos del nombre de un agente con la tasa** (p.
+  ej. "4-72 Servici" en Ria publicaba "4" en vez de la tasa real).
+
+---
+
+## 1.0.8 — 2026-08-10
+
+### Corregido
+
+- **Fuga de conexión en el reproductor**: cada corte de la conexión en tiempo
+  real (SSE) abría una conexión nueva sin cerrar la anterior. En el WiFi de
+  un televisor, mucho menos estable que el de un PC, esto podía acumular
+  conexiones abiertas con las horas.
+
+### Por dentro
+
+- El reproductor se recarga solo cada 4 horas como medida de seguridad,
+  pensada para navegadores de TV con poca memoria (el de LG webOS es un caso
+  documentado por el propio soporte de LG). Es seguro: si el servidor
+  estuviera caído justo en ese instante, la pantalla recupera lo último
+  reproducido igual que al encenderla, no se queda en negro.
+
+---
+
+## 1.0.7 — 2026-08-10
+
+### Nuevo
+
+- **La extensión de Chrome elige el agente de pago correcto en Ria.** Cuando
+  una moneda trae varios agentes (Bancolombia, Davivienda, 4-72...), antes se
+  quedaba con el primero que encontraba en la página. Ahora se configura una
+  lista de preferencia por moneda desde el panel lateral de la extensión
+  («Agente preferido»), y si otro agente paga notablemente más sin estar en
+  la lista, avisa sin cambiar la elección.
+
+### Corregido
+
+- La extensión **confundía dígitos del nombre de un agente con la tasa**: en
+  Ria, "4-72 Servici" hacía que se publicara "4" en vez de la tasa real. Pasa
+  con cualquier página cuyo nombre de agente lleve números.
+
+---
+
 ## 1.0.6 — 2026-08-09
 
 ### Nuevo

@@ -1,4 +1,4 @@
-# Script para compilar el instalador InTeks Display con Inno Setup
+﻿# Script para compilar el instalador InTeks Display con Inno Setup
 
 # Rutas habituales de ISCC.exe. La tercera es la instalación "solo para mí",
 # que no va a Program Files y es la que usa este equipo.

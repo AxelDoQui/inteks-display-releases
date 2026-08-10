@@ -189,6 +189,7 @@ causa más habitual de que la instalación acabe en el 9000.
 | "El servidor no respondió en 30 segundos" | El servidor cascó al arrancar | `cd` a la carpeta y ejecuta `python server.py` a mano para ver el error |
 | Instalación nueva da 404 en todo | Falta un archivo en `[Files]` | Revisa la sección `[Files]` de `setup.iss` |
 | El contenido "desaparece" tras reiniciar | Working directory incorrecto | El `.bat` debe hacer `cd /d` antes de lanzar el servidor; las rutas de `server.py` son relativas |
+| Un TV/tablet se queda cargando indefinidamente al abrir la IP, aunque el PC vea el servidor por `localhost` | Windows Firewall bloquea las conexiones entrantes de otros dispositivos por defecto; el instalador no crea ninguna regla | `New-NetFirewallRule -DisplayName "InTeks Display (HTTP)" -Direction Inbound -Protocol TCP -LocalPort 80,9000 -Action Allow -Profile Private` (PowerShell como administrador) |
 
 ## Distribución
 

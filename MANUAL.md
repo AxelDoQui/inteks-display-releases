@@ -107,6 +107,12 @@ y necesita el **token de la API**, que está en Ajustes.
 **La extensión respeta el orden** que hayas fijado en el panel. Las divisas
 nuevas que detecte se añaden al final.
 
+**Cuando una web ofrece varios agentes de pago para el mismo país** (Ria, por
+ejemplo, muestra Bancolombia, Davivienda, 4-72... para Colombia, cada uno con
+su tasa), el panel lateral de la extensión enseña un desplegable con todos —
+elige el tuyo con un clic y queda guardado para la próxima vez. Si otro agente
+paga notablemente más, avisa con ⚠ sin cambiar tu elección.
+
 ---
 
 ## Horarios
@@ -195,6 +201,25 @@ puerta trasera para cualquiera conectado al wifi de la tienda.
 **Una pantalla no muestra nada.** Mira si aparece «en línea» en el panel. Si no,
 comprueba que el televisor tiene red y que el servidor responde
 (`http://LA-IP/admin.html` desde otro equipo).
+
+**El televisor se queda cargando sin llegar a nada, al escribir la IP.** Suele
+ser el Firewall de Windows, que por defecto bloquea las conexiones que llegan
+de otros aparatos aunque el PC vea el servidor perfectamente por sí mismo. En
+el PC, PowerShell **como administrador**:
+```powershell
+New-NetFirewallRule -DisplayName "InTeks Display (HTTP)" -Direction Inbound -Protocol TCP -LocalPort 80,9000 -Action Allow -Profile Private
+```
+Esto abre solo ese puerto en la red privada del PC — no toca el resto del
+firewall.
+
+**El navegador de un Smart TV se cierra solo pasado un rato.** Algunos
+televisores (el navegador integrado de LG webOS es un caso conocido, según su
+propio soporte) cierran páginas que llevan mucho abiertas por límites de
+memoria del propio televisor, no por InTeks Display. Revisa primero que el
+protector de pantalla y el ahorro de energía estén apagados en el TV. Si
+sigue pasando, la solución más fiable es no depender del navegador de fábrica:
+un Fire TV Stick, mini PC o Android box barato en modo kiosco es mucho más
+estable para tener una pantalla encendida todo el día.
 
 **El escaparate se queda con contenido viejo.** Las pantallas guardan lo último
 reproducido y las imágenes en el propio televisor, así que aguantan sin

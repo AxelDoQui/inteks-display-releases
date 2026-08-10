@@ -152,22 +152,37 @@ window.SignalosParser = (function () {
       : red.toFixed(2).replace('.', ',');
   }
 
-  // Extrae la tasa: el primer número plausible de la línea, ya normalizado.
-  function extractRate(text, cur) {
-    const t = text.replace(new RegExp('\\b' + cur.code + '\\b', 'gi'), ' ');
-    // Se captura el número COMPLETO con sus separadores. La regex anterior
-    // cortaba "1.716,50" en "1.716" y ahí nacía el error.
-    const nums = t.match(/\d[\d.,]*\d|\d/g);
-    if (!nums) return null;
-    for (const raw of nums) {
-      const val = normalizeRate(raw);
+  // Busca, en un texto ya sin el código de moneda, el número que de verdad es
+  // la tasa. Se recorre desde el FINAL hacia atrás: la tasa suele quedar como
+  // el último número, el que estaba justo delante del código de moneda
+  // ("... 3.650 COP" -> "... 3.650"). El ruido -dígitos sueltos en el nombre
+  // de un agente de pago, como "4-72 Servici" en Ria, o un año en alguna
+  // nota- va delante o tiene forma reconocible, y los filtros ya existentes
+  // lo descartan igual. Antes se cogía el PRIMER número válido y "4-72
+  // Servici 3.650 COP" devolvía "4" en vez de la tasa.
+  // La usan extractRate() y extractAgent(): las dos tienen que estar de
+  // acuerdo en qué número es la tasa, o el nombre del agente se cortaría en
+  // el sitio equivocado.
+  function findRateMatch(t) {
+    const nums = Array.from(t.matchAll(/\d[\d.,]*\d|\d/g));
+    for (let i = nums.length - 1; i >= 0; i--) {
+      const m = nums[i];
+      const val = normalizeRate(m[0]);
       if (val === null) continue;
       const v = parseFloat(val.replace(',', '.'));
-      if (v > 100000) continue;                                  // enteros enormes: IDs
-      if (/^\d{4}$/.test(raw) && v > 1900 && v < 2100) continue; // descarta años
-      return val;
+      if (v > 100000) continue;                                    // enteros enormes: IDs
+      if (/^\d{4}$/.test(m[0]) && v > 1900 && v < 2100) continue;  // descarta años
+      return { index: m.index, raw: m[0], value: val };
     }
     return null;
+  }
+
+  // Extrae la tasa: el número plausible más cercano al código de moneda, ya
+  // normalizado.
+  function extractRate(text, cur) {
+    const t = text.replace(new RegExp('\\b' + cur.code + '\\b', 'gi'), ' ');
+    const m = findRateMatch(t);
+    return m ? m.value : null;
   }
 
   // ── Elección de agente en Ria ────────────────────────────────────────────
@@ -256,6 +271,20 @@ window.SignalosParser = (function () {
     return { elegido, motivo, descartados, mejorAlternativa };
   }
 
+  // Nombre del agente de pago antes de la tasa de la fila ("Ria Colombia
+  // 3.650 COP" -> "Ria Colombia"; "4-72 Servici 3.650 COP" -> "4-72
+  // Servici", sin confundir el "4" con el número de la tasa gracias a
+  // findRateMatch()). Solo importa cuando una moneda tiene varias filas
+  // (varios agentes, como en Ria); en una fila normal de "moneda + tasa" da
+  // el nombre de la moneda, que se ignora salvo que haga falta desambiguar.
+  function extractAgent(text, cur) {
+    const sinMoneda = text.replace(new RegExp('\\b' + cur.code + '\\b', 'gi'), ' ');
+    const m = findRateMatch(sinMoneda);
+    if (!m) return null;
+    const nombre = sinMoneda.slice(0, m.index).replace(/[\s.:,-]+$/, '').trim();
+    return nombre || null;
+  }
+
   // Recorre líneas de texto buscando moneda + tasa
   function detectInText(text) {
     const out = [], seen = new Set();
@@ -272,9 +301,16 @@ window.SignalosParser = (function () {
     return out;
   }
 
-  // Escanea la página: filas de tablas/listas/clases típicas y, si hace falta, todo el texto
-  function scanPage() {
-    const results = [], seen = new Set();
+  // Escanea la página: filas de tablas/listas/clases típicas y, si hace falta, todo el texto.
+  //
+  // Una moneda puede salir en VARIAS filas (Ria ofrece varios agentes de pago
+  // por país). Se agrupan por código y, cuando hay más de un candidato, decide
+  // elegirAgente() con la lista de preferencias del usuario para esa moneda —
+  // la tasa más alta no siempre es la correcta, ver elegirAgente() arriba.
+  // `preferencias` tiene forma { COP: ["Davivienda", "Bancolombia"], ... }.
+  function scanPage(preferencias) {
+    const prefs = preferencias || {};
+    const porCodigo = {};
     const sel = 'tr, li, [class*="rate" i], [class*="currency" i], [class*="moneda" i], [class*="divisa" i], [class*="exchange" i], [class*="cambio" i], [class*="cotiz" i]';
     let els = [];
     try { els = Array.prototype.slice.call(document.querySelectorAll(sel)); }
@@ -283,21 +319,45 @@ window.SignalosParser = (function () {
       const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
       if (!text || text.length > 160) continue;
       const cur = matchCurrency(text);
-      if (!cur || seen.has(cur.code)) continue;
+      if (!cur) continue;
       const rate = extractRate(text, cur);
       if (rate === null) continue;
-      seen.add(cur.code);
-      results.push({ flag: cur.flag, country: cur.country, currency: cur.currency, code: cur.code, rate });
-    }
-    // Fallback por líneas si encontramos poco
-    if (results.length < 2 && document.body) {
-      detectInText(document.body.innerText).forEach(r => {
-        if (!seen.has(r.code)) { seen.add(r.code); results.push(r); }
+      (porCodigo[cur.code] = porCodigo[cur.code] || []).push({
+        flag: cur.flag, country: cur.country, currencyName: cur.currency, code: cur.code,
+        rate, agent: extractAgent(text, cur),
       });
     }
-    return results;
+    // Fallback por líneas si encontramos pocas monedas distintas
+    if (Object.keys(porCodigo).length < 2 && document.body) {
+      detectInText(document.body.innerText).forEach(r => {
+        if (!porCodigo[r.code]) {
+          porCodigo[r.code] = [{ flag: r.flag, country: r.country, currencyName: r.currency,
+                                  code: r.code, rate: r.rate, agent: null }];
+        }
+      });
+    }
+    return Object.keys(porCodigo).map(code => {
+      const candidatos = porCodigo[code];
+      const base = candidatos[0];
+      // Caso normal: una sola fila para esta moneda. Se devuelve tal cual se
+      // hacía antes, sin campos de agente que no aportarían nada.
+      if (candidatos.length === 1) {
+        return { flag: base.flag, country: base.country, currency: base.currencyName, code, rate: base.rate };
+      }
+      const paraElegir = candidatos.map(c => ({ agent: c.agent, rate: c.rate, currency: c.code }));
+      const { elegido, motivo, mejorAlternativa } = elegirAgente(paraElegir, prefs[code] || [], code);
+      if (!elegido) return null;
+      return {
+        flag: base.flag, country: base.country, currency: base.currencyName, code,
+        rate: elegido.rate, agent: elegido.agent, agentMotivo: motivo, agentAlternativa: mejorAlternativa,
+        // Todos los candidatos válidos de esta moneda (no solo el elegido), para
+        // que el panel pueda ofrecerlos y el usuario marque su preferido con un
+        // clic en vez de tener que escribir el nombre a mano.
+        agentOpciones: paraElegir.map(c => ({ agent: c.agent, rate: c.rate })),
+      };
+    }).filter(Boolean);
   }
 
-  return { CURRENCY_DB, CODE_MAP, matchCurrency, extractRate, detectInText, scanPage,
+  return { CURRENCY_DB, CODE_MAP, matchCurrency, extractRate, extractAgent, detectInText, scanPage,
            normalizeRate, normalizeAgent, agentMatches, elegirAgente };
 })();
