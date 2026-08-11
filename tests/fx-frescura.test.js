@@ -94,27 +94,45 @@ test("un módulo indefinido no rompe el render", () => {
 
 // ── Qué fecha se enseña en el tablero ──────────────────────────────────────
 
+// Formato esperado: "08/08/2026 14:30". La hora la pidió él: un tablero de
+// divisas se actualiza varias veces al día, y saber que las tasas son de esta
+// mañana o de hace diez minutos cambia lo que el empleado le dice al cliente.
+function selloLegible(ms) {
+  const d = new Date(ms);
+  return String(d.getDate()).padStart(2, "0") + "/" +
+         String(d.getMonth() + 1).padStart(2, "0") + "/" +
+         d.getFullYear() + " " +
+         String(d.getHours()).padStart(2, "0") + ":" +
+         String(d.getMinutes()).padStart(2, "0");
+}
+
 test("se enseña la fecha de las TASAS, no la de hoy", () => {
   // El fallo de fondo: unas tasas del día 5 salían con la fecha del día 8.
   const c = cargar();
-  const hace3dias = new Date(AHORA - 3 * 24 * HORA);
-  const esperado = String(hace3dias.getDate()).padStart(2, "0") + "/" +
-                   String(hace3dias.getMonth() + 1).padStart(2, "0") + "/" +
-                   hace3dias.getFullYear();
-  assert.strictEqual(c.fechaTasas({ updated_at: selloHace(72) }, AHORA), esperado);
+  assert.strictEqual(c.fechaTasas({ updated_at: selloHace(72) }, AHORA),
+                     selloLegible(AHORA - 3 * 24 * HORA));
 });
 
 test("sin sello se cae a la fecha de hoy, como antes", () => {
   const c = cargar();
-  const hoy = new Date(AHORA);
-  const esperado = String(hoy.getDate()).padStart(2, "0") + "/" +
-                   String(hoy.getMonth() + 1).padStart(2, "0") + "/" +
-                   hoy.getFullYear();
-  assert.strictEqual(c.fechaTasas({}, AHORA), esperado);
+  assert.strictEqual(c.fechaTasas({}, AHORA), selloLegible(AHORA));
 });
 
-test("la fecha lleva siempre dos dígitos en día y mes", () => {
+test("se enseña también la hora a la que se actualizaron", () => {
+  // Con solo la fecha, unas tasas puestas a las 9:00 y otras a las 19:00 se
+  // ven idénticas en pantalla.
   const c = cargar();
-  const enero = Date.UTC(2026, 0, 3, 10, 0, 0);
-  assert.match(c.fechaTasas({ updated_at: enero / 1000 }, AHORA), /^0\d\/01\/2026$/);
+  const manana = new Date(2026, 7, 8, 9, 5, 0).getTime();
+  const tarde = new Date(2026, 7, 8, 19, 45, 0).getTime();
+  assert.strictEqual(c.fechaTasas({ updated_at: manana / 1000 }, AHORA), "08/08/2026 09:05");
+  assert.strictEqual(c.fechaTasas({ updated_at: tarde / 1000 }, AHORA), "08/08/2026 19:45");
+});
+
+test("día, mes, hora y minuto llevan siempre dos dígitos", () => {
+  // "3/1/2026 9:5" se lee mal de lejos y descoloca la cabecera al cambiar de
+  // ancho según la hora.
+  const c = cargar();
+  const enero = new Date(2026, 0, 3, 9, 5, 0).getTime();
+  assert.match(c.fechaTasas({ updated_at: enero / 1000 }, AHORA),
+               /^03\/01\/2026 09:05$/);
 });

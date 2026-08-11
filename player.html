@@ -34,11 +34,11 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 #player.tr-slide .slide{transform:translateX(100%)}
 #player.tr-slide .slide.active{transform:translateX(0)}
 #player.tr-slide .slide.leaving{transform:translateX(-100%);opacity:1}
-.slide img{width:100%;height:100%;object-fit:contain}
-.slide video{width:100%;height:100%;object-fit:contain;background:#000}
-.slide iframe{width:100%;height:100%;border:none;background:#fff}
-.slide.wall-left img,.slide.wall-left video{object-fit:cover;object-position:left center}
-.slide.wall-right img,.slide.wall-right video{object-fit:cover;object-position:right center}
+.slide>img{width:100%;height:100%;object-fit:contain}
+.slide>video{width:100%;height:100%;object-fit:contain;background:#000}
+.slide>iframe{width:100%;height:100%;border:none;background:#fff}
+.slide.wall-left>img,.slide.wall-left>video{object-fit:cover;object-position:left center}
+.slide.wall-right>img,.slide.wall-right>video{object-fit:cover;object-position:right center}
 
 /* ── Texto */
 .text-slide{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:8vw;text-align:center}
@@ -59,6 +59,12 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 @keyframes fxCaducada{0%,100%{opacity:.85}50%{opacity:.3}}
 .mod-fx-page{font-size:clamp(11px,1.7vmin,20px);opacity:.55;font-family:monospace;letter-spacing:1px;padding:2px 10px;border:1px solid rgba(255,255,255,.2);border-radius:99px;white-space:nowrap}
 .mod-fx-logo{height:var(--fx-title-size);max-width:26%;object-fit:contain;flex-shrink:0}
+/* Cabecera apilada: el título en su propia línea y debajo el logo con la fecha.
+   La activa ajustarCabeceraFx() cuando el título no cabe compitiendo con ellos,
+   que es lo que pasa en pantallas verticales. En horizontal no se activa y la
+   cabecera sigue siendo la de una sola fila. */
+.mod-fx-header.apilado{flex-wrap:wrap;justify-content:flex-start;row-gap:1vh}
+.mod-fx-header.apilado .mod-fx-title{flex:0 0 100%}
 /* Las filas se REPARTEN el alto disponible y la tipografía escala con el alto
    que le toca a cada una (--fx-row-h, que fija el JS).
    Los topes van contra --fx-box-w, el ancho REAL de la caja medido por el JS,
@@ -452,8 +458,12 @@ function tasasCaducadas(item, ahoraMs){
 function fechaTasas(item, ahoraMs){
   var ts = parseFloat((item||{}).updated_at);
   var d = (ts && !isNaN(ts)) ? new Date(ts*1000) : new Date(ahoraMs);
-  return String(d.getDate()).padStart(2,"0") + "/" +
-         String(d.getMonth()+1).padStart(2,"0") + "/" + d.getFullYear();
+  var dos = function(n){ return String(n).padStart(2,"0"); };
+  // Con la hora, y no solo la fecha: un tablero se actualiza varias veces al
+  // día, y unas tasas de las 9:00 y otras de las 19:00 se veían idénticas.
+  // Todo a dos dígitos para que la cabecera no cambie de ancho según la hora.
+  return dos(d.getDate()) + "/" + dos(d.getMonth()+1) + "/" + d.getFullYear() +
+         " " + dos(d.getHours()) + ":" + dos(d.getMinutes());
 }
 // ── fin de la frescura ─────────────────────────────────────────────────────
 
@@ -1066,9 +1076,51 @@ function reportPreviewPages(pages, rowsFirstPage){
   parent.postMessage({type:"preview-pages",pages,rowsFirstPage},"*");
 }
 
+// El título, el logo y la fecha se reparten UNA fila. En una pantalla estrecha
+// —vertical, o un tablero en media pantalla— no caben: el logo no encoge y la
+// fecha no parte, así que el que cede es el título, y "TIPOS DE CAMBIO" se
+// quedaba en "TIPOS DE…". Un tablero que no dice de qué es no sirve de nada.
+//
+// Se decide midiendo el elemento, no con media queries: el player se rota con
+// transform, así que vw/vh y orientation se refieren al viewport SIN rotar y
+// mienten.
+//
+// El criterio es CUÁNTAS LÍNEAS ocupa el título. Un título que necesita dos
+// líneas compitiendo por el ancho ya va apretado; con la fila entera casi
+// siempre le sobra. Y un título corto ocupa una sola línea, así que en
+// horizontal esto no se activa y la cabecera se queda como estaba.
+//
+// Lo evidente —preguntar si el texto está recortado— NO funciona aquí:
+// -webkit-line-clamp recorta durante el diseño, así que scrollHeight y
+// scrollWidth coinciden con clientHeight y clientWidth y el elemento jura que
+// cabe. Se vio fotografiando el render, no leyendo el código.
+function ajustarCabeceraFx(slide){
+  const header=slide.querySelector(".mod-fx-header");
+  if(!header) return;
+  const titulo=header.querySelector(".mod-fx-title");
+  if(!titulo) return;
+  // El logo se mide DESPUÉS de cargar. Hasta que la imagen llega ocupa cero, el
+  // título tiene todo el ancho y cabe en una línea; cuando llega, el título se
+  // aprieta y ya nadie vuelve a mirar. Por eso se reajusta al cargar el logo.
+  // A partir de la segunda vez la imagen está en caché y la primera medida ya
+  // es la buena.
+  const logo=header.querySelector(".mod-fx-logo");
+  if(logo && !logo.complete && !logo.dataset.remedido){
+    logo.dataset.remedido="1";
+    logo.addEventListener("load",function(){ ajustarCabeceraFx(slide); },{once:true});
+  }
+  header.classList.remove("apilado");        // medir siempre sin apilar
+  const alturaLinea=parseFloat(getComputedStyle(titulo).lineHeight);
+  if(!alturaLinea) return;
+  if(Math.round(titulo.clientHeight/alturaLinea)>=2) header.classList.add("apilado");
+}
+
 // Pagina el módulo de divisas según lo que cabe en pantalla. Muestra una página
 // cada perPageMs y llama onDone() cuando ha mostrado todas (entonces avanza el slide).
 function setupFxPagination(slide, perPageMs, onDone){
+  // ANTES de medir nada: la cabecera puede crecer de alto al apilarse, y eso
+  // cambia el hueco que les queda a las filas.
+  ajustarCabeceraFx(slide);
   const container=slide.querySelector(".mod-fx-rows");
   const indicator=slide.querySelector(".mod-fx-page");
   const rows=container?Array.from(container.querySelectorAll(".fx-row")):[];

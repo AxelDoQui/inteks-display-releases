@@ -8,6 +8,28 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.17 — 2026-08-11
+
+### Nuevo
+
+- **El tablero de divisas dice también a qué hora se actualizaron las tasas**,
+  no solo el día: `11/08/2026 22:28`. Un tablero se actualiza varias veces al
+  día y unas tasas de las 9:00 y otras de las 19:00 se veían idénticas.
+
+### Corregido
+
+- **El título del tablero salía cortado** («TIPOS DE…»). El logo se estaba
+  dibujando mucho más grande de lo previsto y se comía el ancho del título.
+  Ahora el logo tiene el tamaño que debía y el título cabe entero.
+- **Las imágenes de los módulos salían deformadas por la misma causa**: la
+  ficha de producto y la comparativa las estiraban a pantalla completa en vez
+  de respetar su hueco.
+- En pantallas muy estrechas —verticales—, si aun así el título no cabe en una
+  línea, **pasa a ocupar su propia fila** y el logo y la fecha van debajo, en
+  vez de recortarse.
+
+---
+
 ## 1.0.16 — 2026-08-11
 
 ### Por dentro
