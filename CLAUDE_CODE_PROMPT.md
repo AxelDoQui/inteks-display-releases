@@ -264,8 +264,21 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
    una tele concreta: con app propia el cliente enchufa el stick y le sale la
    pantalla de emparejar, sin explicarle a nadie qué es un APK, la app
    Downloader ni un navegador de kiosco. Ahí deja de ser un parche y pasa a
-   ser mejor producto. Coste estimado: un fin de semana. Requiere JDK + SDK de
-   línea de comandos (~3-4 GB; con Android Studio entero, ~15).
+   ser mejor producto.
+
+   **Coste real, medido el 2026-08-11: menor de lo estimado.** El toolchain ya
+   está instalado en el equipo de desarrollo —Android Studio con su JDK, SDK
+   `android-36.1`, build-tools hasta `37.0.0`, `adb` y licencias aceptadas—,
+   así que la descarga de 3-4 GB que se contaba como el grueso no existe.
+   Ninguno está en el PATH: hay que invocarlos por ruta.
+
+   Lo que sí manda sobre el calendario es que **esto no se puede probar sin el
+   aparato**. Escribir la app y compilar el APK cabe en una sesión; que arranque
+   y pinte el player, el mismo día. Pero fiarse de dejarla desatendida en una
+   tienda son días de *observación*, no de trabajo: si vuelve tras un corte de
+   luz, si aguanta que el WiFi caiga de madrugada, si arranca de verdad al
+   encender el televisor. Ese bucle va al ritmo de quien tenga el stick
+   delante, no al de quien escribe el código.
 
 ## Gotchas de despliegue
 
