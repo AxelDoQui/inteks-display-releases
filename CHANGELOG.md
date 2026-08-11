@@ -8,6 +8,25 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.16 — 2026-08-11
+
+### Por dentro
+
+- **Playlists largas dejan de comerse la memoria del reproductor.** Hasta ahora
+  la pantalla cargaba de golpe las imágenes y los vídeos de **todos** los
+  contenidos, aunque tardaran media hora en salir. Con cuatro o cinco no se
+  nota; con cincuenta, un aparato pequeño —una caja Android de 1 o 2 GB— se
+  queda sin memoria y el sistema cierra la aplicación: pantalla en negro sin
+  ningún aviso.
+- Ahora solo se mantienen cargados el contenido actual, el anterior y los dos
+  siguientes. El resto se suelta y se vuelve a cargar cuando le toca, con
+  margen suficiente para que **no haya parpadeo** al cambiar. Los vídeos, que
+  eran lo más pesado, ya no se descargan todos a la vez.
+- Efecto práctico: una playlist de 50 contenidos ocupa en la pantalla más o
+  menos lo mismo que una de 5.
+
+---
+
 ## 1.0.15 — 2026-08-11
 
 ### Corregido

@@ -87,6 +87,26 @@ seguridad cada 4 horas (`RELOAD_SEGURIDAD_MS`), pensada para navegadores de TV
 con poca memoria (el de LG webOS es un caso documentado por el propio soporte
 de LG) — segura porque la caché ya deja algo pintado antes de que llegue.
 
+**Ventana de materialización (desde 1.0.16).** `rebuildSlides()` monta todas
+las diapositivas en el DOM, pero **sin `src`**: guarda la ruta en
+`data-medio` y `materializarVentana()` la pone solo a las que caen dentro de
+`ventanaSlides(orden, posOrden, RADIO_VENTANA)` —la anterior, la actual y las
+dos siguientes—, quitándosela a las demás (y en vídeo, `preload` y `load()`
+para soltar el búfer).
+
+Sin esto, 50 contenidos son 50 imágenes decodificadas a la vez: las
+diapositivas en espera están en `opacity:0`, que **se sigue pintando**, no en
+`display:none`. Un 1080p descomprimido son ~8 MB, y una caja Android de 1-2 GB
+se muere. La ventana se calcula sobre el **orden de reproducción**, no sobre
+los índices: con el orden aleatorio la siguiente no es la de al lado.
+
+Dos cosas que se dan por sabidas al tocar esto: la anterior sigue en la ventana
+porque aún se está animando su salida, y el radio ≥1 existe para que la
+siguiente llegue ya decodificada — materializar justo al mostrarla da un
+parpadeo negro. **Sin cubrir todavía:** las imágenes internas de los módulos
+`product` y `comparison`, que se crean con `src` directo dentro de su
+`build*Slide`.
+
 **Modo vista previa** — `player.html?preview=1`, sin `?screen=`. No conecta el
 SSE, no se registra como pantalla y no aplica el horario. Renderiza el item que
 le inyecta el admin por `postMessage` (`preview-item`) y devuelve cuántas

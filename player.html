@@ -415,9 +415,12 @@ async function sincronizarMedios(){
     }
     try{ mediosLocales[src]=URL.createObjectURL(blob); }catch(e){}
   }
-  // Repintar solo si hemos ganado copias nuevas, para que las diapositivas
-  // pasen a usarlas sin esperar al siguiente cambio de playlist.
-  if(nuevos) rebuildSlides();
+  // Si hemos ganado copias nuevas, que las diapositivas pasen a usarlas sin
+  // esperar al siguiente cambio de playlist. Basta con repasar la ventana: las
+  // que están lejos ya resolverán su URL cuando les toque entrar. Antes esto
+  // rehacía TODAS las diapositivas, que con cincuenta es tirar y reconstruir el
+  // DOM entero cada vez que termina una descarga.
+  if(nuevos) materializarVentana();
 }
 
 // ── Frescura de las tasas ──────────────────────────────────────────────────
@@ -847,9 +850,10 @@ function rebuildSlides(){
 
     if(item.type==="video"){
       const v=document.createElement("video");
-      // Si hay copia guardada en el televisor se usa esa; si no, la del
-      // servidor. Nunca se deja de pintar por no tener copia.
-      v.src=urlDeMedio(item.src,mediosLocales);v.muted=true;v.playsInline=true;v.preload="auto";
+      // El src NO se pone aquí: lo pone materializarVentana() cuando esta
+      // diapositiva se acerca. Con preload="auto" en todas, cincuenta vídeos
+      // se ponían a bufferear a la vez y la caja se quedaba sin memoria.
+      v.dataset.medio=item.src;v.muted=true;v.playsInline=true;v.preload="none";
       slide.appendChild(v);
     } else if(item.type==="url"){
       const fr=document.createElement("iframe");
@@ -884,12 +888,47 @@ function rebuildSlides(){
       slide.appendChild(buildCountdownSlide(item));
     } else {
       const img=document.createElement("img");
-      img.src=urlDeMedio(item.src,mediosLocales);
+      // Igual que el vídeo: la imagen se carga solo si está cerca de tocarle.
+      // Una diapositiva en opacity:0 se sigue pintando, así que un src puesto
+      // aquí obliga al navegador a decodificarla aunque no se vea nunca.
+      img.dataset.medio=item.src;
       slide.appendChild(img);
     }
     player.appendChild(slide);
   });
+  materializarVentana();
 }
+
+// ── Materializar la ventana ────────────────────────────────────────────────
+// Pone y quita el medio de cada diapositiva según la ventana de reproducción.
+// Es la mitad sucia de ventanaSlides(): la decisión está ahí y probada; aquí
+// solo se toca el DOM.
+var RADIO_VENTANA=2;   // la anterior, la actual y las dos siguientes
+function materializarVentana(){
+  const slides=document.querySelectorAll(".slide");
+  if(!slides.length) return;
+  const secuencia=orden.length?orden:playlist.map((_,i)=>i);
+  const dentro={};
+  ventanaSlides(secuencia, posOrden, RADIO_VENTANA).forEach(i=>{ dentro[i]=1; });
+  slides.forEach(slide=>{
+    const m=slide.querySelector("img[data-medio],video[data-medio]");
+    if(!m) return;
+    const i=parseInt(slide.dataset.i,10);
+    if(dentro[i]){
+      // La URL se resuelve AHORA y no al construir: si mientras tanto ha
+      // llegado la copia local, se usa esa sin rehacer todas las diapositivas.
+      const url=urlDeMedio(m.dataset.medio,mediosLocales);
+      if(m.getAttribute("src")!==url){
+        m.setAttribute("src",url);
+        if(m.tagName==="VIDEO"){ m.preload="auto"; }   // que se adelante, ya le toca
+      }
+    } else if(m.hasAttribute("src")){
+      m.removeAttribute("src");
+      if(m.tagName==="VIDEO"){ m.preload="none"; try{ m.load(); }catch(e){} }  // soltar el búfer
+    }
+  });
+}
+// ── fin de materializar ────────────────────────────────────────────────────
 
 function startProgress(ms){
   // La barra está dentro de #player y rota con él, así que siempre anima en anchura
@@ -942,6 +981,10 @@ function showSlide(idx){
   }
   slide.classList.remove("leaving");
   slide.classList.add("active");
+  // Antes de arrancar nada: cargar lo que viene y soltar lo que ya no hace
+  // falta. Va aquí y no en next() porque showSlide también se llama desde el
+  // refresco, desde la caché y al cambiar el tamaño de la pantalla.
+  materializarVentana();
   const isVideo=!!slide.querySelector("video");
   const fx=slide.querySelector(".mod-fx");
   const ms=(parseFloat(slide.dataset.dur)||8)*1000;
@@ -1084,6 +1127,37 @@ function setupFxPagination(slide, perPageMs, onDone){
   };
   show();
 }
+
+// ── Ventana de diapositivas ────────────────────────────────────────────────
+// Qué diapositivas se mantienen cargadas de verdad (con su imagen o su vídeo)
+// y cuáles se dejan vacías.
+//
+// El reproductor monta TODAS las diapositivas en el DOM de una vez. Con cuatro
+// contenidos da igual; con cincuenta no: las que no se ven están en opacity:0,
+// y una capa transparente SE SIGUE PINTANDO, así que el navegador decodifica
+// las cincuenta imágenes. Un 1080p descomprimido son unos 8 MB; en una caja
+// Android de 1-2 GB el sistema acaba matando la aplicación y la pantalla se
+// queda negra. No es lentitud: es que se muere.
+//
+// Se devuelve la actual, la anterior —que aún se está yendo, y descargarla a
+// media transición se ve— y las siguientes, que así llegan ya decodificadas y
+// no hay parpadeo negro al cambiar.
+//
+// Sobre el ORDEN de reproducción, no sobre los índices de la playlist: con el
+// orden aleatorio la siguiente no es la de al lado.
+function ventanaSlides(orden, pos, radio){
+  var total = orden.length;
+  if(!total) return [];
+  var r = Math.min(radio, Math.floor(total/2));   // sin dar vueltas de más
+  var p = ((pos % total) + total) % total;        // una posición fuera de rango no puede dejar la pantalla en negro
+  var vistos = {}, salida = [];
+  for(var d = -r; d <= r; d++){
+    var i = orden[((p + d) % total + total) % total];
+    if(!vistos[i]){ vistos[i] = 1; salida.push(i); }
+  }
+  return salida.sort(function(a,b){ return a-b; });
+}
+// ── fin de la ventana ──────────────────────────────────────────────────────
 
 // ── Ciclo de reproduccion ──────────────────────────────────────────────────
 // El ciclo va por una lista de indices, no por current+1. Asi el orden puede
