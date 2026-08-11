@@ -8,6 +8,25 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.13 — 2026-08-11
+
+### Corregido
+
+- **El instalador abre solo el puerto en el cortafuegos de Windows.** Hasta
+  ahora había que hacerlo a mano, y sin ese paso pasaba lo peor que puede
+  pasar: el panel funcionaba perfectamente en el propio ordenador y **ningún
+  televisor ni tablet llegaba al servidor**, quedándose cargando para siempre
+  sin dar ni un error. Instalado en una tienda, eso son horas buscando el
+  fallo donde no está.
+- **La instrucción que había en el manual para hacerlo a mano no servía en la
+  mayoría de las redes.** Creaba la regla solo para «redes privadas», y
+  Windows marca como pública cualquier wifi que nadie haya cambiado a mano: se
+  seguía el manual al pie de la letra y el televisor seguía sin entrar. Ahora
+  la regla vale para cualquier red, y también aguanta que Windows reclasifique
+  la wifi más adelante.
+
+---
+
 ## 1.0.12 — 2026-08-11
 
 ### Corregido

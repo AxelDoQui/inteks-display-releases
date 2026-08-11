@@ -24,9 +24,51 @@ $TAREA = "InTeks Display"
 # El producto se llamaba SignalOS Pro. Su tarea hay que borrarla siempre, o
 # quedarian dos arrancando servidores que se pelean por el puerto 80.
 $TAREAS_VIEJAS = @("SignalOS Pro", "SignalOS")
+$REGLA = "InTeks Display (HTTP)"
+
+function Abrir-Cortafuegos($dir) {
+    # Sin esta regla, el servidor funciona perfectamente en el propio PC y NO
+    # responde a ningun otro aparato: el televisor o la tablet se quedan
+    # cargando indefinidamente, sin error ni mensaje, porque un paquete
+    # descartado no contesta nada. Era el fallo mas caro de diagnosticar de
+    # todo el producto, y hasta ahora habia que arreglarlo a mano en cada
+    # instalacion. El instalador ya corre elevado aqui: es el momento.
+    #
+    # -Profile Any, y no Private. Windows clasifica como PUBLICA cualquier red
+    # nueva que no se marque a mano, y una regla de perfil Privado no se aplica
+    # en una red Publica: la instalacion parecia correcta y seguia sin
+    # funcionar. Peor aun, Windows puede reclasificar la red mas adelante y
+    # tirar las pantallas sin que nadie haya tocado nada. Abre solo los puertos
+    # de este programa, y el panel sigue pidiendo contrasena.
+    $puertos = @(80, 9000)
+    $cfg = Join-Path $env:ProgramData "InTeks Display\config.json"
+    if (-not (Test-Path $cfg) -and $dir) { $cfg = Join-Path $dir "config.json" }
+    if (Test-Path $cfg) {
+        try {
+            $c = Get-Content $cfg -Raw | ConvertFrom-Json
+            # -as [int] y no -is [int]: ConvertFrom-Json puede devolver Int64,
+            # y con -is se descartaban los puertos leidos sin decir nada.
+            $leidos = @($c.port, $c.port_fallback) | ForEach-Object { $_ -as [int] } |
+                      Where-Object { $_ -gt 0 -and $_ -le 65535 }
+            if ($leidos) { $puertos = $leidos }
+        } catch {}   # config ilegible: valen los de por defecto, no se aborta la instalacion
+    }
+    try {
+        Get-NetFirewallRule -DisplayName $REGLA -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction SilentlyContinue
+        New-NetFirewallRule -DisplayName $REGLA -Direction Inbound -Protocol TCP `
+            -LocalPort $puertos -Action Allow -Profile Any -ErrorAction Stop | Out-Null
+        Write-Host "Cortafuegos: abierto el puerto $($puertos -join ' y ') para las pantallas." -ForegroundColor Green
+    } catch {
+        # Que no se pueda abrir el puerto no puede impedir instalar: en local
+        # funciona igual, y el manual explica como crear la regla a mano.
+        Write-Host "AVISO: no se pudo crear la regla del cortafuegos ($_)." -ForegroundColor Yellow
+        Write-Host "       Las pantallas no veran el servidor hasta crearla. Ver MANUAL.md." -ForegroundColor Yellow
+    }
+}
 
 if ($Quitar) {
     foreach ($t in @($TAREA) + $TAREAS_VIEJAS) { schtasks /Delete /TN $t /F 2>$null | Out-Null }
+    Get-NetFirewallRule -DisplayName $REGLA -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction SilentlyContinue
     Write-Host "Tarea '$TAREA' eliminada."
     exit 0
 }
@@ -86,6 +128,12 @@ if (-not $pythonw) {
 $servidor = Join-Path $AppDir "server.py"
 Write-Host "pythonw : $pythonw"
 Write-Host "servidor: $servidor"
+
+# Antes de registrar la tarea, y pase lo que pase con ella: un servidor que
+# arranca pero al que no llega ninguna pantalla no sirve de nada, y al reves
+# tampoco. Son dos cosas independientes y ninguna debe llevarse a la otra por
+# delante si falla.
+Abrir-Cortafuegos $AppDir
 
 try {
     $accion = New-ScheduledTaskAction -Execute $pythonw -Argument "`"$servidor`"" -WorkingDirectory $AppDir

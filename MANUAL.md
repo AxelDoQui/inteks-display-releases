@@ -172,10 +172,12 @@ del panel lateral con esa misma dirección (`http://signage.local`) y pega el
 token de la API que está en Ajustes.
 
 **Si el otro ordenador no lo encuentra**, casi siempre es el cortafuegos de
-Windows del equipo servidor: el instalador no crea la regla. Hay que permitir
-el puerto de InTeks Display para redes privadas. Si `signage.local` tampoco
-responde, prueba con la IP del equipo servidor, que aparece en la pantalla
-negra del servidor al arrancar.
+Windows del equipo servidor (ver *Cuando algo falla*, más abajo). Si
+`signage.local` tampoco responde, prueba con la IP del equipo servidor. En
+**Android** —móviles, tablets y cajas de TV— hay que usar **siempre la IP**: su
+navegador no resuelve los nombres acabados en `.local`. Los iPhone y los Mac sí
+los entienden, y de ahí la confusión: el mismo enlace funciona en un aparato y
+en otro no.
 
 **Qué pasa si dos personas tocan el panel a la vez.** Manda quien guarde
 primero. El segundo recibe el aviso «otro equipo cambió algo, repite lo último
@@ -272,15 +274,23 @@ puerta trasera para cualquiera conectado al wifi de la tienda.
 comprueba que el televisor tiene red y que el servidor responde
 (`http://LA-IP/admin.html` desde otro equipo).
 
-**El televisor se queda cargando sin llegar a nada, al escribir la IP.** Suele
-ser el Firewall de Windows, que por defecto bloquea las conexiones que llegan
-de otros aparatos aunque el PC vea el servidor perfectamente por sí mismo. En
-el PC, PowerShell **como administrador**:
+**El televisor se queda cargando sin llegar a nada, al escribir la IP.** Es el
+Firewall de Windows, que por defecto bloquea las conexiones que llegan de otros
+aparatos aunque el PC vea el servidor perfectamente por sí mismo. Y no da
+error: se queda cargando y ya, porque un paquete bloqueado no contesta nada.
+
+Desde la versión 1.0.13 **el instalador crea la regla solo**. Si vienes de una
+instalación anterior, en el PC, PowerShell **como administrador**:
 ```powershell
-New-NetFirewallRule -DisplayName "InTeks Display (HTTP)" -Direction Inbound -Protocol TCP -LocalPort 80,9000 -Action Allow -Profile Private
+New-NetFirewallRule -DisplayName "InTeks Display (HTTP)" -Direction Inbound -Protocol TCP -LocalPort 80,9000 -Action Allow -Profile Any
 ```
-Esto abre solo ese puerto en la red privada del PC — no toca el resto del
-firewall.
+Abre solo ese puerto, no toca el resto del firewall, y surte efecto al momento:
+no hay que reiniciar nada.
+
+> `-Profile Any` es importante. Windows clasifica como **red pública**
+> cualquier wifi que no se marque a mano como privada, y una regla «para redes
+> privadas» **no se aplica en una red pública**: parece que has hecho lo
+> correcto y el televisor sigue sin entrar.
 
 **El navegador de un Smart TV se cierra solo pasado un rato.** Algunos
 televisores (el navegador integrado de LG webOS es un caso conocido, según su

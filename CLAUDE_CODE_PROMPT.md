@@ -327,9 +327,31 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
   regla de entrada explícita para el puerto usado (80/9000 típicamente), un
   TV o tablet en la misma red se queda cargando indefinidamente (no da error,
   simplemente no responde) aunque el PC vea al servidor perfectamente por
-  `localhost`. El instalador no crea esta regla. Se soluciona con:
-  `New-NetFirewallRule -DisplayName "InTeks Display (HTTP)" -Direction Inbound -Protocol TCP -LocalPort 80,9000 -Action Allow -Profile Private`
-  (requiere PowerShell como administrador).
+  `localhost`. **Desde 1.0.13 la crea el instalador**, en
+  `installer\registrar-tarea.ps1` (`Abrir-Cortafuegos`), leyendo los puertos de
+  `config.json`. A mano:
+  `New-NetFirewallRule -DisplayName "InTeks Display (HTTP)" -Direction Inbound -Protocol TCP -LocalPort 80,9000 -Action Allow -Profile Any`
+
+  **`-Profile Any`, no `Private`** —esto costó una sesión entera de campo el
+  2026-08-11—. Windows clasifica como **Pública** toda red nueva que no se
+  marque a mano, y una regla de perfil Privado **no se aplica** en una red
+  Pública: la instalación parece correcta, el comando del manual «funciona», y
+  la pantalla sigue sin entrar. Además Windows puede reclasificar una red más
+  tarde y tirar las pantallas sin que nadie haya tocado nada.
+
+  Dos cosas que despistan al diagnosticar esto:
+  - Las reglas **por programa** van atadas a la ruta exacta del `.exe`. Las que
+    Windows crea al preguntar «¿permitir?» cuando arrancas el servidor a mano
+    apuntan al Python de desarrollo, no a `{app}\vendor\python\pythonw.exe`,
+    así que la versión instalada no hereda ese permiso.
+  - Probar `http://<IP-del-propio-PC>/api/info` **desde el propio PC no
+    demuestra nada**: ese tráfico no pasa por el filtro de entrada. Hace falta
+    otro aparato.
+
+- **En Android hay que usar la IP, no `signage.local`.** Su navegador no
+  resuelve mDNS; iOS y macOS sí. Un enlace que funciona en un iPhone puede
+  quedarse cargando para siempre en una caja de TV Android, y parece un
+  problema de red cuando es de nombres.
 
 - **`pick_data_dir()` no siempre elige la carpeta esperada — sin explicar
   todavía.** Al montar una copia de prueba en una carpeta temporal (server.py
