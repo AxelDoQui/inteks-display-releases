@@ -220,6 +220,21 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
    cada 4h) que no explican por sí solas un cierre tan rápido y regular.
    Investigación en pausa a la espera de una prueba de control (una web
    cualquiera en el mismo navegador) que aísle si es del TV o de la página.
+
+   **Revisado el 2026-08-11: la fuga explica el cierre mucho mejor de lo que
+   decía este apunte.** La valoración anterior asumía acumulación lineal («se
+   acumulaban con las horas»), y no lo es: un `EventSource` con error
+   *reintenta solo*, por defecto. Sin el `es.close()` que faltaba, la conexión
+   muerta seguía reintentando por su cuenta **y además** se creaba una nueva
+   cada 4 s, que a su vez fallaba y hacía lo mismo. Crece multiplicándose, no
+   sumando: con un WiFi flojo son decenas de conexiones en dos minutos.
+   Queda por saber si el arreglo (1.0.8) llegó a la tienda. Que el código
+   estuviera sin commitear hasta el 2026-08-10 no implica que no se compilara:
+   los instaladores de 1.0.7, 1.0.8 y 1.0.9 están en `dist/installer/` con
+   fecha de ese mismo día. **Primer paso, antes de teorizar nada: mirar qué
+   versión corre la tienda** (`/api/info` lo devuelve, o el panel). Si es
+   anterior a la 1.0.8, actualizar y volver a observar; si ya la tenía y sigue
+   cayéndose, la fuga queda descartada y toca la prueba de control.
 4. **Preservar ediciones a medias durante un repintado** — `admin.html` hace
    `es.onmessage=()=>loadAll()`, que reconstruye la interfaz ante cualquier
    aviso SSE y se lleva por delante lo que hubiera a medio escribir. Es un
@@ -230,6 +245,27 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
    arreglo de raíz es guardado granular por entidad (`/api/items/<id>`), que
    hoy es desproporcionado: `saveContentLocal()` se llama desde doce sitios de
    un `admin.html` de 214 KB.
+5. **App propia de reproductor para Android TV** — un navegador de kiosco
+   hecho a medida, para sticks tipo Xiaomi/Google TV. El núcleo es pequeño:
+   un `WebView` a pantalla completa apuntado a
+   `/player.html?screen=NOMBRE`, `keepScreenOn`, un receptor de
+   `BOOT_COMPLETED` para arrancar al enchufar la tele, y reintento con espera
+   creciente en `onReceivedError`. El `WebView` es Chromium, así que soporta
+   SSE, IndexedDB y el caché offline que ya usa el player.
+
+   **No se hace como parche de un fallo**, y menos del punto 3: la
+   alternativa de mercado (Fully Kiosk Browser, ~7 €) lleva años resolviendo
+   lo que de verdad muerde —fiabilidad del arranque automático en cada
+   fabricante, restricciones de segundo plano, recuperación tras un cierre—,
+   y eso no son 200 líneas. Además mete un segundo lenguaje y un SDK con
+   Gradle en un proyecto cuya regla fundacional es *sin paso de compilación*.
+
+   **Se hace el día que el problema sea la instalación en tienda nueva**, no
+   una tele concreta: con app propia el cliente enchufa el stick y le sale la
+   pantalla de emparejar, sin explicarle a nadie qué es un APK, la app
+   Downloader ni un navegador de kiosco. Ahí deja de ser un parche y pasa a
+   ser mejor producto. Coste estimado: un fin de semana. Requiere JDK + SDK de
+   línea de comandos (~3-4 GB; con Android Studio entero, ~15).
 
 ## Gotchas de despliegue
 
