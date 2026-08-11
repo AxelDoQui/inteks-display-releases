@@ -148,11 +148,22 @@ GET       /uploads/*           archivos subidos (soporta Range)
 
 ## Datos en disco
 
-Todos son rutas **relativas**, así que el servidor debe ejecutarse con el
-working directory en su propia carpeta. Es la razón de que
-`abrir-panel.bat` haga `cd /d` antes de arrancar: lanzado desde el registro
-de autoarranque, el CWD sería `System32` y crearía allí una base de datos
-vacía.
+**Dónde viven lo decide `pick_data_dir()` por la ruta de instalación, no por
+los permisos** (desde 1.0.12). Si `APP_DIR` cuelga de `%ProgramFiles%`, los
+datos van a `%PROGRAMDATA%\InTeks Display`; en cualquier otro sitio —una copia
+de desarrollo— se quedan junto al programa. `SIGNALOS_DATA` manda sobre todo lo
+demás y es lo que usan las pruebas.
+
+Antes esto lo decidía **solo** una prueba de escritura sobre `APP_DIR`, escrita
+dando por hecho que nadie puede escribir en Archivos de programa. Pero el
+servidor arranca como SYSTEM desde la tarea programada, y SYSTEM sí puede: la
+prueba pasaba y `DATA_DIR == APP_DIR`, con los datos dentro de Program Files
+—justo donde el manual jura que no están, y donde `restablecer-contrasena.py`
+se niega a buscar a propósito, así que la recuperación de contraseña no
+encontraba la instalación—. Un cambio en el *contexto de ejecución* (clave
+`Run` del registro → tarea como SYSTEM) alteró el comportamiento de una
+función que nadie tocó. Las instalaciones que vienen de esa época se migran
+solas al arrancar (`migrar_datos_antiguos()`), sin borrar la copia vieja.
 
 | Archivo | Contenido | ¿Se versiona? |
 |---|---|---|

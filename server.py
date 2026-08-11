@@ -22,17 +22,48 @@ import urllib.request
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.11"
+APP_VERSION = "1.0.12"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
+def _dentro_de(ruta, carpeta):
+    """¿'ruta' cuelga de 'carpeta'? Comparando como lo hace Windows.
+
+    Con startswith a pelo, «C:\\Program Files Comunes» contaría como dentro de
+    «C:\\Program Files»: hay que exigir el separador.
+    """
+    if not carpeta:
+        return False
+    ruta = os.path.normcase(os.path.abspath(ruta))
+    carpeta = os.path.normcase(os.path.abspath(carpeta)).rstrip(os.sep)
+    return ruta == carpeta or ruta.startswith(carpeta + os.sep)
+
+def _carpeta_de_datos_del_sistema():
+    base = os.environ.get("PROGRAMDATA") or os.path.expanduser("~")
+    d = os.path.join(base, "InTeks Display")
+    os.makedirs(d, exist_ok=True)
+    return d
+
 def pick_data_dir():
-    """Carpeta donde guardar lo que cambia. Junto al programa si se puede
-    escribir ahí; si no —caso Program Files— en ProgramData."""
+    """Carpeta donde guardar lo que cambia. Junto al programa mientras se
+    desarrolla; en ProgramData cuando está instalado en Program Files."""
     override = os.environ.get("SIGNALOS_DATA")
     if override:
         os.makedirs(override, exist_ok=True)
         return os.path.abspath(override)
+    # Instalado en Archivos de programa: a ProgramData, y no se pregunta si se
+    # puede escribir aquí.
+    #
+    # Antes esto lo decidía solo la prueba de escritura de más abajo, y la
+    # prueba se escribió pensando en un proceso de usuario normal, que no puede
+    # escribir en Program Files. Pero el servidor arranca desde la tarea
+    # programada como SYSTEM, y SYSTEM sí puede: la prueba pasaba y los datos
+    # acababan dentro de Program Files —mezclados con el programa, borrables
+    # por el instalador y justo donde el manual jura que no están—. Quien
+    # decide es DÓNDE está instalado, no qué permisos tenga quien arranca.
+    for var in ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"):
+        if _dentro_de(APP_DIR, os.environ.get(var)):
+            return _carpeta_de_datos_del_sistema()
     # Comprobar escritura de verdad: los permisos de Windows no se deducen
     # fiablemente con os.access(), hay que intentarlo.
     try:
@@ -41,10 +72,7 @@ def pick_data_dir():
         os.remove(probe)
         return APP_DIR
     except OSError:
-        base = os.environ.get("PROGRAMDATA") or os.path.expanduser("~")
-        d = os.path.join(base, "InTeks Display")
-        os.makedirs(d, exist_ok=True)
-        return d
+        return _carpeta_de_datos_del_sistema()
 
 DATA_DIR = pick_data_dir()
 LOG_FILE = os.path.join(DATA_DIR, "server.log")

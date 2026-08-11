@@ -214,7 +214,103 @@ def main():
     finally:
         parar(p)
 
-    for d in (dev, app, datos, app2, datos2, app3, datos3, app4, datos4, app5, raiz5):
+    # ── 7. En Program Files los datos se van a ProgramData aunque SE PUEDA ───
+    #      escribir junto al programa.
+    #
+    # La prueba de escritura de pick_data_dir() se escribio pensando en un
+    # proceso de usuario normal, que no puede escribir en Archivos de programa.
+    # Pero el servidor arranca desde la tarea programada como SYSTEM, y SYSTEM
+    # SI puede: la prueba pasa y los datos acaban dentro de Program Files, que
+    # es justo donde el manual jura que no estan. Aqui no se mira si se puede
+    # escribir, se mira DONDE esta instalado el programa.
+    raiz6 = tempfile.mkdtemp(prefix="signalos_win_")
+    pf6 = os.path.join(raiz6, "Program Files")
+    app6 = os.path.join(pf6, "InTeks Display")
+    pd6 = os.path.join(raiz6, "ProgramData")
+    os.makedirs(app6, exist_ok=True)
+    os.makedirs(pd6, exist_ok=True)
+    for f in ESTATICOS:
+        shutil.copy2(os.path.join(SRC, f), app6)
+    # Datos de una version anterior, ya escritos dentro de Program Files: son
+    # los que hay hoy en el equipo de una tienda instalada.
+    json.dump({"TV-Caja": {"id": "TV-Caja", "connected": False, "last_seen": 1}},
+              open(os.path.join(app6, "screens.json"), "w"))
+    json.dump({"salt": "aa", "pwd_hash": "bb"}, open(os.path.join(app6, "admin.json"), "w"))
+    os.makedirs(os.path.join(app6, "uploads"), exist_ok=True)
+    open(os.path.join(app6, "uploads", "cartel.png"), "wb").write(b"PNG")
+    # Mientras los datos vivieron en Program Files, esta config.json no era la
+    # plantilla del instalador: era la CONFIGURACION VIVA del cliente, con su
+    # puerto, su nombre de instalacion y su token de Telegram. No viaja en
+    # ESTADO, viaja por la via de la plantilla; si alguien la toca, una tienda
+    # actualizada se queda sin avisos y sin saber por que.
+    json.dump({"port": 8080, "installation_name": "Tienda Norte",
+               "telegram_token": "12345:secreto"},
+              open(os.path.join(app6, "config.json"), "w"))
+    # La carpeta de datos ya existe y con un uploads vacio dentro: es el estado
+    # real del equipo de desarrollo, y una migracion que mire la carpeta en vez
+    # de los archivos se saltaria las imagenes.
+    os.makedirs(os.path.join(pd6, "InTeks Display", "uploads"), exist_ok=True)
+
+    # EN MAYUSCULAS a proposito: en Windows os.environ pone las claves en
+    # mayusculas, asi que un {"ProgramFiles": ...} no reemplaza al heredado,
+    # se suma. Llegarian las dos al hijo y ganaria la de verdad.
+    entorno6 = {"PROGRAMFILES": pf6, "PROGRAMFILES(X86)": pf6,
+                "PROGRAMW6432": pf6, "PROGRAMDATA": pd6}
+    p, err = arrancar(app6, entorno6, PORT + 6)
+    destino6 = os.path.join(pd6, "InTeks Display")
+    try:
+        if err:
+            print(f"  FALLO no arranco: {str(err)[:200]}")
+            fallos += 1
+        else:
+            ok = os.path.exists(os.path.join(destino6, "content.json"))
+            print(f"  {'ok  ' if ok else 'FALLO'} instalado en Program Files, los datos van a ProgramData")
+            fallos += not ok
+
+            scr_path = os.path.join(destino6, "screens.json")
+            ok = os.path.exists(scr_path) and "TV-Caja" in json.load(open(scr_path))
+            print(f"  {'ok  ' if ok else 'FALLO'} y se traen las pantallas que ya estaban en Program Files")
+            fallos += not ok
+
+            ok = os.path.exists(os.path.join(destino6, "admin.json"))
+            print(f"  {'ok  ' if ok else 'FALLO'} y la contrasena")
+            fallos += not ok
+
+            ok = os.path.exists(os.path.join(destino6, "uploads", "cartel.png"))
+            print(f"  {'ok  ' if ok else 'FALLO'} y los archivos subidos, aunque el uploads de destino ya existiera")
+            fallos += not ok
+
+            cfg6 = json.load(open(os.path.join(destino6, "config.json")))
+            ok = cfg6.get("telegram_token") == "12345:secreto" and \
+                 cfg6.get("installation_name") == "Tienda Norte"
+            print(f"  {'ok  ' if ok else 'FALLO'} y la configuracion viva: puerto, nombre y token de avisos")
+            fallos += not ok
+    finally:
+        parar(p)
+
+    # ── 8. Fuera de Program Files no cambia nada ────────────────────────────
+    # El modo de desarrollo no puede depender de que exista o no un ProgramData.
+    raiz7 = tempfile.mkdtemp(prefix="signalos_dev2_")
+    dev7 = os.path.join(raiz7, "proyecto")
+    pd7 = os.path.join(raiz7, "ProgramData")
+    os.makedirs(dev7, exist_ok=True)
+    os.makedirs(pd7, exist_ok=True)
+    for f in ESTATICOS:
+        shutil.copy2(os.path.join(SRC, f), dev7)
+    pf7 = os.path.join(raiz7, "Program Files")
+    p, err = arrancar(dev7, {"PROGRAMFILES": pf7, "PROGRAMFILES(X86)": pf7,
+                             "PROGRAMW6432": pf7, "PROGRAMDATA": pd7}, PORT + 7)
+    try:
+        ok = err is None and os.path.exists(os.path.join(dev7, "content.json"))
+        print(f"  {'ok  ' if ok else 'FALLO'} fuera de Program Files los datos siguen junto al programa")
+        if err:
+            print("        " + str(err)[:200])
+        fallos += not ok
+    finally:
+        parar(p)
+
+    for d in (dev, app, datos, app2, datos2, app3, datos3, app4, datos4, app5,
+              raiz5, raiz6, raiz7):
         shutil.rmtree(d, ignore_errors=True)
     print("TODO OK" if fallos == 0 else f"{fallos} FALLO(S)")
     return 1 if fallos else 0

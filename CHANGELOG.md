@@ -8,6 +8,25 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.12 — 2026-08-11
+
+### Corregido
+
+- **Los datos se guardaban dentro de la carpeta del programa.** Deberían haber
+  ido siempre a `C:\ProgramData\InTeks Display\`, y así lo dice el manual, pero
+  acababan en `C:\Program Files\InTeks Display\` junto al propio programa. Al
+  actualizar se arreglan solos: la primera vez que arranca la versión nueva se
+  traen las pantallas, el contenido, los archivos subidos, la contraseña y la
+  configuración —incluido el token de avisos— a su sitio. No hay que hacer
+  nada, y la copia vieja se queda donde estaba por si acaso.
+- **`restablecer-contrasena.bat` no encontraba la instalación.** Buscaba en
+  `ProgramData`, que es donde se supone que están los datos; como en realidad
+  estaban en la carpeta del programa, decía que no había ninguna instalación y
+  no había forma de recuperar el acceso al panel. Con los datos en su sitio,
+  vuelve a funcionar.
+
+---
+
 ## 1.0.11 — 2026-08-11
 
 ### Nuevo
