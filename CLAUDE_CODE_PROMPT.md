@@ -1,6 +1,6 @@
 # InTeks Display — Contexto para Claude Code
 
-> Actualizado: 11 de agosto de 2026. Este documento describe el estado **real** del
+> Actualizado: 12 de agosto de 2026. Este documento describe el estado **real** del
 > código. Si algo aquí no cuadra con lo que ves en los archivos, gana el código:
 > avísalo y se corrige el documento.
 
@@ -24,7 +24,7 @@ restaurantes, casas de cambio y similares.
 
 ## Arquitectura
 
-### Servidor — `server.py` (~42 KB, stdlib pura)
+### Servidor — `server.py` (~99 KB, stdlib pura)
 
 `ThreadingHTTPServer`: cada conexión en su propio hilo, imprescindible porque
 las conexiones SSE de `/api/events` viven indefinidamente y bloquearían al
@@ -37,7 +37,7 @@ mDNS del nombre de la instalación.
 
 Puerto: lee `config.json`, acepta `--port` como override y **cae al puerto
 alternativo automáticamente** si el principal está ocupado (`find_free_port`,
-línea 194). Quien necesite saber el puerto real no puede fiarse de
+línea 403). Quien necesite saber el puerto real no puede fiarse de
 `config.json`.
 
 ### Interfaces web
@@ -46,8 +46,8 @@ línea 194). Quien necesite saber el puerto real no puede fiarse de
 |---|---|
 | `index.html` | Raíz `/`. Router de arranque: si el dispositivo ya está enlazado (localStorage) redirige al player; si no, a emparejar. |
 | `login.html` | Puerta de autenticación. En el primer arranque cambia a modo "crear contraseña". |
-| `admin.html` | Panel de administración (~144 KB, monolito). |
-| `player.html` | Reproductor para pantallas y tablets. |
+| `admin.html` | Panel de administración (~212 KB, monolito). |
+| `player.html` | Reproductor para pantallas y tablets (~69 KB). |
 | `pair.html` | Emparejamiento por PIN. |
 | `sw.js` | Service worker de la PWA. Solo se activa bajo HTTPS o localhost. |
 
@@ -64,7 +64,7 @@ Ajustes · Ayuda
 
 `fx` (divisas) · `weather` · `ticker` · `text` · `url` · `video` · `comparison` ·
 `countdown` · `qr` · `product`. La imagen es la rama por defecto cuando el tipo
-no coincide con ninguno de los anteriores (`player.html:449`).
+no coincide con ninguno de los anteriores (`player.html:911`).
 
 Cada fila de `fx` admite un `agent` opcional (la ventanilla/agente de pago,
 caso Ria y similares con varios puntos de pago por moneda): si viene, el
@@ -87,6 +87,23 @@ seguridad cada 4 horas (`RELOAD_SEGURIDAD_MS`), pensada para navegadores de TV
 con poca memoria (el de LG webOS es un caso documentado por el propio soporte
 de LG) — segura porque la caché ya deja algo pintado antes de que llegue.
 
+**Recarga al actualizar (desde 1.0.18).** `/api/playlist` devuelve `version`;
+el player guarda la que vio al cargar y, si en un refresco posterior es otra,
+hace `location.reload()` (`debeRecargarPorVersion`). Sin esto, **instalar no
+cambiaba lo que la pantalla estaba mostrando**: el archivo del disco cambia,
+pero la página que el televisor lleva horas abierta sigue ejecutando el JS
+viejo —el contenido se refresca por SSE, el código no— hasta la recarga de
+seguridad de las 4 h o hasta que alguien reinicie el aparato. Pasó en campo con
+la 1.0.17: `/api/info` decía 1.0.17 y el televisor pintaba el fallo anterior.
+
+Dos consecuencias que hay que tener presentes: **`/api/info` dice qué sirve el
+servidor, no qué ejecuta la pantalla**, y una pantalla solo empieza a
+auto-recargarse cuando ya ha cargado el código de 1.0.18 o posterior — al
+actualizar desde una versión anterior hay que recargarla a mano una última vez.
+La regla es tacaña a propósito: exige dos versiones presentes y distintas, así
+que ni un servidor que no manda el dato ni un reinicio con la misma versión
+provocan una recarga.
+
 **Ventana de materialización (desde 1.0.16).** `rebuildSlides()` monta todas
 las diapositivas en el DOM, pero **sin `src`**: guarda la ruta en
 `data-medio` y `materializarVentana()` la pone solo a las que caen dentro de
@@ -106,6 +123,23 @@ siguiente llegue ya decodificada — materializar justo al mostrarla da un
 parpadeo negro. **Sin cubrir todavía:** las imágenes internas de los módulos
 `product` y `comparison`, que se crean con `src` directo dentro de su
 `build*Slide`.
+
+**Cabecera del tablero de divisas.** El título compite por el ancho con el
+logo y la fecha. Dos cosas que hay que saber antes de tocarla:
+
+- Las reglas de pantalla completa están acotadas a **hijos directos**
+  (`.slide>img`, `.slide>video`, `.slide>iframe`). Con `.slide img` a secas
+  (especificidad 0,1,1) ganaban a `.mod-fx-logo` (0,1,0) y el logo recibía
+  `height:100%`: salía a 99 px donde su CSS pedía 20, se llevaba el 26 % del
+  ancho y dejaba el título en «TIPOS DE…». Les pasaba igual a las imágenes de
+  `product` y `comparison`.
+- `ajustarCabeceraFx()` (`player.html:1104`) apila el título en su propia fila
+  cuando ocupa dos líneas, para pantallas verticales. Corre **antes** de medir
+  el hueco de las filas, porque la cabecera cambia de alto al apilarse.
+  Preguntar al DOM si el texto está recortado **no funciona**:
+  `-webkit-line-clamp` recorta durante el diseño y el elemento jura que cabe.
+  Y hay que remedir al cargar el logo: hasta que la imagen llega ocupa cero y
+  el título parece caber de sobra.
 
 **Modo vista previa** — `player.html?preview=1`, sin `?screen=`. No conecta el
 SSE, no se registra como pantalla y no aplica el horario. Renderiza el item que
@@ -152,15 +186,22 @@ GET       /api/auth-status     ¿hay contraseña? ¿hay sesión?  (público)
 GET       /api/admin-info      token de API                   (requiere sesión)
 GET/POST  /api/content         leer / guardar contenido completo
 GET/POST  /api/config          leer / guardar ajustes
-GET       /api/playlist        playlist + config de una pantalla
+GET       /api/playlist        playlist + config + versión del servidor
 GET       /api/screens         pantallas registradas
 GET       /api/events          SSE, conexión persistente
 GET       /api/pin             PIN de emparejamiento vigente
+GET       /api/pair-pending    pantallas esperando nombre
+GET       /api/update-check    ¿hay versión nueva? (token; ?force=1 salta la caché)
+GET       /api/backup          descargar copia de seguridad
 POST      /api/login  /api/logout  /api/set-password
 POST      /api/pair            enlazar una pantalla con el PIN
+POST      /api/pair-request  /api/pair-status  /api/pair-claim
 POST      /api/upload  /api/delete
 POST      /api/screens/config  /api/screens/delete
+POST      /api/screen-unlink   soltar el aparato sin borrar la pantalla
 POST      /api/fx-update       divisas desde la extensión (token)
+POST      /api/restore         restaurar una copia
+POST      /api/alert-test      mensaje de prueba de Telegram
 POST      /api/restart         reiniciar el servidor
 GET       /pair                atajo a pair.html
 GET       /uploads/*           archivos subidos (soporta Range)
@@ -238,6 +279,34 @@ npm test                          REM tests de lógica del player (Node stdlib)
 Admin en `/admin.html`, player en `/player.html?screen=NOMBRE`, emparejar en
 `/pair`.
 
+**Un fallo visual se verifica renderizando, no leyendo.** Costó dos arreglos
+fallidos el 2026-08-11 (un título que se recortaba: el primer arreglo parecía
+impecable y no hacía nada). La receta que funciona, sin dependencias nuevas:
+
+```
+SIGNALOS_DATA=<temporal> python server.py --port 8099     # servidor de pruebas
+```
+
+y una página con un `<iframe src="player.html?preview=1">` que le inyecta el
+item por `postMessage` — igual que hace el admin. **El modo previa no abre
+SSE**, así que la página se queda quieta y se deja fotografiar; contra
+`player.html?screen=X` el navegador nunca termina de cargar y la captura se
+cuelga. Después:
+
+```
+chrome --headless --disable-gpu --virtual-time-budget=6000 \
+       --window-size=1280,720 --screenshot=out.png  http://127.0.0.1:8099/marco.html
+chrome ... --dump-dom                       # para LEER medidas en vez de mirarlas
+```
+
+Con `--dump-dom` y un `<div>` donde el marco escribe `getBoundingClientRect()`
+del iframe (mismo origen, se puede leer) se miden alineaciones y tamaños reales.
+Así se descubrió que el logo medía 92 px donde su CSS pedía 20, y que un
+supuesto desalineado de las cotizaciones era 1 px —la foto estaba tomada de
+lado—. **Ojo:** `Select-Object -First N` en PowerShell corta la tubería y mata
+al compilador o al navegador a media faena; dejó un instalador truncado que
+parecía bueno.
+
 **Tests:** `tests/schedule.test.js` extrae las funciones directamente de
 `player.html` y las ejecuta en un `vm` de Node con un `Date` falso inyectado.
 Se hace así porque el JS es inline en un HTML monolítico y no hay nada que
@@ -249,6 +318,17 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
 1. **Asistente de primer arranque para el puerto** — `config.json` mantiene
    `first_run: true` pero nadie lo lee. El único flujo de "primera vez" que
    existe es el de contraseña, en `login.html`.
+
+   Del mismo tipo y peor: **la casilla «Iniciar con Windows» de Ajustes no la
+   lee nadie**. `admin.html` la guarda en `config.json` (`autostart`) y el
+   único `autostart` de `server.py` es el valor por defecto. El arranque real
+   lo da la tarea programada que registra el instalador, y eso significa que
+   quien desmarque esa casilla creyendo que apaga el arranque no apaga nada, y
+   quien la marque creyendo que lo enciende se queda sin servidor tras un
+   reinicio. O se cablea a `registrar-tarea.ps1` o se quita del panel.
+   Comprobado en el equipo de desarrollo el 2026-08-12: la tarea **no está
+   registrada** y el servidor no arrancaría solo tras un corte de luz.
+
 2. **Unificar las dos rutas de distribución** (Python vs Electron) o decidir
    explícitamente cuál se abandona.
 3. ~~**Cierre del navegador en TVs LG (webOS)**~~ — **cerrado el 2026-08-11**,
@@ -316,6 +396,12 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
    luz, si aguanta que el WiFi caiga de madrugada, si arranca de verdad al
    encender el televisor. Ese bucle va al ritmo de quien tenga el stick
    delante, no al de quien escribe el código.
+
+6. **Bot de Telegram que responda, no solo que avise.** Un `/estado` que
+   conteste la última conexión de cada pantalla y cuándo se actualizó cada
+   tablero. Decidido con el usuario el 2026-08-12 —un solo comando, solo
+   lectura, `getUpdates` con espera larga— y **sin implementar**. El diseño
+   está en `docs/superpowers/specs/2026-08-12-bot-telegram-estado-design.md`.
 
 ## Gotchas de despliegue
 
