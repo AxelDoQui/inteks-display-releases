@@ -120,3 +120,73 @@ test("un error de verdad del servidor se avisa y no se confunde con un conflicto
   assert.strictEqual(r.loadAlls, 0, "un 500 no significa que otro equipo escribiera");
   assert.strictEqual(r.recargas, 0);
 });
+
+// ── Lo mismo, pero para saveScreensConfig(): crear pantalla, asignar
+// playlist y videowall pasan todos por aqui, y mandaban content.screens
+// entero SIN rev hasta este arreglo — un panel con datos viejos podia borrar
+// en silencio lo que guardo otro.
+function extraerFuenteScreens() {
+  const src = fs.readFileSync(ADMIN, "utf8");
+  const from = src.indexOf("async function saveScreensConfig()");
+  const to = src.indexOf("async function comprobarActualizacion");
+  if (from === -1 || to === -1 || to <= from) {
+    throw new Error(
+      "No se encuentran saveScreensConfig()/comprobarActualizacion() en admin.html. " +
+      "Si se han renombrado, actualiza los marcadores de este arnés."
+    );
+  }
+  return src.slice(from, to);
+}
+
+async function guardarScreensCon(respuesta, contenido = { screens: { TV: {} }, rev: 7 }) {
+  const registro = { enviado: null, toasts: [], recargas: 0, loadAlls: 0 };
+  const ctx = {
+    content: contenido,
+    async fetch(url, opciones) {
+      registro.enviado = { url, cuerpo: JSON.parse(opciones.body) };
+      return {
+        status: respuesta.status,
+        ok: respuesta.status >= 200 && respuesta.status < 300,
+        json: async () => respuesta.cuerpo,
+      };
+    },
+    toast(msg, isErr) { registro.toasts.push({ msg, isErr: !!isErr }); },
+    async loadAll() { registro.loadAlls++; },
+    location: { reload() { registro.recargas++; } },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(extraerFuenteScreens(), ctx);
+  await ctx.saveScreensConfig();
+  return registro;
+}
+
+test("saveScreensConfig manda rev y screens envueltos, no el dict suelto", async () => {
+  const r = await guardarScreensCon({ status: 200, cuerpo: { ok: true } });
+  assert.strictEqual(r.enviado.url, "/api/screens/config");
+  assert.strictEqual(r.enviado.cuerpo.rev, 7);
+  assert.deepStrictEqual(r.enviado.cuerpo.screens, { TV: {} });
+});
+
+test("saveScreensConfig: un guardado normal no molesta al usuario", async () => {
+  const r = await guardarScreensCon({ status: 200, cuerpo: { ok: true } });
+  assert.deepStrictEqual(r.toasts, []);
+  assert.strictEqual(r.recargas, 0);
+  assert.strictEqual(r.loadAlls, 0);
+});
+
+test("saveScreensConfig: ante un 409 de conflicto avisa y recarga los datos", async () => {
+  const r = await guardarScreensCon({
+    status: 409, cuerpo: { ok: false, error: "rev_conflict", rev: 42 },
+  });
+  assert.strictEqual(r.toasts.length, 1, "el usuario tiene que enterarse");
+  assert.strictEqual(r.loadAlls, 1, "hay que traer lo que escribió el otro equipo");
+  assert.strictEqual(r.recargas, 0);
+});
+
+test("saveScreensConfig: una pestaña cacheada de antes recarga en vez de avisar", async () => {
+  const r = await guardarScreensCon({
+    status: 409, cuerpo: { ok: false, error: "rev_stale_client" },
+  });
+  assert.strictEqual(r.recargas, 1);
+  assert.deepStrictEqual(r.toasts, []);
+});

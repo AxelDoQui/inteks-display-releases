@@ -22,7 +22,7 @@ import urllib.request
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.10"
+APP_VERSION = "1.0.11"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -1751,10 +1751,27 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/screens/config":
             try:
                 d = json.loads(body)
-                with contenido_en_edicion() as content:
-                    content["screens"] = d
-                # Notificar a todas las pantallas afectadas
-                for sid in d.keys(): notify_screen(sid)
+                enviado = d.get("rev")
+                try:
+                    with contenido_en_edicion() as content:
+                        # Mismo hueco que /api/content: 'd' es una foto completa
+                        # de content["screens"], así que sin esta comprobación un
+                        # panel con datos viejos borra en silencio lo que guardó
+                        # otro (playlist asignada, videowall...).
+                        actual = int(content.get("rev", 0))
+                        if enviado is None or int(enviado) != actual:
+                            raise RevConflicto(actual)
+                        nuevo = d.get("screens", {})
+                        content["screens"] = nuevo
+                except RevConflicto as c:
+                    if enviado is None:
+                        jresp(409, {"ok": False, "error": "rev_stale_client"}); return
+                    jresp(409, {"ok": False, "error": "rev_conflict", "rev": c.actual}); return
+                # Notificar a las pantallas afectadas y a otros paneles admin:
+                # el panel escucha en sse_clients["admin"], que queda fuera de
+                # 'nuevo' porque nunca es un id de pantalla real.
+                for sid in nuevo.keys(): notify_screen(sid)
+                notify_screen("admin")
                 ok()
             except Exception as e: err(e)
             return
@@ -1778,6 +1795,7 @@ class Handler(BaseHTTPRequestHandler):
                         content.get("screens", {}).pop(sid, None)
                 # Avisar a la tablet de esa pantalla para que se desconecte (vuelva a emparejar)
                 notify_deleted(sid)
+                notify_screen("admin")  # que otros paneles abiertos refresquen la lista
                 # Soltar cualquier conexión SSE asociada a esa pantalla
                 with sse_lock:
                     sse_clients.pop(sid, None)

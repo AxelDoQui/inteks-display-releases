@@ -156,6 +156,36 @@ def main():
         ok = item["title"] == "OTRO TITULO"
         print(f"  {'ok  ' if ok else 'FALLO'} un titulo explicito si se aplica")
         failed += not ok
+
+        # ── La ventanilla/agente (Ria y similares) llega hasta la pantalla ──
+        # Antes sidebar.js la calculaba para elegir la tasa y la tiraba antes de
+        # mandarla; ahora tiene que sobrevivir para que el cliente la vea.
+        json.dump({"items": [dict(MODULO)],
+                   "screens": {"TV": {"mode": "independent", "playlist": [dict(MODULO)]}}},
+                  open(cpath, "w"))
+        post(base + "/api/fx-update", {"rows": [
+            {"flag": "co", "country": "Colombia", "currency": "Peso", "code": "COP",
+             "rate": "4100", "agent": "Davivienda"},
+        ], "screen_ids": ["TV"]})
+        item = json.load(open(cpath))["screens"]["TV"]["playlist"][0]
+        ok = item["rows"][0].get("agent") == "Davivienda"
+        print(f"  {'ok  ' if ok else 'FALLO'} la ventanilla/agente llega hasta la pantalla")
+        failed += not ok
+
+        lib = json.load(open(cpath))["items"][0]
+        ok = lib["rows"][0].get("agent") == "Davivienda"
+        print(f"  {'ok  ' if ok else 'FALLO'} y tambien a la copia de la libreria")
+        failed += not ok
+
+        # Una fila sin agente (cambio normal) no se inventa uno
+        post(base + "/api/fx-update", {"rows": [
+            {"flag": "ar", "country": "Argentina", "currency": "Peso", "code": "ARS", "rate": "1900"},
+        ], "screen_ids": ["TV"]})
+        item = json.load(open(cpath))["screens"]["TV"]["playlist"][0]
+        fila_ars = next(r for r in item["rows"] if r["code"] == "ARS")
+        ok = not fila_ars.get("agent")
+        print(f"  {'ok  ' if ok else 'FALLO'} una fila sin ventanilla no se inventa una")
+        failed += not ok
     finally:
         proc.terminate()
         try:

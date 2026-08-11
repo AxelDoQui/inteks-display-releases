@@ -685,7 +685,7 @@ function buildFxSlide(item){
       <div class="fx-flag">${flagImg(r.flag,"100%")}</div>
       <div class="fx-country">
         <div class="fx-country-name">${r.country||""}</div>
-        <div class="fx-currency">${r.currency||""}</div>
+        <div class="fx-currency">${r.currency||""}${r.agent?` · ${r.agent}`:""}</div>
       </div>
       <div class="fx-rate">
         <div class="fx-rate-val">${r.rate||"—"}</div>

@@ -8,6 +8,31 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.11 — 2026-08-11
+
+### Nuevo
+
+- **La ventanilla del agente de pago (Ria y similares) ya se ve en la
+  pantalla.** Cuando una moneda se cobra por varios agentes (Davivienda,
+  4-72...), la extensión de Chrome ya elegía uno para calcular la tasa, pero
+  esa elección se quedaba solo en el ordenador que la mandaba. Ahora aparece
+  también en el cartel, bajo el país, para que el cliente sepa a qué
+  ventanilla dirigirse. El campo también se puede escribir a mano en el
+  admin, para tableros hechos pegando texto o leyendo una imagen.
+
+### Corregido
+
+- **Crear una pantalla, asignarle una playlist o configurar un videowall
+  desde dos paneles todavía se pisaba.** El arreglo de la 1.0.10 cubrió el
+  guardado general y las tasas de cambio, pero se dejó fuera esta otra vía:
+  no avisaba a otros paneles abiertos ni comprobaba si alguien había
+  guardado algo mientras tanto, así que un panel con datos viejos podía
+  borrar en silencio lo que acababa de configurar otro equipo. Ahora se
+  comporta igual que el resto: avisa y rechaza el guardado caducado en vez
+  de sobrescribir a ciegas.
+
+---
+
 ## 1.0.10 — 2026-08-10
 
 ### Corregido

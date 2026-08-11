@@ -289,7 +289,10 @@ async function enviarAServidor() {
   const screenId = document.getElementById('screen-select').value;
   btn.textContent = 'Enviando...'; btn.disabled = true;
   const payload = {
-    rows: selectedRows.map(r => ({ flag: r.flag, country: r.country, currency: r.currency, code: r.code, rate: r.rate })),
+    // agent: la ventanilla/agente de pago elegido (Ria y similares). Antes se
+    // calculaba solo para ayudar a elegir la tasa y se tiraba aquí; ahora viaja
+    // al servidor para que la pantalla del cliente pueda mostrarla.
+    rows: selectedRows.map(r => ({ flag: r.flag, country: r.country, currency: r.currency, code: r.code, rate: r.rate, agent: r.agent || undefined })),
     screen_ids: screenId ? [screenId] : []
   };
   try {

@@ -203,6 +203,72 @@ def prueba_5_fx_update_avisa_al_panel():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  5b. /api/screens/config tenia el mismo agujero que las tasas (5), y peor:
+#  ademas de no avisar al panel, escribia sin comprobar el rev. saveScreensConfig()
+#  manda una foto COMPLETA de content["screens"] (crear pantalla, asignar
+#  playlist, videowall...), asi que sin el rev un panel con datos viejos borra
+#  en silencio lo que guardo otro.
+# ─────────────────────────────────────────────────────────────────────────────
+def prueba_5b_screens_config_rechaza_rev_viejo(cpath):
+    fallos = 0
+    r = rev_actual()
+    antes = json.load(open(cpath))
+
+    codigo, cuerpo = peticion(BASE + "/api/screens/config",
+                              {"rev": r - 1, "screens": {"TV": {"mode": "independent",
+                                                                 "playlist": []}}},
+                              metodo="POST")
+    fallos += comprobar("/api/screens/config con rev viejo devuelve 409", codigo == 409,
+                        f"codigo {codigo}")
+    fallos += comprobar("el 409 dice rev_conflict",
+                        cuerpo.get("error") == "rev_conflict", str(cuerpo))
+
+    despues = json.load(open(cpath))
+    fallos += comprobar("no se ha escrito nada: el contenido esta intacto", antes == despues)
+
+    codigo, cuerpo = peticion(BASE + "/api/screens/config",
+                              {"screens": {"TV": {"mode": "independent", "playlist": []}}},
+                              metodo="POST")
+    fallos += comprobar("/api/screens/config sin rev devuelve 409", codigo == 409,
+                        f"codigo {codigo}")
+    fallos += comprobar("el 409 dice rev_stale_client",
+                        cuerpo.get("error") == "rev_stale_client", str(cuerpo))
+    return fallos
+
+
+def prueba_5c_screens_config_avisa_al_panel():
+    recibido = []
+
+    def escuchar():
+        try:
+            req = urllib.request.Request(BASE + "/api/events?screen=admin",
+                                         headers={"X-SignalOS-Token": TOKEN})
+            with urllib.request.urlopen(req, timeout=12) as r:
+                for linea in r:
+                    texto = linea.decode(errors="ignore").strip()
+                    if texto.startswith("data:"):
+                        recibido.append(texto)
+                        if "update:admin" in texto:
+                            return
+        except Exception:
+            pass
+
+    oyente = threading.Thread(target=escuchar, daemon=True)
+    oyente.start()
+    time.sleep(1.5)
+
+    r = rev_actual()
+    peticion(BASE + "/api/screens/config",
+             {"rev": r, "screens": {"TV": {"mode": "independent", "playlist": []}}},
+             metodo="POST")
+
+    oyente.join(timeout=8)
+    ok = any("update:admin" in m for m in recibido)
+    return comprobar("/api/screens/config avisa al panel por SSE (update:admin)", ok,
+                     f"recibido: {recibido}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  6. La carrera entre leer y escribir
 #
 #  load_json y save_json cierran cada uno su propio file_lock, pero el hueco
@@ -280,6 +346,8 @@ def main():
         fallos += prueba_3_rev_viejo_rechaza(cpath)
         fallos += prueba_4_sin_rev_rechaza()
         fallos += prueba_5_fx_update_avisa_al_panel()
+        fallos += prueba_5b_screens_config_rechaza_rev_viejo(cpath)
+        fallos += prueba_5c_screens_config_avisa_al_panel()
         fallos += prueba_6_subidas_simultaneas(cpath)
     finally:
         parar(proc, work)

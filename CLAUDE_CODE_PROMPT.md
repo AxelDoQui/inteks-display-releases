@@ -1,6 +1,6 @@
 # InTeks Display — Contexto para Claude Code
 
-> Actualizado: 10 de agosto de 2026. Este documento describe el estado **real** del
+> Actualizado: 11 de agosto de 2026. Este documento describe el estado **real** del
 > código. Si algo aquí no cuadra con lo que ves en los archivos, gana el código:
 > avísalo y se corrige el documento.
 
@@ -65,6 +65,14 @@ Ajustes · Ayuda
 `fx` (divisas) · `weather` · `ticker` · `text` · `url` · `video` · `comparison` ·
 `countdown` · `qr` · `product`. La imagen es la rama por defecto cuando el tipo
 no coincide con ninguno de los anteriores (`player.html:449`).
+
+Cada fila de `fx` admite un `agent` opcional (la ventanilla/agente de pago,
+caso Ria y similares con varios puntos de pago por moneda): si viene, el
+player la muestra bajo el país (`COP · Davivienda`); si no, la fila se ve
+igual que un tablero de cambio normal. La extensión de Chrome ya elegía un
+agente para decidir la tasa (`elegirAgente` en `parser.js`) pero lo
+descartaba antes de mandarlo — desde 1.0.11 viaja hasta la pantalla. También
+se puede escribir a mano en el editor de filas del admin.
 
 Otras capacidades del player: rotación arbitraria vía `config.rotation`,
 videowall en dos pantallas (`wall_mode` + `wall_pos`, que recorta la imagen con
@@ -245,6 +253,16 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
    arreglo de raíz es guardado granular por entidad (`/api/items/<id>`), que
    hoy es desproporcionado: `saveContentLocal()` se llama desde doce sitios de
    un `admin.html` de 214 KB.
+
+   **No confundir con el arreglo de la 1.0.11**, que es otro fallo distinto:
+   `/api/screens/config` (crear pantalla, asignar playlist, videowall —
+   `saveScreensConfig()`) sobrescribía `content["screens"]` sin comprobar
+   `rev` y sin avisar a otros paneles, así que un panel con datos viejos
+   podía borrar en silencio lo que acababa de guardar otro equipo — el mismo
+   síntoma que el fallo de las tasas que arregló la 1.0.10, pero en la ruta
+   de pantallas. Ya tiene el mismo `rev`/409 que `/api/content`. El punto 4
+   de aquí arriba sigue sin arreglar: es el caso, más raro, de estar
+   tecleando en el mismo instante en que llega un SSE.
 5. **App propia de reproductor para Android TV** — un navegador de kiosco
    hecho a medida, para sticks tipo Xiaomi/Google TV. El núcleo es pequeño:
    un `WebView` a pantalla completa apuntado a
@@ -290,3 +308,19 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
   `localhost`. El instalador no crea esta regla. Se soluciona con:
   `New-NetFirewallRule -DisplayName "InTeks Display (HTTP)" -Direction Inbound -Protocol TCP -LocalPort 80,9000 -Action Allow -Profile Private`
   (requiere PowerShell como administrador).
+
+- **`pick_data_dir()` no siempre elige la carpeta esperada — sin explicar
+  todavía.** Al montar una copia de prueba en una carpeta temporal (server.py
+  + estáticos + `content.json` propio) para comprobar un cambio a mano,
+  `/api/playlist?screen=X` devolvía `{"config": {}}` — como si el
+  `content.json` de esa carpeta no existiera — a pesar de que el archivo en
+  disco tenía la pantalla configurada y `APP_DIR` (junto al programa, que en
+  ese caso era la propia carpeta temporal) debería pasar la prueba de
+  escritura de `pick_data_dir()` sin caer a `ProgramData`. Ni `ProgramData\
+  InTeks Display` ni `~\InTeks Display` tenían el `content.json` esperado
+  tampoco. Sin investigar a fondo — quedó rodeado en vez de resuelto,
+  verificando el cambio con la función real de `player.html` ejecutada en
+  Node en lugar de contra un servidor vivo. Si vuelve a pasar: mirar primero
+  si `pick_data_dir()` cachea `DATA_DIR` en algún sitio entre arranques, o si
+  la prueba de escritura (`.signalos-escritura`) puede fallar por un
+  antivirus/EDR que bloquee la escritura en `%TEMP%` sin lanzar `OSError`.
