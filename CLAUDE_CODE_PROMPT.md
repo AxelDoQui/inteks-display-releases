@@ -327,8 +327,8 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
   regla de entrada explícita para el puerto usado (80/9000 típicamente), un
   TV o tablet en la misma red se queda cargando indefinidamente (no da error,
   simplemente no responde) aunque el PC vea al servidor perfectamente por
-  `localhost`. **Desde 1.0.13 la crea el instalador**, en
-  `installer\registrar-tarea.ps1` (`Abrir-Cortafuegos`), leyendo los puertos de
+  `localhost`. **Desde 1.0.14 la crea el instalador**, en
+  `installer\registrar-tarea.ps1` (`AbrirCortafuegos`), leyendo los puertos de
   `config.json`. A mano:
   `New-NetFirewallRule -DisplayName "InTeks Display (HTTP)" -Direction Inbound -Protocol TCP -LocalPort 80,9000 -Action Allow -Profile Any`
 

@@ -13,11 +13,17 @@
 # carpeta de datos.
 #
 # Uso:  registrar-tarea.ps1 -AppDir "C:\Program Files\InTeks Display"
+#       registrar-tarea.ps1 -AppDir "..." -SoloFirewall   (solo abrir el puerto)
 #       registrar-tarea.ps1 -Quitar
 
 param(
     [string]$AppDir,
-    [switch]$Quitar
+    [switch]$Quitar,
+    # Solo la regla del cortafuegos, sin tocar la tarea. El instalador lo llama
+    # asi SIEMPRE, marque o no el usuario el arranque automatico: sin la regla
+    # ninguna pantalla llega al servidor, y eso no puede depender de una casilla
+    # que habla de otra cosa.
+    [switch]$SoloFirewall
 )
 
 $TAREA = "InTeks Display"
@@ -26,7 +32,7 @@ $TAREA = "InTeks Display"
 $TAREAS_VIEJAS = @("SignalOS Pro", "SignalOS")
 $REGLA = "InTeks Display (HTTP)"
 
-function Abrir-Cortafuegos($dir) {
+function AbrirCortafuegos($dir) {
     # Sin esta regla, el servidor funciona perfectamente en el propio PC y NO
     # responde a ningun otro aparato: el televisor o la tablet se quedan
     # cargando indefinidamente, sin error ni mensaje, porque un paquete
@@ -70,6 +76,11 @@ if ($Quitar) {
     foreach ($t in @($TAREA) + $TAREAS_VIEJAS) { schtasks /Delete /TN $t /F 2>$null | Out-Null }
     Get-NetFirewallRule -DisplayName $REGLA -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction SilentlyContinue
     Write-Host "Tarea '$TAREA' eliminada."
+    exit 0
+}
+
+if ($SoloFirewall) {
+    AbrirCortafuegos $AppDir
     exit 0
 }
 
@@ -133,7 +144,12 @@ Write-Host "servidor: $servidor"
 # arranca pero al que no llega ninguna pantalla no sirve de nada, y al reves
 # tampoco. Son dos cosas independientes y ninguna debe llevarse a la otra por
 # delante si falla.
-Abrir-Cortafuegos $AppDir
+#
+# Durante la instalacion esto se ejecuta dos veces —el instalador ya llamo con
+# -SoloFirewall— y da igual: la funcion borra la regla antes de crearla, asi
+# que es repetible. Se deja aqui para que quien repare una instalacion a mano
+# lanzando este script se lleve las dos cosas y no solo una.
+AbrirCortafuegos $AppDir
 
 try {
     $accion = New-ScheduledTaskAction -Execute $pythonw -Argument "`"$servidor`"" -WorkingDirectory $AppDir

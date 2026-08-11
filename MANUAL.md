@@ -279,7 +279,7 @@ Firewall de Windows, que por defecto bloquea las conexiones que llegan de otros
 aparatos aunque el PC vea el servidor perfectamente por sí mismo. Y no da
 error: se queda cargando y ya, porque un paquete bloqueado no contesta nada.
 
-Desde la versión 1.0.13 **el instalador crea la regla solo**. Si vienes de una
+Desde la versión 1.0.14 **el instalador crea la regla solo**. Si vienes de una
 instalación anterior, en el PC, PowerShell **como administrador**:
 ```powershell
 New-NetFirewallRule -DisplayName "InTeks Display (HTTP)" -Direction Inbound -Protocol TCP -LocalPort 80,9000 -Action Allow -Profile Any

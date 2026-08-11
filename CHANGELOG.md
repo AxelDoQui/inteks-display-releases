@@ -8,6 +8,18 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.14 — 2026-08-11
+
+### Corregido
+
+- **La regla del cortafuegos se crea aunque no marques el arranque
+  automático.** En la 1.0.13 iba dentro del mismo paso que registra el
+  arranque con Windows, así que quien desmarcara esa casilla se quedaba sin
+  regla y sin saberlo: el panel funcionaba y las pantallas no entraban. Son
+  dos cosas distintas y ahora van por separado.
+
+---
+
 ## 1.0.13 — 2026-08-11
 
 ### Corregido

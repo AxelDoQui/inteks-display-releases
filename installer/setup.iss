@@ -7,12 +7,12 @@
 
 [Setup]
 AppName=InTeks Display
-AppVersion=1.0.13
+AppVersion=1.0.14
 AppPublisher=InTeks Solutions
 DefaultDirName={autopf}\InTeks Display
 DefaultGroupName=InTeks Display
 OutputDir=..\dist\installer
-OutputBaseFilename=InTeks_Display_Setup_v1.0.13
+OutputBaseFilename=InTeks_Display_Setup_v1.0.14
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -128,6 +128,16 @@ Name: "{group}\Desinstalar"; Filename: "{uninstallexe}"
 Name: "{commondesktop}\InTeks Display"; Filename: "{app}\abrir-panel.bat"; WorkingDir: "{app}"; IconFilename: "{app}\assets\icon.ico"; Tasks: desktopicon
 
 [Run]
+; Abrir el puerto en el cortafuegos. SIN "Tasks:", a propósito: esto se hace
+; siempre. Sin la regla, el servidor funciona en el propio PC y ninguna pantalla
+; llega a él —se quedan cargando, sin error—, y eso no puede depender de que el
+; usuario marque una casilla que habla del arranque automático. Es también el
+; único momento en que hay permisos de administrador garantizados.
+Filename: "powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\registrar-tarea.ps1"" -AppDir ""{app}"" -SoloFirewall"; \
+  StatusMsg: "Permitiendo el acceso de las pantallas..."; \
+  Flags: runhidden waituntilterminated
+
 ; Registrar el servidor como tarea al encender el equipo. Corre como SYSTEM con
 ; pythonw.exe: sin ventana que cerrar y sin depender de que alguien inicie
 ; sesión. Windows la reinicia sola si el proceso se cae.
