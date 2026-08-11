@@ -48,6 +48,48 @@ identidad viaja en la URL y ningún borrado la alcanza.
 
 ---
 
+## Con qué reproducir: el televisor o una cajita
+
+Cualquier televisor con navegador vale para empezar, y para una pantalla que se
+apaga por la noche suele ir bien. Pero **el navegador de fábrica de un Smart TV
+no está pensado para tener una página abierta doce horas seguidas**, y cuando
+falla no avisa: cierra la página y deja el escaparate en negro.
+
+Pasó de verdad, en una tienda, con un LG: el navegador se cerraba solo cada dos
+minutos. No era el protector de pantalla, ni el ahorro de energía, ni el
+HDMI-CEC, ni InTeks Display — se probó con la versión corregida y siguió igual.
+Se resolvió **cambiando el aparato, no la página**.
+
+**La recomendación, si la pantalla tiene que estar encendida todo el día:** una
+caja Android barata (o un Fire TV Stick, o un mini PC) enchufada al HDMI del
+televisor, con la app **Fully Kiosk Browser** (~7 €, pago único). El televisor
+pasa a ser solo la pantalla. Es lo que está funcionando hoy en la tienda del
+caso de arriba.
+
+### Cómo se deja montada
+
+1. Enlaza la caja como una pantalla normal (ver arriba) y, en su tarjeta del
+   panel, pulsa **copiar enlace directo**.
+2. Instala Fully Kiosk en la caja y pega ese enlace en **Start URL**. Va con el
+   nombre de la pantalla dentro, así que la identidad viaja en la dirección y
+   no se pierde aunque la caja se reinicie o se borre su memoria.
+3. Activa, en los ajustes de Fully Kiosk:
+   - **Keep Screen On** — la pantalla no se apaga sola.
+   - **Start on Boot** — al volver la luz, arranca sin que nadie toque nada.
+   - **Kiosk Mode** — nadie sale de la aplicación con el mando por error.
+   - Y **desactiva el salvapantallas** de la propia app (*Screensaver*), que
+     viene puesto y taparía el contenido.
+
+Los nombres son los de la app en inglés y pueden cambiar un poco de una versión
+a otra.
+
+**No hace falta configurar nada más.** El reproductor ya se ocupa solo del
+resto: se reconecta cuando vuelve la red, guarda las imágenes y los vídeos en
+el propio aparato para sobrevivir a un arranque con el servidor apagado, y se
+refresca cada cuatro horas por seguridad.
+
+---
+
 ## Contenido
 
 ### Librería y playlists
@@ -244,10 +286,14 @@ firewall.
 televisores (el navegador integrado de LG webOS es un caso conocido, según su
 propio soporte) cierran páginas que llevan mucho abiertas por límites de
 memoria del propio televisor, no por InTeks Display. Revisa primero que el
-protector de pantalla y el ahorro de energía estén apagados en el TV. Si
-sigue pasando, la solución más fiable es no depender del navegador de fábrica:
-un Fire TV Stick, mini PC o Android box barato en modo kiosco es mucho más
-estable para tener una pantalla encendida todo el día.
+protector de pantalla y el ahorro de energía estén apagados en el TV.
+
+Si sigue pasando, **no pierdas tiempo peleándote con el televisor**: en el caso
+real que tuvimos no había nada que ajustar y no se arregló hasta cambiar de
+aparato. Ver *Con qué reproducir*, más arriba. La pantalla configurada no se
+pierde: cuando la caja nueva enseñe su código, usa el desplegable **«reenlazar
+a: …»** y elige la pantalla que era. Hereda su playlist, su horario y su
+rotación tal cual.
 
 **El escaparate se queda con contenido viejo.** Las pantallas guardan lo último
 reproducido y las imágenes en el propio televisor, así que aguantan sin

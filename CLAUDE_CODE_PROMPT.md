@@ -231,29 +231,9 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
    existe es el de contraseña, en `login.html`.
 2. **Unificar las dos rutas de distribución** (Python vs Electron) o decidir
    explícitamente cuál se abandona.
-3. **Cierre del navegador en TVs LG (webOS) sin causa clara** — un caso real
-   en campo: el navegador integrado se cierra cada ~2 minutos incluso con una
-   playlist de solo imágenes. Se descartaron protector de pantalla, ahorro de
-   energía, HDMI-CEC/SimpLink y domótica. Se aplicaron dos mitigaciones del
-   lado del código (fuga de reconexión SSE arreglada, recarga de seguridad
-   cada 4h) que no explican por sí solas un cierre tan rápido y regular.
-   Investigación en pausa a la espera de una prueba de control (una web
-   cualquiera en el mismo navegador) que aísle si es del TV o de la página.
-
-   **Revisado el 2026-08-11: la fuga explica el cierre mucho mejor de lo que
-   decía este apunte.** La valoración anterior asumía acumulación lineal («se
-   acumulaban con las horas»), y no lo es: un `EventSource` con error
-   *reintenta solo*, por defecto. Sin el `es.close()` que faltaba, la conexión
-   muerta seguía reintentando por su cuenta **y además** se creaba una nueva
-   cada 4 s, que a su vez fallaba y hacía lo mismo. Crece multiplicándose, no
-   sumando: con un WiFi flojo son decenas de conexiones en dos minutos.
-   Queda por saber si el arreglo (1.0.8) llegó a la tienda. Que el código
-   estuviera sin commitear hasta el 2026-08-10 no implica que no se compilara:
-   los instaladores de 1.0.7, 1.0.8 y 1.0.9 están en `dist/installer/` con
-   fecha de ese mismo día. **Primer paso, antes de teorizar nada: mirar qué
-   versión corre la tienda** (`/api/info` lo devuelve, o el panel). Si es
-   anterior a la 1.0.8, actualizar y volver a observar; si ya la tenía y sigue
-   cayéndose, la fuga queda descartada y toca la prueba de control.
+3. ~~**Cierre del navegador en TVs LG (webOS)**~~ — **cerrado el 2026-08-11**,
+   y no por código. Ver «El navegador de un Smart TV se cierra solo» en
+   *Gotchas de despliegue*.
 4. **Preservar ediciones a medias durante un repintado** — `admin.html` hace
    `es.onmessage=()=>loadAll()`, que reconstruye la interfaz ante cualquier
    aviso SSE y se lleva por delante lo que hubiera a medio escribir. Es un
@@ -286,7 +266,15 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
    alternativa de mercado (Fully Kiosk Browser, ~7 €) lleva años resolviendo
    lo que de verdad muerde —fiabilidad del arranque automático en cada
    fabricante, restricciones de segundo plano, recuperación tras un cierre—,
-   y eso no son 200 líneas. Además mete un segundo lenguaje y un SDK con
+   y eso no son 200 líneas.
+
+   **Ya no es hipotética: está en producción desde el 2026-08-11.** La tienda
+   del LG funciona con una caja Android y Fully Kiosk. Eso rebaja la urgencia
+   de escribir la app propia —lo que había que arreglar ya está arreglado— y a
+   la vez da lo que faltaba para decidirlo bien: una referencia de campo
+   contra la que comparar. El día que se escriba, la vara de medir no es «un
+   WebView que pinta el player», es «igual de fiable que Fully, sin pagar 7 €
+   por pantalla ni explicarle a nadie qué es un APK». Además mete un segundo lenguaje y un SDK con
    Gradle en un proyecto cuya regla fundacional es *sin paso de compilación*.
 
    **Se hace el día que el problema sea la instalación en tienda nueva**, no
@@ -310,6 +298,29 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
    delante, no al de quien escribe el código.
 
 ## Gotchas de despliegue
+
+- **El navegador de un Smart TV se cierra solo, y no hay arreglo por código.**
+  Caso real y cerrado: un LG con webOS cerraba el navegador integrado cada ~2
+  minutos, incluso con una playlist de solo imágenes. Se descartaron protector
+  de pantalla, ahorro de energía, HDMI-CEC/SimpLink y domótica. Se aplicaron
+  dos mitigaciones —la fuga de reconexión SSE y la recarga de seguridad cada
+  4 h— y **con la 1.0.8 o posterior ya instalada en esa tienda, la tele se
+  seguía cerrando igual**. Se resolvió sustituyendo el navegador del televisor
+  por una caja Android con **Fully Kiosk Browser**, que lleva funcionando
+  desde entonces.
+
+  **La fuga de SSE queda descartada como causa** de este caso. El arreglo se
+  queda por mérito propio: era un fallo real y feo —un `EventSource` con error
+  reintenta solo por defecto, así que sin el `es.close()` la conexión muerta
+  seguía reintentando **y además** se creaba una nueva cada 4 s—, pero no era
+  esto. La prueba de control que quedaba pendiente (una web cualquiera en el
+  mismo navegador) ya no se hará: el televisor está fuera de producción.
+
+  **Qué sacar en limpio:** ante un navegador de fábrica que se cierra, el
+  camino corto es cambiar el aparato, no seguir apuntalando la página. El
+  player ya sobrevive a un arranque en frío sin servidor, así que sustituir el
+  reproductor no cuesta nada más que enchufarlo y pegar el enlace directo. La
+  configuración concreta está en `MANUAL.md` → *Con qué reproducir*.
 
 - **Windows Firewall bloquea el acceso desde otros dispositivos por
   defecto.** El servidor escucha en `0.0.0.0` sin problema, pero sin una
