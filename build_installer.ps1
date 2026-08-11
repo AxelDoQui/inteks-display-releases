@@ -29,6 +29,34 @@ Write-Host "Compilando instalador..." -ForegroundColor Cyan
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "`n✓ Instalador compilado correctamente" -ForegroundColor Green
+
+    # Dejar solo el recien compilado.
+    #
+    # El nombre del .exe lleva la version dentro a proposito (setup.iss,
+    # OutputBaseFilename): sin eso salian varios instaladores distintos
+    # llamados igual y no habia forma de saber cual tenia cada tienda. El
+    # efecto secundario era que se acumulaban todos —cinco versiones, 60 MB—
+    # y volvia la misma duda por el otro lado: cual de los cinco hay que
+    # llevarse. Se borran aqui y no antes de compilar, para no quedarse sin
+    # ninguno si la compilacion falla.
+    #
+    # Si alguna vez hace falta una version anterior, se reconstruye: el
+    # historial de git la tiene, y tools\subir-version.ps1 deja los cuatro
+    # sitios coherentes.
+    $m = Select-String -Path $setupPath -Pattern '^OutputBaseFilename=(.+)$' | Select-Object -First 1
+    if ($m) {
+        $actual = $m.Matches[0].Groups[1].Value.Trim()
+        $viejos = Get-ChildItem $distPath -Filter "InTeks_Display_Setup_v*.exe" -ErrorAction SilentlyContinue |
+                  Where-Object { $_.BaseName -ne $actual }
+        foreach ($v in $viejos) {
+            Remove-Item $v.FullName -Force
+            Write-Host "  retirado $($v.Name)" -ForegroundColor DarkGray
+        }
+    } else {
+        # Sin poder leer que version se acaba de compilar, borrar seria a ciegas.
+        Write-Host "  aviso: no se pudo leer OutputBaseFilename, no se limpia nada" -ForegroundColor Yellow
+    }
+
     Write-Host "Ubicación: $distPath" -ForegroundColor Green
 } else {
     Write-Host "`n✗ Error compilando instalador" -ForegroundColor Red
