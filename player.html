@@ -584,14 +584,15 @@ async function loadPlaylist(){
       applyRotation(rot);
     }
     screenSchedule=d.config?.schedule||null;
+    // Se anota ANTES de pisar screenConfig: es la única forma de saber si el
+    // usuario acaba de activar o quitar el orden aleatorio.
+    const aleatorioAntes=!!(screenConfig&&screenConfig.shuffle);
     screenConfig=d.config||null;
     aplicarTransicion(screenConfig);
     lastContact=Date.now();
     updateScreenStatus();
-    // Rehacer el orden SIEMPRE, no solo si cambió la playlist: el usuario
-    // puede haber activado el aleatorio sin tocar el contenido.
     if(changed){playlist=d.playlist;rebuildSlides();}
-    rehacerOrden();
+    refrescarOrden(changed, !!(screenConfig&&screenConfig.shuffle)!==aleatorioAntes);
     if(changed&&playlist.length) showSlide(orden[0]||0);
     saveCache();
     // Descargar al televisor lo que aún no tenga. Va sin await a propósito: la
@@ -1084,15 +1085,31 @@ function setupFxPagination(slide, perPageMs, onDone){
   show();
 }
 
+// ── Ciclo de reproduccion ──────────────────────────────────────────────────
 // El ciclo va por una lista de indices, no por current+1. Asi el orden puede
 // ser el del usuario o uno barajado sin que showSlide se entere de nada.
-let orden=[], posOrden=0;
+var orden=[], posOrden=0;
 
 function rehacerOrden(){
   const aleatorio=!!(screenConfig&&screenConfig.shuffle);
   const ultimo=orden.length?orden[orden.length-1]:-1;
   orden=ordenReproduccion(playlist.length, aleatorio, ultimo);
   posOrden=0;
+}
+
+// Por aquí pasa el refresco periódico, cada 15 segundos.
+//
+// Rehacer el orden devuelve el puntero al principio, así que hacerlo en cada
+// refresco -como se hacía- dejaba la pantalla ATASCADA: con pases de 10 s, el
+// puntero volvía a cero cada 15 y el siguiente avance saltaba otra vez al
+// segundo contenido, una y otra vez. Los demás no aparecían nunca. Se vio en
+// una tienda con dos imágenes y dos tableros de divisas: solo salía uno.
+//
+// Se rehace solo cuando de verdad cambió algo. El caso que obligaba a mirar
+// siempre -que el usuario active el orden aleatorio sin tocar el contenido- se
+// resuelve comparando el ajuste, no reconstruyendo a ciegas.
+function refrescarOrden(cambioPlaylist, cambioAleatorio){
+  if(cambioPlaylist || cambioAleatorio || !orden.length) rehacerOrden();
 }
 
 function next(){
@@ -1104,6 +1121,7 @@ function next(){
   if(posOrden>=orden.length) rehacerOrden();
   showSlide(orden.length?orden[posOrden]:0);
 }
+// ── fin del ciclo ──────────────────────────────────────────────────────────
 
 document.addEventListener("keydown",e=>{
   if(e.key==="ArrowRight")next();

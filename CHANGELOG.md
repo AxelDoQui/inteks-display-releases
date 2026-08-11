@@ -8,6 +8,30 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.15 — 2026-08-11
+
+### Corregido
+
+- **La pantalla se quedaba repitiendo siempre el mismo contenido.** Con una
+  playlist de varios elementos, al cabo de la primera vuelta la pantalla se
+  atascaba en el segundo y los demás no volvían a salir. Se veía sobre todo
+  con pases de unos diez segundos: el reproductor pregunta al servidor por
+  novedades cada quince, y cada una de esas consultas devolvía el turno al
+  principio de la lista aunque no hubiera cambiado nada. Está en todas las
+  versiones desde que existe el orden aleatorio (1.0.5).
+- Como efecto de lo anterior, un tablero de divisas podía parecer que **duraba
+  mucho más de los segundos configurados**: en realidad volvía a empezar una y
+  otra vez.
+
+### Nota
+
+- Cuando un tablero tiene más divisas de las que caben en la pantalla, se
+  reparte en páginas y **cada página dura lo que hayas puesto en el contenido**.
+  Un tablero de dos páginas a 10 segundos ocupa 20. Es a propósito, para que dé
+  tiempo a leer, pero conviene saberlo al cuadrar los tiempos.
+
+---
+
 ## 1.0.14 — 2026-08-11
 
 ### Corregido
