@@ -94,6 +94,18 @@ def main():
         check("update_available" not in d or d.get("update_available") is False,
               "y no se inventa que hay actualizacion")
 
+        # ── La pantalla tiene que poder enterarse de que el servidor cambio ──
+        # Al instalar una version nueva, la pagina que el televisor lleva horas
+        # abierta sigue ejecutando el codigo viejo. Sin este dato en la
+        # respuesta, el arreglo tarda hasta 4 horas en verse o no se ve nunca.
+        # Paso de verdad con la 1.0.17.
+        pl = json.load(urllib.request.urlopen(
+            f"http://127.0.0.1:{PORT}/api/playlist?screen=TV", timeout=10))
+        import re as _re
+        srv_version = pl.get("version", "")
+        check(bool(_re.match(r"^\d+\.\d+\.\d+$", str(srv_version))),
+              f"la playlist dice que version sirve el servidor -> {srv_version!r}")
+
         try:
             consultar(PORT, tok=None)
             check(False, "deberia exigir autenticacion")

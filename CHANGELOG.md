@@ -8,6 +8,23 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.18 — 2026-08-12
+
+### Corregido
+
+- **Las pantallas se enteran de que has actualizado.** Hasta ahora, instalar
+  una versión nueva cambiaba el programa pero **no lo que estaba mostrando el
+  televisor**: la página llevaba horas abierta y seguía funcionando con el
+  código viejo. El arreglo tardaba hasta cuatro horas en verse —lo que tarda la
+  recarga de seguridad— o no se veía nunca si nadie reiniciaba el aparato.
+  Ahora, cuando el servidor cambia de versión, cada pantalla se recarga sola en
+  menos de un minuto.
+
+  Es la razón de que la 1.0.17 pareciera no haber arreglado nada: el servidor
+  ya estaba actualizado y el televisor seguía pintando lo de antes.
+
+---
+
 ## 1.0.17 — 2026-08-11
 
 ### Nuevo

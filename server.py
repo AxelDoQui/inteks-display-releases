@@ -22,7 +22,7 @@ import urllib.request
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.17"
+APP_VERSION = "1.0.18"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -1386,7 +1386,13 @@ class Handler(BaseHTTPRequestHandler):
                 playlist = [dict(item, wall_mode=True, wall_pos=wall_pos) for item in resuelta]
             else:
                 playlist = resuelta
-            result = {"playlist": playlist, "mode": mode, "screen_id": sid, "config": scr}
+            # La versión viaja aquí para que la pantalla note que el servidor se
+            # ha actualizado y recargue: el archivo del disco cambia al
+            # instalar, pero la página que el televisor lleva horas abierta
+            # sigue ejecutando el código viejo. Ver debeRecargarPorVersion() en
+            # player.html.
+            result = {"playlist": playlist, "mode": mode, "screen_id": sid,
+                      "config": scr, "version": APP_VERSION}
             self.send_response(200); self.send_header("Content-Type","application/json")
             self.cors(); self.end_headers(); self.wfile.write(json.dumps(result).encode()); return
 

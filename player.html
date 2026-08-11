@@ -479,6 +479,9 @@ function fechaTasas(item, ahoraMs){
 const OFFLINE_AFTER_MS=120000;                     // 2 min sin contacto = corte
 const CACHE_KEY="signalos_cache_"+SCREEN_ID;
 let lastContact=Date.now();
+// Versión del servidor la primera vez que respondió. Si cambia, esta página se
+// quedó con el código viejo. Ver debeRecargarPorVersion().
+let versionServidor="";
 
 function isOffline(desde, ahora){ return (ahora-desde)>OFFLINE_AFTER_MS; }
 
@@ -596,6 +599,10 @@ async function loadPlaylist(){
       const rot = (d.config && d.config.rotation!==undefined) ? d.config.rotation : (d.config && d.config.vertical ? 90 : 0);
       applyRotation(rot);
     }
+    // ¿Ha cambiado el servidor de versión desde que se cargó esta página? Si
+    // sí, el código que se está ejecutando es el viejo y hay que recargar.
+    if(!versionServidor) versionServidor=d.version||"";
+    else if(debeRecargarPorVersion(versionServidor, d.version)){ location.reload(); return; }
     screenSchedule=d.config?.schedule||null;
     // Se anota ANTES de pisar screenConfig: es la única forma de saber si el
     // usuario acaba de activar o quitar el orden aleatorio.
@@ -1179,6 +1186,23 @@ function setupFxPagination(slide, perPageMs, onDone){
   };
   show();
 }
+
+// ── Recarga por version ────────────────────────────────────────────────────
+// Al instalar una version nueva cambia el archivo en disco, pero la pagina que
+// el televisor lleva horas abierta SIGUE SIENDO LA DE ANTES: el contenido se
+// refresca por SSE, el codigo no. Sin esto, un arreglo tardaba hasta 4 horas en
+// verse -lo que tarda la recarga de seguridad- o no se veia nunca si la caja no
+// se reinicia. Paso de verdad con la 1.0.17: servidor actualizado, televisor
+// pintando el fallo de la version anterior.
+//
+// Tacano a proposito: recargar el escaparate se ve, asi que solo se hace cuando
+// hay dos versiones y son distintas. Un servidor viejo que no manda el dato, o
+// una respuesta a medias, no pueden provocar una recarga.
+function debeRecargarPorVersion(alCargar, ahora){
+  if(!alCargar || !ahora) return false;
+  return String(alCargar) !== String(ahora);
+}
+// ── fin de la recarga por version ──────────────────────────────────────────
 
 // ── Ventana de diapositivas ────────────────────────────────────────────────
 // Qué diapositivas se mantienen cargadas de verdad (con su imagen o su vídeo)
