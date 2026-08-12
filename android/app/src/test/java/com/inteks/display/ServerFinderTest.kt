@@ -63,4 +63,50 @@ class ServerFinderTest {
         assertTrue(!esRespuestaDeInTeks(""))
         assertTrue(!esRespuestaDeInTeks("{"))
     }
+
+    private val respuestaBuena = """{"mdns_name":"signage","player_url":"http://x/player.html"}"""
+
+    @Test
+    fun `encuentra el servidor y devuelve su url base`() {
+        val sondeador = object : Sondeador {
+            override fun pedir(url: String, timeoutMs: Int): String? =
+                if (url == "http://192.168.0.63/api/info") respuestaBuena else null
+        }
+        assertEquals("http://192.168.0.63", buscarServidor(RedLocal("192.168.0.64", 24), sondeador))
+    }
+
+    @Test
+    fun `si esta en el 9000 la url base lleva el puerto`() {
+        val sondeador = object : Sondeador {
+            override fun pedir(url: String, timeoutMs: Int): String? =
+                if (url == "http://192.168.0.70:9000/api/info") respuestaBuena else null
+        }
+        assertEquals("http://192.168.0.70:9000", buscarServidor(RedLocal("192.168.0.64", 24), sondeador))
+    }
+
+    @Test
+    fun `si no contesta nadie devuelve null`() {
+        val sondeador = object : Sondeador {
+            override fun pedir(url: String, timeoutMs: Int): String? = null
+        }
+        assertEquals(null, buscarServidor(RedLocal("192.168.0.64", 24), sondeador))
+    }
+
+    @Test
+    fun `un impostor que contesta pero no es InTeks no se elige`() {
+        val sondeador = object : Sondeador {
+            override fun pedir(url: String, timeoutMs: Int): String? = "<html>router</html>"
+        }
+        assertEquals(null, buscarServidor(RedLocal("192.168.0.64", 24), sondeador))
+    }
+
+    @Test
+    fun `en una red que no se puede barrer no se sondea nada`() {
+        var llamadas = 0
+        val sondeador = object : Sondeador {
+            override fun pedir(url: String, timeoutMs: Int): String? { llamadas++; return null }
+        }
+        assertEquals(null, buscarServidor(RedLocal("10.0.0.5", 16), sondeador))
+        assertEquals(0, llamadas)
+    }
 }

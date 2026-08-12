@@ -1,5 +1,13 @@
 package com.inteks.display
 
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+
+const val TIMEOUT_SONDA_MS = 1500
+const val SONDAS_EN_PARALELO = 32
+const val TOPE_BARRIDO_SEGUNDOS = 8L
+
 /**
  * Direcciones a sondear dentro de la subred del aparato.
  *
@@ -36,4 +44,39 @@ fun direccionesDeLaSubred(red: RedLocal): List<String> {
 fun esRespuestaDeInTeks(cuerpo: String?): Boolean {
     if (cuerpo.isNullOrBlank()) return false
     return cuerpo.contains("\"mdns_name\"") && cuerpo.contains("\"player_url\"")
+}
+
+/**
+ * Busca un InTeks Display en la subred. Devuelve la URL base, o null.
+ *
+ * Se sondea con un pool acotado en vez de una a una: 254 direcciones por dos
+ * puertos son 508 peticiones, y en serie a 1,5 s cada una serían 12 minutos.
+ */
+fun buscarServidor(
+    red: RedLocal,
+    sondeador: Sondeador,
+    puertos: List<Int> = listOf(80, 9000)
+): String? {
+    val direcciones = direccionesDeLaSubred(red)
+    if (direcciones.isEmpty()) return null
+
+    val encontrada = AtomicReference<String?>(null)
+    val pool = Executors.newFixedThreadPool(SONDAS_EN_PARALELO)
+    try {
+        for (ip in direcciones) {
+            for (puerto in puertos) {
+                pool.submit {
+                    if (encontrada.get() != null) return@submit
+                    val base = if (puerto == 80) "http://$ip" else "http://$ip:$puerto"
+                    val cuerpo = sondeador.pedir("$base/api/info", TIMEOUT_SONDA_MS)
+                    if (esRespuestaDeInTeks(cuerpo)) encontrada.compareAndSet(null, base)
+                }
+            }
+        }
+        pool.shutdown()
+        pool.awaitTermination(TOPE_BARRIDO_SEGUNDOS, TimeUnit.SECONDS)
+    } finally {
+        pool.shutdownNow()
+    }
+    return encontrada.get()
 }
