@@ -838,7 +838,7 @@ JPY  Yen        162.5"></textarea>
         <input type="checkbox" id="set-autostart" style="cursor:pointer;width:18px;height:18px">
         <span style="font-size:13px">Iniciar automáticamente con Windows</span>
       </label>
-      <p style="font-size:11px;color:var(--muted);margin-left:28px;margin-top:4px">Inicia el servidor automáticamente cuando enciendes el portátil</p>
+      <p style="font-size:11px;color:var(--muted);margin-left:28px;margin-top:4px">Crea o quita de verdad la tarea programada de Windows — el estado que ves aquí es el real, consultado en cada carga. Necesita permisos de administrador para cambiarlo.</p>
     </div>
   </div>
 
@@ -875,6 +875,33 @@ JPY  Yen        162.5"></textarea>
       <code style="display:block;background:var(--s2);padding:10px;border-radius:var(--r);margin:6px 0;font-size:11px">http://IP:8080/player.html?screen=pantalla1<br>http://IP:8080/player.html?screen=pantalla2</code>
       <p>3. Para girar la pantalla añade <code style="background:var(--s2);padding:2px 6px;border-radius:4px;font-family:monospace">&rotation=90</code> (0, 90, 180 o 270):</p>
       <code style="display:block;background:var(--s2);padding:10px;border-radius:var(--r);margin:6px 0;font-size:11px">http://IP/player.html?screen=pantalla3&rotation=90</code>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Extensión de Chrome (divisas) desde otro ordenador</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.9">
+      <p>Detecta tablas de tipos de cambio en cualquier web (Western Union, Ria...)
+      y las manda al panel con un clic, sin teclear nada. <strong style="color:var(--text)">No
+      hace falta que corra en este mismo ordenador</strong> — se instala una vez en
+      cualquier equipo con Chrome o Edge (menú Inicio → «Instalar extensión de
+      divisas», o cargándola a mano desde <code style="background:var(--s2);padding:2px 6px;border-radius:4px;font-family:monospace">chrome://extensions</code>
+      en modo desarrollador).</p>
+
+      <p>Al abrir su panel lateral, la primera vez pide dos datos:</p>
+
+      <p style="margin:4px 0 2px"><strong style="color:var(--text)">1. Servidor</strong> — la dirección de este panel:</p>
+      <code style="display:block;background:var(--s2);padding:10px;border-radius:var(--r);margin:6px 0;font-size:11px">Misma red:  http://signage.local   ó   http://IP-de-este-equipo<br>Desde fuera: la URL de acceso remoto, si la tenés configurada (https://tu-dominio.com)</code>
+
+      <p style="margin:4px 0 2px"><strong style="color:var(--text)">2. Token</strong> — se copia de
+      <em>Ajustes → Seguridad y acceso → Token de API</em>, aquí mismo en este panel, y
+      se pega una sola vez.</p>
+
+      <p>Con esos dos datos guardados, cada vez que se detecta una tabla de tasas
+      basta un clic para que lleguen a esta pantalla — funciona igual desde la
+      misma red que desde otra oficina, sin tocar nada más que el campo
+      Servidor. Si la extensión no conecta, casi siempre es que el cortafuegos
+      de Windows de este equipo no tiene abierto el puerto (ver <em>Cuando algo
+      falla</em> en el manual), o que el token no coincide con el de arriba.</p>
     </div>
   </div>
   <div class="card">
@@ -979,13 +1006,21 @@ JPY  Yen        162.5"></textarea>
         <span style="font-size:11px;color:var(--muted)">ms</span>
       </span>
       <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;margin-left:6px">
-        <input type="checkbox" id="plm-shuffle" style="cursor:pointer;width:16px;height:16px">
+        <input type="checkbox" id="plm-shuffle" style="cursor:pointer;width:16px;height:16px" onchange="cambioShuffle()">
         Orden aleatorio
       </label>
+      <span id="plm-priority-wrap" style="display:none;align-items:center;gap:6px;font-size:12px">
+        <span style="color:var(--muted)">prioridad ⭐ cada</span>
+        <input class="finput" id="plm-priority-every" type="number" min="2" max="50" step="1"
+               value="4" style="width:56px" title="Cada cuántos pases sale un contenido marcado con ⭐">
+        <span style="color:var(--muted)">pases</span>
+      </span>
     </div>
     <div style="font-size:11px;color:var(--muted);margin-bottom:10px">
       Se aplica a todos los pases de esta pantalla. Con orden aleatorio, cada vuelta
-      se baraja de nuevo y nunca se repite el último de la vuelta anterior.
+      se baraja de nuevo y nunca se repite el último de la vuelta anterior. Marca con
+      ⭐ un contenido de la playlist (p.ej. el tablero de divisas) para que salga con
+      esa cadencia fija en vez de quedar al azar como el resto.
     </div>
 
     <div id="plm-packages" style="margin:6px 0 10px"></div>
@@ -1684,7 +1719,9 @@ function openPlModal(sid){
   document.getElementById("plm-trans-ms").value=
     (cfg.transition_ms===undefined||cfg.transition_ms===null)?1000:cfg.transition_ms;
   document.getElementById("plm-shuffle").checked=!!cfg.shuffle;
+  document.getElementById("plm-priority-every").value=cfg.priority_every||4;
   cambioTransicion();
+  cambioShuffle();
   renderPlList(sid);renderPlLib(sid);
   document.getElementById("pl-modal").classList.add("show");
 }
@@ -1693,6 +1730,12 @@ function openPlModal(sid){
 function cambioTransicion(){
   const t=document.getElementById("plm-trans").value;
   document.getElementById("plm-trans-ms-wrap").style.display=(t==="none")?"none":"flex";
+}
+// La cadencia de prioridad solo tiene sentido con orden aleatorio: en orden
+// fijo el usuario ya decide la posicion de cada cosa a mano, arrastrando.
+function cambioShuffle(){
+  const on=document.getElementById("plm-shuffle").checked;
+  document.getElementById("plm-priority-wrap").style.display=on?"flex":"none";
 }
 function closePlModal(){document.getElementById("pl-modal").classList.remove("show");editingScreen=null;}
 function renderPlList(sid){
@@ -1749,7 +1792,12 @@ function renderPlList(sid){
       `onchange="updVigencia('${sid}',${i},'hasta',this.value)">`+
       `<span style="opacity:.7">vacío = sin límite</span></div>`;
     const marca=fuera?'<span class="pl-tbadge" style="background:rgba(240,160,80,.14);color:#f0a050">fuera de fechas</span>':'';
-    el.innerHTML=`<span class="pl-handle"><i class="fa-solid fa-grip-vertical"></i></span><div class="pl-thumb">${thumb}</div><div class="pl-info"><div class="pl-name">${item.name}</div><span class="pl-tbadge ${tc}">${item.type.toUpperCase()}</span>${marca}</div>${durControl}<button class="btn btn-danger btn-sm" onclick="rmFromPl('${sid}',${i})"><i class="fa-solid fa-xmark"></i></button>${fechas}`;
+    // La estrella solo cambia algo con orden aleatorio: en orden fijo la
+    // posicion ya la decide el usuario arrastrando, y marcarla no haria nada.
+    const prioBtn=`<button class="btn ${item.priority?'btn-accent':'btn-ghost'} btn-sm" `+
+      `title="Prioridad: con orden aleatorio, sale cada X pases en vez de quedar al azar" `+
+      `onclick="togglePriority('${sid}',${i})"><i class="fa-solid fa-star"></i></button>`;
+    el.innerHTML=`<span class="pl-handle"><i class="fa-solid fa-grip-vertical"></i></span><div class="pl-thumb">${thumb}</div><div class="pl-info"><div class="pl-name">${item.name}</div><span class="pl-tbadge ${tc}">${item.type.toUpperCase()}</span>${marca}</div>${durControl}${prioBtn}<button class="btn btn-danger btn-sm" onclick="rmFromPl('${sid}',${i})"><i class="fa-solid fa-xmark"></i></button>${fechas}`;
     el.addEventListener("dragstart",()=>{dragSrc=i;setTimeout(()=>el.classList.add("dragging"),0);});
     el.addEventListener("dragend",()=>el.classList.remove("dragging"));
     el.addEventListener("dragover",e=>{e.preventDefault();el.classList.add("drag-over");});
@@ -1803,6 +1851,12 @@ function addToPl(sid,item){
 }
 function rmFromPl(sid,idx){content.screens[sid].playlist.splice(idx,1);renderPlList(sid);}
 function updDur(sid,idx,v){if(content.screens[sid]?.playlist[idx])content.screens[sid].playlist[idx].duration=parseFloat(v)||8;}
+function togglePriority(sid,idx){
+  const it=content.screens[sid]?.playlist[idx];
+  if(!it) return;
+  it.priority=!it.priority;
+  renderPlList(sid);
+}
 async function savePlModal(){
   // La transicion se guarda con la playlist: es como se reproduce esa pantalla.
   if(editingScreen){
@@ -1814,6 +1868,9 @@ async function savePlModal(){
       isNaN(ms)?1000:Math.max(0,Math.min(2000,ms));
     content.screens[editingScreen].shuffle=
       document.getElementById("plm-shuffle").checked;
+    const cada=parseInt(document.getElementById("plm-priority-every").value,10);
+    content.screens[editingScreen].priority_every=
+      isNaN(cada)?4:Math.max(2,Math.min(50,cada));
   }
   await saveScreensConfig();closePlModal();renderScreens();toast("Playlist guardada ✓");
 }
@@ -3540,8 +3597,16 @@ async function saveSettings(){
   };
   try{
     const res=await fetch("/api/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)});
+    const d=await res.json().catch(()=>({}));
     if(res.ok){
-      toast("Ajustes guardados. Reinicia el servidor para aplicar cambios.");
+      if(d.autostart_ok===false){
+        // Se guardo el resto de Ajustes igual; solo la tarea de Windows no
+        // se pudo tocar (normalmente, falta de permisos de administrador).
+        toast(`Ajustes guardados, pero el arranque automático no se pudo cambiar: ${d.autostart_msg||"sin detalle"}`,true);
+        loadSettings();   // la casilla vuelve a mostrar lo que Windows tiene de verdad
+      }else{
+        toast("Ajustes guardados. Reinicia el servidor para aplicar cambios.");
+      }
     }else{
       toast("Error al guardar ajustes",true);
     }

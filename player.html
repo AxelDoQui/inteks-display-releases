@@ -240,19 +240,59 @@ let playlist=[],current=0,timer=null,screenSchedule=null,screenConfig=null;
 // vuelta y la siguiente: si la última de una vuelta abre la siguiente, el mismo
 // cartel sale dos veces seguidas y parece que la pantalla se ha colgado. De ahí
 // el parámetro `ultimo`.
-function ordenReproduccion(n, aleatorio, ultimo){
+//
+// `prioritarios` (índices) y `cada` son opcionales: un contenido marcado como
+// prioritario (p.ej. el tablero de divisas) se reparte aparte del resto para
+// garantizar su cadencia -aparece una vez cada `cada` diapositivas- en vez de
+// quedar a merced del azar como cualquier otro. Sin prioritarios, o con
+// `cada` sin sentido (<2), el comportamiento es exactamente el de siempre.
+function ordenReproduccion(n, aleatorio, ultimo, prioritarios, cada){
   var o = [];
   for(var i = 0; i < n; i++) o.push(i);
   if(!aleatorio || n < 2) return o;
-  for(var j = o.length - 1; j > 0; j--){          // Fisher-Yates
-    var k = Math.floor(Math.random() * (j + 1));
-    var t = o[j]; o[j] = o[k]; o[k] = t;
+
+  function barajar(arr){                          // Fisher-Yates
+    for(var j = arr.length - 1; j > 0; j--){
+      var k = Math.floor(Math.random() * (j + 1));
+      var t = arr[j]; arr[j] = arr[k]; arr[k] = t;
+    }
+    return arr;
   }
+
+  var prio = (prioritarios || []).filter(function(i){ return i >= 0 && i < n; });
+  cada = parseInt(cada, 10);
+
+  var resultado;
+  if(!prio.length || !cada || cada < 2){
+    resultado = barajar(o.slice());
+  }else{
+    // Los prioritarios se barajan aparte, entre ellos, y se reparten en sus
+    // propios huecos: lo que importa de ellos es SU cadencia, no dónde caen
+    // respecto al resto.
+    var esPrio = {};
+    prio.forEach(function(i){ esPrio[i] = true; });
+    var normales = barajar(o.filter(function(i){ return !esPrio[i]; }));
+    var turno = barajar(prio.slice());
+
+    resultado = [];
+    var t = 0;
+    for(var idx = 0; idx < normales.length; idx++){
+      resultado.push(normales[idx]);
+      if((idx + 1) % (cada - 1) === 0){
+        resultado.push(turno[t % turno.length]); t++;
+      }
+    }
+    // Si no hubo suficientes huecos para repartir a todos (playlist corta,
+    // `cada` grande), los que faltan se añaden al final: prioritario
+    // significa "aparece seguro", no "desaparece si no cupo".
+    while(t < turno.length){ resultado.push(turno[t % turno.length]); t++; }
+  }
+
   // Con un solo contenido repetir es inevitable; con dos o más, se aparta.
-  if(ultimo >= 0 && o[0] === ultimo){
-    var t2 = o[0]; o[0] = o[1]; o[1] = t2;
+  if(ultimo >= 0 && resultado[0] === ultimo && resultado.length > 1){
+    var t2 = resultado[0]; resultado[0] = resultado[1]; resultado[1] = t2;
   }
-  return o;
+  return resultado;
 }
 // ── fin del orden ──────────────────────────────────────────────────────────
 
@@ -607,12 +647,15 @@ async function loadPlaylist(){
     // Se anota ANTES de pisar screenConfig: es la única forma de saber si el
     // usuario acaba de activar o quitar el orden aleatorio.
     const aleatorioAntes=!!(screenConfig&&screenConfig.shuffle);
+    const prioCadaAntes=screenConfig&&screenConfig.priority_every;
     screenConfig=d.config||null;
     aplicarTransicion(screenConfig);
     lastContact=Date.now();
     updateScreenStatus();
     if(changed){playlist=d.playlist;rebuildSlides();}
-    refrescarOrden(changed, !!(screenConfig&&screenConfig.shuffle)!==aleatorioAntes);
+    refrescarOrden(changed,
+      !!(screenConfig&&screenConfig.shuffle)!==aleatorioAntes ||
+      (screenConfig&&screenConfig.priority_every)!==prioCadaAntes);
     if(changed&&playlist.length) showSlide(orden[0]||0);
     saveCache();
     // Descargar al televisor lo que aún no tenga. Va sin await a propósito: la
@@ -1243,7 +1286,10 @@ var orden=[], posOrden=0;
 function rehacerOrden(){
   const aleatorio=!!(screenConfig&&screenConfig.shuffle);
   const ultimo=orden.length?orden[orden.length-1]:-1;
-  orden=ordenReproduccion(playlist.length, aleatorio, ultimo);
+  const prioritarios=[];
+  playlist.forEach((it,i)=>{ if(it&&it.priority) prioritarios.push(i); });
+  const cada=parseInt(screenConfig&&screenConfig.priority_every,10)||4;
+  orden=ordenReproduccion(playlist.length, aleatorio, ultimo, prioritarios, cada);
   posOrden=0;
 }
 

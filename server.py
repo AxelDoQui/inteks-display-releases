@@ -7,7 +7,7 @@ Player:   http://TU_IP/player.html?screen=NOMBRE
 Enlazar:  http://signage.local/pair     (nombre mDNS, configurable en config.json)
 """
 import json, os, base64, mimetypes, threading, time, socket, sys, random, struct
-import hmac, hashlib, secrets, shutil, io, zipfile, contextlib
+import hmac, hashlib, secrets, shutil, io, zipfile, contextlib, subprocess
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, unquote
 import urllib.request
@@ -22,7 +22,7 @@ import urllib.request
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.18"
+APP_VERSION = "1.0.25"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -943,6 +943,158 @@ def _vigilante():
         time.sleep(60)
         revisar_avisos()
 
+# ── Bot de Telegram (solo lectura) ──────────────────────────────────────────
+# Telegram era de una sola dirección: el servidor empuja avisos, nunca
+# contesta nada. Esto añade un único comando, /estado, que responde con lo
+# mismo que ya sabe el vigilante de avisos —pantallas caídas, tableros
+# vencidos— sin exponer nada nuevo: nada de reiniciar el servidor ni de dar
+# el PIN de emparejamiento por chat.
+TELEGRAM_GETUPDATES_API = "https://api.telegram.org/bot{token}/getUpdates"
+
+def _telegram_get_updates(token, offset=None, timeout=25):
+    """Long-poll de mensajes nuevos. Nunca lanza: devuelve [] si algo falla."""
+    try:
+        qs = f"timeout={int(timeout)}"
+        if offset is not None:
+            qs += f"&offset={int(offset)}"
+        req = urllib.request.Request(
+            f"{TELEGRAM_GETUPDATES_API.format(token=token)}?{qs}",
+            headers={"User-Agent": f"InTeks-Display/{APP_VERSION}"})
+        with urllib.request.urlopen(req, timeout=timeout + 10) as r:
+            datos = json.loads(r.read().decode("utf-8", "replace"))
+        return datos.get("result", []) if datos.get("ok") else []
+    except Exception as e:
+        log(f"  [bot] no se pudo leer mensajes: {e}")
+        return []
+
+def _formatear_duracion(segundos):
+    segundos = max(0, int(segundos))
+    dias, resto = divmod(segundos, 86400)
+    horas, resto = divmod(resto, 3600)
+    minutos = resto // 60
+    if dias:
+        return f"{dias}d {horas}h"
+    if horas:
+        return f"{horas}h {minutos}min"
+    return f"{minutos}min"
+
+def construir_estado():
+    """Texto de `/estado`: mismos datos que ya usa `revisar_avisos()`, en un
+    único mensaje corto -pensado para leerse entero en un móvil."""
+    ahora_ts = time.time()
+    screens = load_json(SCREENS_FILE)
+    content = load_json(CONTENT_FILE)
+    pantallas = content.get("screens", {})
+
+    lineas_p = []
+    for sid, reg in sorted(screens.items()):
+        if sid == "admin":
+            continue
+        if reg.get("connected"):
+            lineas_p.append(f"✅ {sid} — en línea")
+        else:
+            visto = reg.get("last_seen") or 0
+            desde = _formatear_duracion(ahora_ts - visto) if visto else "?"
+            lineas_p.append(f"❌ {sid} — caída desde hace {desde}")
+    if not lineas_p:
+        lineas_p = ["(sin pantallas registradas)"]
+
+    lineas_t = []
+    vistos = set()
+    for sid, cfg_p in pantallas.items():
+        for it in expandir_paquetes(cfg_p.get("playlist", []), content):
+            if not isinstance(it, dict) or it.get("type") != "fx":
+                continue
+            mid = it.get("id") or it.get("name") or "fx"
+            if mid in vistos:
+                continue
+            vistos.add(mid)
+            nombre = it.get("name") or mid
+            try:
+                horas_venc = it.get("stale_hours")
+                horas_venc = 24.0 if horas_venc in (None, "") else float(horas_venc)
+                ts = float(it.get("updated_at") or 0)
+            except (TypeError, ValueError):
+                ts, horas_venc = 0, 24.0
+            if not ts:
+                lineas_t.append(f"⚠ {nombre} — sin actualizar nunca")
+                continue
+            caducado = horas_venc and (ahora_ts - ts) > horas_venc * 3600
+            marca = "⚠" if caducado else "✅"
+            lineas_t.append(f"{marca} {nombre} — hace {_formatear_duracion(ahora_ts - ts)}")
+    if not lineas_t:
+        lineas_t = ["(sin tableros de divisas)"]
+
+    disco = estado_disco()
+    disco_txt = f"{disco.get('pct_usado', 0)}% usado, {disco.get('libre_mb', 0)} MB libres"
+    if disco.get("aviso"):
+        disco_txt += " ⚠"
+
+    return (f"📋 {_nombre_instalacion()}\n\n"
+            f"🖥 Pantallas\n" + "\n".join(lineas_p) + "\n\n"
+            f"💱 Tableros\n" + "\n".join(lineas_t) + "\n\n"
+            f"InTeks Display {APP_VERSION} · disco {disco_txt}")
+
+def _responder_mensaje(texto, chat_id, chat_autorizado):
+    """Qué contestar, o None si no hay que contestar nada.
+
+    Un bot es público: cualquiera que sepa su nombre puede escribirle. Solo
+    se responde al chat configurado en el panel; a cualquier otro, silencio
+    total -ni siquiera un error, para no confirmarle a un desconocido que el
+    bot existe y está vivo.
+    """
+    if str(chat_id) != str(chat_autorizado):
+        return None
+    comando = (texto or "").strip().lower().split("@")[0]   # tolera /estado@nombrebot
+    if comando == "/estado":
+        return construir_estado()
+    return "No entendí. Escribe /estado para ver pantallas y tableros."
+
+def _bot_loop():
+    """Hilo de fondo: long-poll de Telegram, contesta solo /estado.
+
+    Relee la configuración en cada vuelta -igual que enviar_telegram()- para
+    que activar el bot o cambiar el token/chat desde el panel se note sin
+    reiniciar el servidor. Con el token vacío no llama a Telegram para nada:
+    se limita a dormir y comprobar de nuevo.
+    """
+    offset = None
+    token_previo = None
+    while True:
+        try:
+            cfg = load_config()
+            token = str(cfg.get("telegram_token", "") or "").strip()
+            chat_autorizado = str(cfg.get("telegram_chat_id", "") or "").strip()
+            if not token or not chat_autorizado:
+                token_previo = None
+                time.sleep(5)
+                continue
+
+            if token != token_previo:
+                # Token nuevo (o primer arranque tras encenderlo): descarta lo
+                # pendiente sin contestarlo. Si no, un /estado de ayer -Telegram
+                # guarda lo no leído 24h- se contestaría con datos de ahora
+                # como si fuera de este momento, y eso confunde más que ayuda.
+                pendientes = _telegram_get_updates(token, offset=-1, timeout=0)
+                offset = (pendientes[-1]["update_id"] + 1) if pendientes else None
+                token_previo = token
+
+            for upd in _telegram_get_updates(token, offset, timeout=25):
+                offset = upd["update_id"] + 1
+                msg = upd.get("message") or {}
+                chat_id = (msg.get("chat") or {}).get("id")
+                if chat_id is None:
+                    continue
+                respuesta = _responder_mensaje(msg.get("text"), chat_id, chat_autorizado)
+                if respuesta:
+                    enviar_telegram(respuesta)
+        except Exception as e:
+            # Mismo criterio que el vigilante de avisos: esto no puede tumbar
+            # el servidor, y una vuelta que falla no debe convertirse en un
+            # bucle que grita sin parar.
+            log(f"  [bot] error en el hilo: {e}")
+            time.sleep(5)
+
 def notify_unlink(screen_id):
     """Le dice a la pantalla que olvide quién era, sin borrar su configuración.
 
@@ -1100,6 +1252,78 @@ def estado_disco():
         "pct_usado": pct,
         "aviso": pct >= DISCO_AVISO_PCT,
     }
+
+# ── Arranque automático (desde 1.0.21) ──────────────────────────────────────
+# La casilla «Iniciar con Windows» del panel guardaba un valor en config.json
+# que nadie leía: el arranque real lo daba (o no) la tarea programada que
+# registra el instalador, y la casilla no tenía ninguna conexión con eso.
+# Quien la desmarcaba creyendo apagar el arranque no apagaba nada, y quien la
+# marcaba se quedaba sin servidor tras un corte de luz igual. Ahora la casilla
+# consulta y toca la tarea de Windows de verdad.
+TAREA_AUTOARRANQUE = "InTeks Display"
+_SIN_VENTANA = getattr(subprocess, "CREATE_NO_WINDOW", 0)   # no aplica fuera de Windows
+
+def _tarea_autoarranque_estado():
+    """¿Existe la tarea de autoarranque en Windows, y está activada? Consulta
+    real vía schtasks, no lo que diga config.json."""
+    try:
+        r = subprocess.run(
+            ["schtasks", "/Query", "/TN", TAREA_AUTOARRANQUE, "/FO", "LIST"],
+            capture_output=True, text=True, timeout=10, creationflags=_SIN_VENTANA)
+        if r.returncode != 0:
+            return {"existe": False, "activa": False}
+        # El nombre del campo de estado cambia con el idioma de Windows
+        # ("Estado"/"Status"); buscar que NO diga deshabilitada es más
+        # robusto que adivinar el valor exacto en cada idioma.
+        salida = r.stdout.lower()
+        activa = "disabled" not in salida and "deshabilitad" not in salida
+        return {"existe": True, "activa": activa}
+    except Exception as e:
+        return {"existe": None, "activa": None, "error": str(e)}
+
+def _fijar_autoarranque(activar):
+    """Enciende o apaga el arranque automático DE VERDAD, tocando la tarea
+    programada de Windows en vez de un valor decorativo.
+
+    Nunca lanza: es una acción desde el panel y no puede tumbar el servidor
+    si falla -y falla fácil, porque hace falta ser administrador para tocar
+    el Programador de tareas. Devuelve (ok, mensaje); mensaje vacío si salió
+    bien.
+    """
+    estado = _tarea_autoarranque_estado()
+    try:
+        if activar:
+            if estado.get("existe"):
+                r = subprocess.run(
+                    ["schtasks", "/Change", "/TN", TAREA_AUTOARRANQUE, "/Enable"],
+                    capture_output=True, text=True, timeout=10, creationflags=_SIN_VENTANA)
+            else:
+                # No existe -instalación antigua, o se desmarcó en el
+                # instalador-: se crea de cero reutilizando registrar-tarea.ps1
+                # en vez de duplicar aquí cómo encuentra pythonw.exe y los
+                # ajustes de reintento que ya tiene ese script.
+                ps1 = os.path.join(APP_DIR, "registrar-tarea.ps1")
+                if not os.path.exists(ps1):
+                    ps1 = os.path.join(APP_DIR, "installer", "registrar-tarea.ps1")
+                if not os.path.exists(ps1):
+                    return False, "No se encuentra registrar-tarea.ps1."
+                r = subprocess.run(
+                    ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                     "-File", ps1, "-AppDir", APP_DIR],
+                    capture_output=True, text=True, timeout=30, creationflags=_SIN_VENTANA)
+        else:
+            if not estado.get("existe"):
+                return True, ""             # ya estaba apagado
+            r = subprocess.run(
+                ["schtasks", "/Change", "/TN", TAREA_AUTOARRANQUE, "/Disable"],
+                capture_output=True, text=True, timeout=10, creationflags=_SIN_VENTANA)
+        if r.returncode != 0:
+            detalle = (r.stderr or r.stdout or "error desconocido").strip()
+            return False, detalle[:300]
+        return True, ""
+    except Exception as e:
+        return False, str(e)
+# ── fin del arranque automático ─────────────────────────────────────────────
 
 def get_ip():
     try:
@@ -1302,6 +1526,11 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 with open(CONFIG_FILE) as f:
                     cfg = json.load(f)
+                # El valor de verdad es lo que diga Windows, no lo guardado: si
+                # alguien borró la tarea a mano, o el instalador no la registró
+                # porque se desmarcó esa casilla, config.json podía seguir
+                # diciendo que sí sin que fuera cierto.
+                cfg["autostart"] = bool(_tarea_autoarranque_estado().get("activa"))
                 body = json.dumps(cfg).encode()
                 self.send_response(200); self.send_header("Content-Type","application/json")
                 self.cors(); self.end_headers(); self.wfile.write(body); return
@@ -1445,10 +1674,22 @@ class Handler(BaseHTTPRequestHandler):
                 with sse_lock:
                     if sid in sse_clients and self.wfile in sse_clients[sid]:
                         sse_clients[sid].remove(self.wfile)
-                screens = load_json(SCREENS_FILE)
-                if sid in screens:
-                    screens[sid]["connected"] = False
-                    save_json(SCREENS_FILE, screens)
+                    # Esta conexion murio, pero puede no ser la unica: un
+                    # EventSource reconecta solo, y la reconexion puede llegar
+                    # -y quedar registrada aqui- ANTES de que este hilo se
+                    # entere de que la suya se cayo (hasta 10 s, el intervalo
+                    # del ping). Si ya hay otra conexion viva para esta
+                    # pantalla, marcarla caida ahora pisaria el connected=True
+                    # que puso esa conexion nueva, y se quedaria marcada
+                    # offline para siempre aunque siguiera respondiendo -es
+                    # justo lo que sufria "Pantalla Exterior (LG)": el panel
+                    # la daba por caida mientras seguia sirviendo contenido.
+                    sigue_viva = bool(sse_clients.get(sid))
+                if not sigue_viva:
+                    screens = load_json(SCREENS_FILE)
+                    if sid in screens:
+                        screens[sid]["connected"] = False
+                        save_json(SCREENS_FILE, screens)
             return
 
         # ── Servir uploads (con soporte de HTTP Range -> vídeo en streaming + seeking)
@@ -1889,6 +2130,11 @@ class Handler(BaseHTTPRequestHandler):
                 # no lo envía, no lo toques". La extensión manda solo las filas.
                 title = d.get("title")
                 base_currency = d.get("base_currency")
+                # Qué módulo tocar cuando una pantalla tiene más de uno (p.ej. Western
+                # Union y Ria en la misma pantalla). Antes, sin esto, se actualizaban
+                # TODOS los módulos tipo fx de la pantalla con las mismas filas: cada
+                # envío para uno pisaba también al otro.
+                item_id = str(d.get("item_id") or "").strip()
                 updated_at = time.time()
                 if not rows:
                     err("rows requerido y no puede estar vacío"); return
@@ -1900,27 +2146,33 @@ class Handler(BaseHTTPRequestHandler):
                     for sid in targets:
                         if sid not in screens: continue
                         playlist = screens[sid].get("playlist", [])
-                        fx_found = False
-                        for item in playlist:
-                            if item.get("type") == "fx":
-                                touched_ids.add(item.get("id"))
-                                # Actualizar SOLO las tasas y lo que venga explícito.
-                                # Antes se pisaban siempre título y moneda base, así que
-                                # cada envío desde la extensión borraba lo que el usuario
-                                # había configurado en el admin.
-                                item["rows"] = fusionar_filas(item.get("rows"), rows)
-                                if title: item["title"] = title
-                                if base_currency: item["base_currency"] = base_currency
-                                item["updated_at"] = updated_at
-                                fx_found = True
-                        if not fx_found:
+                        fx_items = [it for it in playlist if it.get("type") == "fx"]
+                        # Sin item_id y con más de un módulo en la pantalla no hay forma
+                        # de saber cuál quería el usuario: mejor no tocar ninguno que
+                        # adivinar y pisar el que no era.
+                        if not item_id and len(fx_items) > 1:
+                            continue
+                        target_items = [it for it in fx_items if it.get("id") == item_id] if item_id else fx_items
+                        for item in target_items:
+                            touched_ids.add(item.get("id"))
+                            # Actualizar SOLO las tasas y lo que venga explícito.
+                            # Antes se pisaban siempre título y moneda base, así que
+                            # cada envío desde la extensión borraba lo que el usuario
+                            # había configurado en el admin.
+                            item["rows"] = fusionar_filas(item.get("rows"), rows)
+                            if title: item["title"] = title
+                            if base_currency: item["base_currency"] = base_currency
+                            item["updated_at"] = updated_at
+                        if not target_items:
                             # Módulo nuevo: aquí sí hacen falta valores por defecto.
                             new_title = title or "Tipos de cambio"
+                            new_id = item_id or f"fx_{int(updated_at)}"
                             playlist.append({
-                                "id": f"fx_{int(updated_at)}", "name": new_title, "type": "fx",
+                                "id": new_id, "name": new_title, "type": "fx",
                                 "title": new_title, "base_currency": base_currency or "EUR", "rows": rows,
                                 "duration": 15, "bg": "#07182b", "color": "#ffffff", "updated_at": updated_at
                             })
+                            touched_ids.add(new_id)
                         screens[sid]["playlist"] = playlist
                         updated_screens.append(sid)
                     # Sincronizar la copia de la LIBRERÍA de los módulos tocados.
@@ -1982,7 +2234,18 @@ class Handler(BaseHTTPRequestHandler):
                 actual = load_json(CONFIG_FILE)
                 actual.update(d)
                 save_json(CONFIG_FILE, actual)
-                ok()
+                extra = {}
+                if "autostart" in d:
+                    # Tocar la tarea de Windows es lo que de verdad enciende o
+                    # apaga el arranque; guardarlo en config.json de arriba es
+                    # solo un rastro. Si esto falla (falta ser administrador,
+                    # normalmente) el resto de Ajustes se guardó igual: no se
+                    # aborta el guardado completo por esto.
+                    autostart_ok, autostart_msg = _fijar_autoarranque(bool(d["autostart"]))
+                    extra["autostart_ok"] = autostart_ok
+                    if not autostart_ok:
+                        extra["autostart_msg"] = autostart_msg
+                ok(extra)
             except Exception as e: err(e)
             return
 
@@ -2069,10 +2332,11 @@ if __name__ == "__main__":
     log("="*56)
     log(f"  PIN de enlace:   {pin_state['pin']} (válido 10 min)")
     log("="*56)
-    # Vigilante de avisos. Solo cuando el programa se ejecuta de verdad: si
-    # arrancara al importar server.py, los tests que lo importan tendrian un
-    # hilo suelto mandando mensajes por su cuenta.
+    # Vigilante de avisos y bot de /estado. Solo cuando el programa se
+    # ejecuta de verdad: si arrancaran al importar server.py, los tests que
+    # lo importan tendrian un hilo suelto mandando mensajes por su cuenta.
     threading.Thread(target=_vigilante, daemon=True).start()
+    threading.Thread(target=_bot_loop, daemon=True).start()
 
     _disco = estado_disco()
     if _disco.get("aviso"):

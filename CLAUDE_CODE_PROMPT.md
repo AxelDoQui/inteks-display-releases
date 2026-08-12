@@ -1,6 +1,6 @@
 # InTeks Display — Contexto para Claude Code
 
-> Actualizado: 12 de agosto de 2026. Este documento describe el estado **real** del
+> Actualizado: 12 de agosto de 2026 (v1.0.25). Este documento describe el estado **real** del
 > código. Si algo aquí no cuadra con lo que ves en los archivos, gana el código:
 > avísalo y se corrige el documento.
 
@@ -79,6 +79,17 @@ videowall en dos pantallas (`wall_mode` + `wall_pos`, que recorta la imagen con
 `object-position` a izquierda o derecha), horario con imagen de standby, barra
 de progreso y refresco del clima cada 15 minutos.
 
+**Prioridad en el orden aleatorio (desde 1.0.20).** Un contenido de la
+playlist con `priority: true` (se marca con ⭐ en el editor del admin) se
+reparte aparte del resto en `ordenReproduccion()` (`player.html`) para
+garantizar una cadencia fija — `config.priority_every` pases, 4 por defecto —
+en vez de quedar sujeto al azar. El resto de la vuelta se sigue barajando y
+sin repetirse; solo lo marcado ⭐ puede repetirse dentro de la misma vuelta,
+si eso es lo que hace falta para cumplir su cadencia con pocos contenidos
+prioritarios y una vuelta larga. Con varios marcados, se turnan en vez de
+amontonarse en el mismo hueco. Solo tiene efecto con `shuffle` activo: con
+orden fijo la posición ya la decide quien arrastra la playlist.
+
 **Resiliencia sin servidor:** el contenido nunca fuerza una recarga de la
 página (llega por SSE, `connectSSE()`, y repinta solo); lo último reproducido
 se cachea en IndexedDB (imágenes/vídeos) y localStorage (playlist/config) para
@@ -154,22 +165,59 @@ lógica de maquetación duplicada que se desincronice al tocar el CSS.
 
 ### Extensión de Chrome — `inteks-extension/`
 
-Manifest V3. Detecta tablas de tipos de cambio en cualquier web y las envía a
-InTeks Display con un clic, vía `POST /api/fx-update` autenticado con el token de API
-que se copia desde *Ajustes → Seguridad*. Sirve también en remoto a través del
-túnel de Cloudflare.
+Manifest V3. Envía tipos de cambio a InTeks Display con un clic, vía
+`POST /api/fx-update` autenticado con el token de API que se copia desde
+*Ajustes → Seguridad*. Sirve también en remoto a través del túnel de
+Cloudflare.
 
-**Varios agentes de pago por moneda (Ria y similares):** `scanPage()` agrupa
-las filas detectadas por código de moneda; cuando hay más de un candidato
-(`agentOpciones`), `elegirAgente()` decide con la lista de preferencia del
-usuario (`chrome.storage.local.agentPrefs`, `{COP:["Davivienda",...]}`) — la
-tasa más alta no siempre es la correcta (ver comentario de `elegirAgente` en
-`parser.js`). El panel lateral ofrece un `<select>` con todos los candidatos
-para elegir con un clic en vez de escribir el nombre a mano, y avisa
-(`agentAlternativa`) cuando otro paga notablemente más sin cambiar la
-elección. `extractRate`/`extractAgent` comparten `findRateMatch()`, que busca
-el número desde el final del texto — necesario porque un nombre de agente con
-dígitos ("4-72 Servici", real en Ria) se confundía con la tasa.
+**Desde 1.0.24: sin detección automática de página.** Hasta la 1.0.23,
+`content.js` escaneaba el DOM de la pestaña activa cada vez que se abría el
+panel (y cada 30 s mientras seguía abierto) y ofrecía lo detectado bajo
+«DETECTADO EN ESTA PÁGINA». Se quitó de la parte que corre sola —el usuario no
+podía verificarlo en todas las webs que usa— y el panel lateral pasó a un
+selector de país/moneda con buscador (`fxPickerOptions`/`fxFilterOptions` en
+`parser.js`, duplicadas de `FX_COUNTRIES` en `admin.html`, mismo patrón y
+mismo test de sincronización que ya existía para `CURRENCY_DB`: ver
+`tests/fx-countries-sync.test.js` y `tests/currency-db-sync.test.js`), más un
+formulario de código a mano para lo que no esté en la lista. `content.js`
+ahora solo inyecta y muestra/oculta el iframe del panel; ya no escanea nada.
+
+El motor de escaneo (`scanPage`, `detectInText`, `extractRate`, `extractAgent`,
+`elegirAgente`) **sigue en `parser.js`, sin usarse** — no se borró porque
+tiene su propia cobertura de tests (`ria-agente-en-scan.test.js`,
+`ria-eleccion-agente.test.js`, `extension-rate-agent-digits.test.js`,
+`extension-rate-format.test.js`) y borrarlo no era parte de lo pedido. Si
+algún día hace falta un escaneo manual (botón "leer esta página" en vez de
+automático), la lógica ya está.
+
+**Consecuencia:** el selector multi-agente (Ria y similares, `agentOpciones`/
+`chrome.storage.local.agentPrefs`) solo tenía sentido cuando la página traía
+varias filas para la misma moneda a la vez —eso solo lo daba el escaneo—, así
+que desapareció del panel lateral con él. El campo `agent` de una fila (la
+ventanilla/agente de pago) solo se puede fijar ahora desde el editor de filas
+del admin, como cualquier tablero que no usa la extensión.
+
+### Bot de Telegram (desde 1.0.19)
+
+Hasta la 1.0.18, Telegram era de una sola dirección: `enviar_telegram()`
+empuja avisos (pantalla caída, tasas viejas, disco lleno) y nadie puede
+preguntarle nada. `_bot_loop()` (hilo de fondo, junto a `_vigilante`) añade
+un único comando de solo lectura, `/estado`, por long-poll
+(`getUpdates`, sin webhook ni URL pública) contra el mismo `telegram_token` y
+`telegram_chat_id` que ya usan los avisos — no hay ajuste nuevo que configurar.
+
+`construir_estado()` arma la respuesta con los mismos datos que ya calcula
+`revisar_avisos()` (pantallas en línea/caídas, tableros al día/vencidos) más
+disco y versión. `_responder_mensaje()` solo contesta al `chat_id` que
+coincide con `telegram_chat_id`; a cualquier otro, silencio total —ni
+siquiera un error, para no confirmarle a un desconocido que el bot existe.
+No puede reiniciar el servidor ni dar el PIN de emparejamiento: es un chat,
+no una llave.
+
+Al arrancar (o al activar el token desde el panel sin reiniciar: el hilo
+relee la configuración en cada vuelta) descarta con `offset=-1` lo que
+Telegram tuviera pendiente de hasta 24 h atrás, para no contestar un
+`/estado` de ayer con los datos de ahora como si fuera de este momento.
 
 ### Empaquetado
 
@@ -319,15 +367,25 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
    `first_run: true` pero nadie lo lee. El único flujo de "primera vez" que
    existe es el de contraseña, en `login.html`.
 
-   Del mismo tipo y peor: **la casilla «Iniciar con Windows» de Ajustes no la
-   lee nadie**. `admin.html` la guarda en `config.json` (`autostart`) y el
-   único `autostart` de `server.py` es el valor por defecto. El arranque real
-   lo da la tarea programada que registra el instalador, y eso significa que
-   quien desmarque esa casilla creyendo que apaga el arranque no apaga nada, y
-   quien la marque creyendo que lo enciende se queda sin servidor tras un
-   reinicio. O se cablea a `registrar-tarea.ps1` o se quita del panel.
-   Comprobado en el equipo de desarrollo el 2026-08-12: la tarea **no está
-   registrada** y el servidor no arrancaría solo tras un corte de luz.
+   ~~Del mismo tipo y peor: la casilla «Iniciar con Windows» de Ajustes no la
+   lee nadie~~ — **cableada de verdad en la 1.0.21.** `_tarea_autoarranque_estado()`
+   y `_fijar_autoarranque()` (`server.py`) consultan y tocan la tarea
+   programada real vía `schtasks.exe` en vez de un valor decorativo en
+   `config.json`: `GET /api/config` devuelve el estado real, y `POST
+   /api/config` la crea (reutilizando `registrar-tarea.ps1`, sin duplicar la
+   búsqueda de `pythonw.exe`), habilita o deshabilita según corresponda.
+   Como hace falta ser administrador para tocar el Programador de tareas de
+   Windows, el guardado puede fallar —normalmente por permisos—; cuando pasa,
+   el panel lo dice explícitamente en vez de fingir que se aplicó.
+
+   **En este equipo de desarrollo concreto, la tarea sigue sin registrar**
+   (comprobado el 2026-08-12: `_tarea_autoarranque_estado()` devuelve
+   `existe: False`). La sesión de Claude Code no tiene permisos de
+   administrador para registrarla desde aquí; se le pasó al usuario el
+   comando exacto para correrlo él mismo elevado
+   (`installer\registrar-tarea.ps1 -AppDir "D:\Digital Signage"`), sin
+   confirmación todavía de que lo haya hecho. Si este PC pierde corriente,
+   el servidor no arrancaría solo hasta que se registre.
 
 2. **Unificar las dos rutas de distribución** (Python vs Electron) o decidir
    explícitamente cuál se abandona.
@@ -397,13 +455,39 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
    encender el televisor. Ese bucle va al ritmo de quien tenga el stick
    delante, no al de quien escribe el código.
 
-6. **Bot de Telegram que responda, no solo que avise.** Un `/estado` que
-   conteste la última conexión de cada pantalla y cuándo se actualizó cada
-   tablero. Decidido con el usuario el 2026-08-12 —un solo comando, solo
-   lectura, `getUpdates` con espera larga— y **sin implementar**. El diseño
-   está en `docs/superpowers/specs/2026-08-12-bot-telegram-estado-design.md`.
+6. ~~**Bot de Telegram que responda, no solo que avise.**~~ — **hecho en la
+   1.0.19.** Ver «Bot de Telegram» más abajo.
 
 ## Gotchas de despliegue
+
+- **Una pantalla viva podía quedar marcada «offline» para siempre (cerrado en
+  la 1.0.21).** Caso real: «Pantalla Exterior (LG)» servía contenido con
+  normalidad —el bot de `/estado` la veía conectada— y el panel la mostraba
+  caída. Causa: carrera entre hilos de `/api/events`. Cada conexión SSE corre
+  en su propio hilo (`ThreadingHTTPServer`), y un `EventSource` reconecta solo
+  por su cuenta ante un corte de wifi. Si la reconexión llegaba **antes** de
+  que el hilo de la conexión vieja se enterara de que la suya había muerto
+  —eso tarda hasta el siguiente ping, cada 10 s, porque el hilo solo lee
+  fallos de escritura, nunca hace `recv()`—, el hilo viejo, al fin
+  detectarlo, pisaba el `connected=True` que acababa de poner la conexión
+  nueva con su propio `connected=False`. Sin otro evento que lo corrigiera
+  —`connected` solo se pone en `True` una vez, al conectar; los pings
+  correctos solo tocan `last_seen`—, quedaba mal indefinidamente aunque la
+  pantalla siguiera respondiendo.
+
+  Arreglo: antes de marcar `connected=False`, el hilo que detecta el fallo
+  comprueba si `sse_clients[sid]` sigue teniendo alguna conexión registrada
+  —una reconexión ya habría quedado ahí—; si es así, no toca nada. Ver
+  `tests/test_sse_reconexion.py`: reproduce la carrera con sockets de verdad
+  (un simulacro no la reproduce) forzando un cierre abortivo (`SO_LINGER=0`,
+  RST) en vez de uno normal, porque un cierre normal no se detectaba dentro
+  de un tiempo razonable de prueba en esta máquina.
+
+  Nota aparte, sin resolver: `screens.json` se lee-modifica-escribe sin
+  ningún guardián (a diferencia de `content.json`, que tiene
+  `contenido_en_edicion()` justo por este motivo). El arreglo de arriba cierra
+  la carrera concreta que se vio en campo, pero la clase general de carrera
+  —dos hilos escribiendo `screens.json` a la vez— sigue abierta en teoría.
 
 - **El navegador de un Smart TV se cierra solo, y no hay arreglo por código.**
   Caso real y cerrado: un LG con webOS cerraba el navegador integrado cada ~2

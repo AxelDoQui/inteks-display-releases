@@ -22,11 +22,9 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .mini-btn{margin-left:auto;background:var(--s2);border:1px solid var(--b);border-radius:4px;color:var(--accent);cursor:pointer;font-size:11px;padding:1px 6px;line-height:1.4}
 .mini-btn:hover{border-color:var(--accent)}
 
-.detected-list{flex:1;overflow-y:auto;border-bottom:1px solid var(--b);min-height:80px;max-height:240px}
-.fx-row{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--b);cursor:pointer;transition:background .15s}
+.fx-row{display:flex;flex-direction:column;gap:5px;padding:8px 14px;border-bottom:1px solid var(--b);transition:background .15s}
 .fx-row:hover{background:var(--s2)}
-.fx-row.selected{background:rgba(255,127,0,.10)}
-.fx-row input[type=checkbox]{accent-color:var(--accent);flex-shrink:0;width:15px;height:15px}
+.fx-row-main{display:flex;align-items:center;gap:8px}
 .fx-flag{font-size:18px;flex-shrink:0}
 .fx-info{flex:1;min-width:0}
 .fx-code{font-size:12px;font-weight:600;font-family:monospace;color:var(--text)}
@@ -35,24 +33,26 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .fx-rate-input:focus{outline:none;border-color:var(--accent)}
 .fx-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px}
 .fx-remove:hover{color:var(--danger)}
-/* Tasa anterior cuando el escaneo de la página la ha cambiado */
+.fx-agent-input{width:100%;background:var(--s2);border:1px solid var(--b);border-radius:5px;color:var(--muted);font-size:11px;padding:4px 7px;font-family:inherit}
+.fx-agent-input:focus{outline:none;border-color:var(--accent);color:var(--text)}
+/* Tasa anterior cuando se edita a mano una fila ya cargada */
 .fx-was{font-size:10px;color:#7a8ca3;text-decoration:line-through;margin-right:5px;font-family:monospace}
 .fx-row.changed{background:rgba(255,127,0,.10)}
-.fx-row.missing .fx-rate-input{opacity:.55}
-.fx-hint{font-size:10px;color:#7a8ca3;padding:6px 2px 2px;line-height:1.5}
 .empty-msg{padding:16px 14px;color:var(--muted);font-size:11px;text-align:center}
 
-/* Agente elegido en filas con varios candidatos (Ria y similares) */
-.fx-agent{font-size:9px;color:var(--accent);font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fx-alt{color:#f0a050;cursor:help}
-/* Selector de agente cuando hay más de un candidato para la misma moneda */
-.fx-agent-select{width:100%;margin-top:2px;background:var(--s2);border:1px solid var(--b);border-radius:4px;color:var(--accent);font-size:9px;font-family:monospace;padding:2px 3px;max-width:150px}
-.fx-agent-select:focus{outline:none;border-color:var(--accent)}
+/* Buscador de país/moneda — mismo comportamiento que el de admin.html */
+.fx-combo-wrap{position:relative}
+.fx-combo-input{width:100%;padding:8px 10px;font-size:12px}
+.fx-combo-list{display:none;position:absolute;left:14px;right:14px;z-index:30;max-height:220px;overflow-y:auto;background:var(--s2);border:1px solid var(--b);border-radius:6px;margin-top:4px;box-shadow:0 10px 24px rgba(0,0,0,.5)}
+.fx-combo-item{display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;font-size:11.5px;border-bottom:1px solid var(--b)}
+.fx-combo-item:last-child{border-bottom:none}
+.fx-combo-item.active,.fx-combo-item:hover{background:rgba(255,255,255,.06)}
+.fx-combo-info{flex:1;min-width:0;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fx-combo-currency{opacity:.55}
+.fx-combo-code{font-family:monospace;font-size:10px;opacity:.55;flex-shrink:0}
+.fx-combo-check{color:var(--a2);font-size:11px;flex-shrink:0}
 
 .manual-form{padding:6px 14px 10px;flex-shrink:0}
-.agent-prefs-input{width:100%;min-height:48px;background:var(--s2);border:1px solid var(--b);border-radius:5px;color:var(--text);padding:6px 7px;font-size:11px;font-family:monospace;resize:vertical}
-.agent-prefs-input:focus{outline:none;border-color:var(--accent)}
-.agent-prefs-save{width:100%;margin-top:5px}
 .manual-row{display:flex;gap:5px;align-items:center}
 .input-flag{width:42px;text-align:center;font-size:16px}
 .input-code{width:48px;font-family:monospace;text-transform:uppercase}
@@ -62,7 +62,11 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .btn-add{background:var(--s2);border:1px solid var(--b);border-radius:5px;color:var(--accent);font-size:18px;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .btn-add:hover{border-color:var(--accent)}
 
-.selected-list{min-height:50px;max-height:150px;overflow-y:auto;border-bottom:1px solid var(--b)}
+/* flex:1 -no un alto fijo- para que la lista use el hueco libre del panel en
+   vez de dejarlo vacio entre el boton de enviar y Servidor/Token. min-height:0
+   es imprescindible: sin el, un hijo flex no encoge por debajo del alto de su
+   contenido y overflow-y:auto no llega a activarse nunca. */
+.selected-list{flex:1;min-height:0;overflow-y:auto;border-bottom:1px solid var(--b)}
 .screen-select{margin:6px 14px 10px;width:calc(100% - 28px);background:var(--s2);border:1px solid var(--b);border-radius:5px;color:var(--text);padding:8px 10px;font-size:12px;flex-shrink:0}
 .screen-select:focus{outline:none;border-color:var(--accent)}
 
@@ -71,7 +75,10 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .send-btn:disabled{background:var(--s2);color:var(--muted);cursor:not-allowed}
 .last-update{text-align:center;font-size:10px;color:var(--muted);padding:0 14px 8px;font-family:monospace;flex-shrink:0}
 
-.config-row{display:flex;align-items:center;gap:5px;padding:8px 14px;border-top:1px solid var(--b);background:var(--s1);flex-shrink:0;margin-top:auto}
+/* Ya no hace falta margin-top:auto para empujar esto al fondo: con
+   .selected-list en flex:1, ese es quien absorbe el hueco libre y esto queda
+   pegado abajo solo, por orden natural. */
+.config-row{display:flex;align-items:center;gap:5px;padding:8px 14px;border-top:1px solid var(--b);background:var(--s1);flex-shrink:0}
 .config-label{font-size:10px;color:var(--muted);white-space:nowrap;font-family:monospace}
 .config-input{flex:1;background:var(--s2);border:1px solid var(--b);border-radius:5px;color:var(--text);padding:5px 7px;font-size:10px;font-family:monospace}
 .config-input:focus{outline:none;border-color:var(--accent)}

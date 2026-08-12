@@ -142,18 +142,17 @@ del cliente. En el panel se lee más claro: «actualizado hace 3 días ⚠».
 
 ### La extensión de Chrome
 
-Actualiza las tasas desde la web de Western Union o Ria sin teclear nada.
+Manda tasas a InTeks Display sin teclear el tablero entero cada vez.
 Se instala una vez por equipo (menú Inicio → «Instalar extensión de divisas»)
 y necesita el **token de la API**, que está en Ajustes.
 
-**La extensión respeta el orden** que hayas fijado en el panel. Las divisas
-nuevas que detecte se añaden al final.
+**Busca el país o la moneda y añádela con un clic**, igual que en el
+buscador del panel de administración (sección Divisas). Si un código no está
+en la lista, «¿No está en la lista? Añadir código a mano» deja escribirlo
+directamente. Elegida una divisa, solo falta escribir la tasa.
 
-**Cuando una web ofrece varios agentes de pago para el mismo país** (Ria, por
-ejemplo, muestra Bancolombia, Davivienda, 4-72... para Colombia, cada uno con
-su tasa), el panel lateral de la extensión enseña un desplegable con todos —
-elige el tuyo con un clic y queda guardado para la próxima vez. Si otro agente
-paga notablemente más, avisa con ⚠ sin cambiar tu elección.
+**Desde otro ordenador**, se configura igual: campo Servidor + token, ver
+*Usar el panel desde otro ordenador* más abajo.
 
 ---
 

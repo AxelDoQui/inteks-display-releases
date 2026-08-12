@@ -102,3 +102,67 @@ test("dos contenidos al azar siempre alternan", () => {
   assert.deepStrictEqual(plano(c.ordenReproduccion(2, true, 1))[0], 0);
   assert.deepStrictEqual(plano(c.ordenReproduccion(2, true, 0))[0], 1);
 });
+
+// ── Prioridad (p.ej. el tablero de divisas cada X pases) ────────────────────
+
+test("sin prioritarios, se comporta exactamente igual que antes", () => {
+  const c = cargar(() => 0);
+  assert.deepStrictEqual(
+    plano(c.ordenReproduccion(6, true, -1)),
+    plano(c.ordenReproduccion(6, true, -1, [], 4)),
+    "pasar cada=4 sin prioritarios no debe cambiar nada"
+  );
+});
+
+test("un prioritario sale cada 4 pases, aunque para eso repita mas que el resto", () => {
+  // 8 contenidos, el indice 5 marcado. Con solo UN prioritario y una vuelta
+  // larga, cumplir "cada 4" exige que ese mismo indice vuelva a salir dentro
+  // de la misma vuelta -es justo lo que "prioritario" quiere decir: el resto
+  // no se repite, este si, tantas veces como haga falta para su cadencia.
+  // random()=0 hace el barajado determinista: se comprueba la CADENCIA, no
+  // una permutacion concreta.
+  const c = cargar(() => 0);
+  const o = plano(c.ordenReproduccion(8, true, -1, [5], 4));
+  const normales = o.filter(v => v !== 5);
+  assert.deepStrictEqual([...normales].sort((x, y) => x - y), [0, 1, 2, 3, 4, 6, 7],
+    "los siete no-prioritarios salen todos, una sola vez cada uno");
+  const posiciones = o.reduce((a, v, i) => { if (v === 5) a.push(i + 1); return a; }, []);
+  assert.deepStrictEqual(posiciones, [4, 8], "el prioritario cae en la posicion 4 y la 8: cadencia de 4");
+});
+
+test("con dos prioritarios, se turnan en vez de amontonarse", () => {
+  const c = cargar(() => 0);
+  const o = plano(c.ordenReproduccion(9, true, -1, [3, 7], 4));
+  assert.strictEqual(o.length, 9);
+  assert.deepStrictEqual([...o].sort((x, y) => x - y), [0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  const huecos = [o[3], o[7]];
+  assert.deepStrictEqual([...huecos].sort(), [3, 7], "los dos prioritarios ocupan los huecos de cadencia");
+});
+
+test("mas prioritarios que huecos: los que sobran igual aparecen", () => {
+  // Prioritario significa "aparece seguro", no "se descarta si no cupo".
+  const c = cargar(() => 0);
+  const o = plano(c.ordenReproduccion(5, true, -1, [0, 1, 2, 3], 4));
+  assert.deepStrictEqual([...o].sort((x, y) => x - y), [0, 1, 2, 3, 4]);
+});
+
+test("todos son prioritarios: no hay huecos que repartir, simplemente se barajan", () => {
+  const c = cargar(() => 0);
+  const o = plano(c.ordenReproduccion(3, true, -1, [0, 1, 2], 4));
+  assert.deepStrictEqual([...o].sort((x, y) => x - y), [0, 1, 2]);
+});
+
+test("cada < 2 no tiene sentido y se ignora: cae al barajado normal", () => {
+  const c = cargar(() => 0);
+  assert.deepStrictEqual(
+    plano(c.ordenReproduccion(5, true, -1, [2], 1)),
+    plano(c.ordenReproduccion(5, true, -1, [], 1))
+  );
+});
+
+test("el prioritario tambien respeta el empalme entre vueltas", () => {
+  const c = cargar(() => 0);
+  const o = plano(c.ordenReproduccion(6, true, 3, [5], 4));  // 'ultimo'=3 no puede abrir
+  assert.notStrictEqual(o[0], 3);
+  assert.deepStrictEqual([...o].sort((x, y) => x - y), [0, 1, 2, 3, 4, 5]);
+});

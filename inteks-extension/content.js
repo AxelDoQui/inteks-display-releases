@@ -1,7 +1,6 @@
 // Vive en cada pestaña: inyecta el panel lateral (iframe) y hace de puente con él.
 let sidebarVisible = false;
 let sidebarFrame = null;
-let scanInterval = null;
 
 function createSidebar() {
   sidebarFrame = document.createElement('iframe');
@@ -19,27 +18,7 @@ function toggleSidebar(force) {
   if (!sidebarFrame) createSidebar();
   sidebarVisible = (typeof force === 'boolean') ? force : !sidebarVisible;
   sidebarFrame.style.setProperty('transform', sidebarVisible ? 'translateX(0)' : 'translateX(100%)', 'important');
-  if (sidebarVisible) { scanAndUpdate(); startAutoScan(); }
-  else { stopAutoScan(); }
 }
-
-async function scanAndUpdate() {
-  let detected = [];
-  try {
-    let prefs = {};
-    try { prefs = (await chrome.storage.local.get('agentPrefs')).agentPrefs || {}; } catch (e) {}
-    detected = window.SignalosParser.scanPage(prefs);
-  } catch (e) {}
-  if (sidebarFrame && sidebarVisible && sidebarFrame.contentWindow) {
-    sidebarFrame.contentWindow.postMessage({
-      type: 'SIGNALOS_DETECTED', rows: detected,
-      url: location.href, title: document.title
-    }, '*');
-  }
-}
-
-function startAutoScan() { stopAutoScan(); scanInterval = setInterval(scanAndUpdate, 30000); }
-function stopAutoScan() { if (scanInterval) { clearInterval(scanInterval); scanInterval = null; } }
 
 // Mensajes desde el background (toggle) / popup
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -54,6 +33,5 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // Mensajes desde el panel lateral (iframe)
 window.addEventListener('message', (e) => {
   const d = e.data || {};
-  if (d.type === 'SIGNALOS_RESCAN') scanAndUpdate();
-  else if (d.type === 'SIGNALOS_CLOSE') toggleSidebar(false);
+  if (d.type === 'SIGNALOS_CLOSE') toggleSidebar(false);
 });

@@ -1,29 +1,9 @@
 // Panel lateral de InTeks Display — corre dentro del iframe inyectado en la página.
 let selectedRows = [];
-let detectedRows = [];
 let savedModules = [];   // módulos de divisas que ya existen en el admin
 let serverUrl = 'http://localhost';   // puerto 80 por defecto (InTeks Display); configurable
 let apiToken = '';                    // token de API (Ajustes del admin); requerido si hay contraseña
 let screens = [];
-let agentPrefs = {};                  // { COP: ["Davivienda","Bancolombia"], ... } — ver elegirAgente() en parser.js
-
-// "COP: Davivienda, Bancolombia" por línea -> { COP: ["Davivienda","Bancolombia"] }.
-// Ria ofrece varios agentes de pago por país y el que más paga no siempre es
-// el correcto (ver elegirAgente() en parser.js); esta lista es lo que decide
-// cuál usar cuando una moneda trae más de un candidato.
-function parseAgentPrefs(text) {
-  const out = {};
-  String(text || '').split('\n').forEach(linea => {
-    const m = linea.match(/^\s*([A-Za-z]{3})\s*:\s*(.+)$/);
-    if (!m) return;
-    const nombres = m[2].split(',').map(s => s.trim()).filter(Boolean);
-    if (nombres.length) out[m[1].toUpperCase()] = nombres;
-  });
-  return out;
-}
-function stringifyAgentPrefs(prefs) {
-  return Object.keys(prefs || {}).map(c => `${c}: ${prefs[c].join(', ')}`).join('\n');
-}
 
 // Cabeceras con el token de API para los endpoints protegidos del servidor.
 function authHeaders(extra) {
@@ -38,40 +18,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   await checkConnection();
   await loadScreens();
   await loadModules();
-  // Pedir a la página que escanee (el iframe ya está listo)
-  window.parent.postMessage({ type: 'SIGNALOS_RESCAN' }, '*');
 });
 
 async function loadConfig() {
   try {
-    const data = await chrome.storage.local.get(['serverUrl', 'apiToken', 'agentPrefs']);
+    const data = await chrome.storage.local.get(['serverUrl', 'apiToken']);
     if (data.serverUrl) serverUrl = data.serverUrl;
     if (data.apiToken) apiToken = data.apiToken;
-    if (data.agentPrefs) agentPrefs = data.agentPrefs;
   } catch (e) {}
   document.getElementById('server-url').value = serverUrl;
   document.getElementById('api-token').value = apiToken;
-  document.getElementById('agent-prefs').value = stringifyAgentPrefs(agentPrefs);
-}
-
-async function saveAgentPrefs() {
-  agentPrefs = parseAgentPrefs(document.getElementById('agent-prefs').value);
-  try { await chrome.storage.local.set({ agentPrefs }); } catch (e) {}
-  // Re-escanear con las preferencias nuevas ya guardadas.
-  window.parent.postMessage({ type: 'SIGNALOS_RESCAN' }, '*');
-}
-
-// Elegir un agente con un clic desde «Detectado en esta página», en vez de
-// tener que escribir su nombre a mano en el cuadro de preferencias. Se pone
-// el primero de la lista para esa moneda -manda sobre los demás- y se
-// conservan los que ya hubiera como respaldo si ese agente deja de aparecer.
-async function elegirAgentePreferido(code, agentName) {
-  if (!agentName) return;
-  const resto = (agentPrefs[code] || []).filter(a => a !== agentName);
-  agentPrefs[code] = [agentName, ...resto];
-  try { await chrome.storage.local.set({ agentPrefs }); } catch (e) {}
-  document.getElementById('agent-prefs').value = stringifyAgentPrefs(agentPrefs);
-  window.parent.postMessage({ type: 'SIGNALOS_RESCAN' }, '*');
 }
 
 async function checkConnection() {
@@ -151,150 +107,142 @@ async function loadModules() {
 }
 
 // Carga las filas del módulo elegido como punto de partida. Se guarda la tasa
-// original en `was` para poder enseñar de dónde a dónde ha cambiado.
+// original en `was` para poder enseñar de dónde a dónde ha cambiado si se edita.
 function pickModule() {
   const id = document.getElementById('module-select').value;
   const m = savedModules.find(x => x.id === id);
-  selectedRows = m
-    ? m.rows.map(r => ({ ...r, was: r.rate, changed: false, missing: true }))
-    : [];
-  applyDetectedToSelected();
-  renderSelected(); renderDetected(); updateSendBtn();
+  selectedRows = m ? m.rows.map(r => ({ ...r, was: r.rate, changed: false })) : [];
+  renderSelected(); updateSendBtn();
 }
 
-// Empareja por código lo detectado en la página con lo que ya tienes cargado.
-function applyDetectedToSelected() {
-  selectedRows.forEach(r => {
-    const det = detectedRows.find(d => (d.code || '').toUpperCase() === (r.code || '').toUpperCase());
-    if (!det) { r.missing = true; return; }
-    r.missing = false;
-    r.changed = String(det.rate) !== String(r.was);
-    r.rate = det.rate;
-  });
+// ── Selector de país/moneda, con buscador — mismo comportamiento que el de
+// admin.html (fxPickerOptions/fxFilterOptions viven en parser.js, duplicadas
+// de admin.html; ver tests/fx-countries-sync.test.js). Sin esto, la única
+// forma de añadir una divisa era escribir el código de memoria a mano.
+let fxComboOpts = [], fxComboIdx = -1;
+
+function fxOptions() {
+  return (window.SignalosParser && window.SignalosParser.fxPickerOptions)
+    ? window.SignalosParser.fxPickerOptions() : [];
 }
 
-// Divisas detectadas enviadas por content.js
-window.addEventListener('message', (e) => {
-  if (e.data && e.data.type === 'SIGNALOS_DETECTED') {
-    detectedRows = e.data.rows || [];
-    applyDetectedToSelected();
-    renderDetected(); renderSelected(); updateSendBtn();
-  }
-});
-
-function renderDetected() {
-  const list = document.getElementById('detected-list');
-  if (!detectedRows.length) {
-    list.innerHTML = '<div class="empty-msg">No se detectaron divisas en esta página.<br>Usa "Añadir manualmente".</div>';
+function renderFxCombo() {
+  const inp = document.getElementById('fx-country-search');
+  const list = document.getElementById('fx-country-list');
+  if (!inp || !list || !window.SignalosParser) return;
+  fxComboOpts = window.SignalosParser.fxFilterOptions(fxOptions(), inp.value);
+  if (fxComboIdx >= fxComboOpts.length) fxComboIdx = fxComboOpts.length - 1;
+  list.innerHTML = '';
+  if (!fxComboOpts.length) {
+    list.innerHTML = '<div class="empty-msg">Ningún país coincide</div>';
     return;
   }
-  list.innerHTML = '';
-  detectedRows.forEach((row) => {
-    const isSel = selectedRows.find(r => r.code === row.code);
+  fxComboOpts.forEach((o, i) => {
+    const yaEsta = selectedRows.some(r => r.code === o.code && r.country === o.country);
     const el = document.createElement('div');
-    el.className = 'fx-row' + (isSel ? ' selected' : '');
-    // Solo aparece cuando la página trae varios agentes de pago para la misma
-    // moneda (típico de Ria). Con más de un candidato, un <select> deja elegir
-    // el preferido con un clic -se guarda solo, sin tener que escribir el
-    // nombre a mano en «Agente preferido»-. Con uno solo, o sin agente, se
-    // enseña el aviso de siempre. mejorAlternativa nunca cambia la elección,
-    // solo avisa; ver elegirAgente() en parser.js.
-    let agentLine = '';
-    if (row.agentOpciones && row.agentOpciones.length > 1) {
-      const opts = row.agentOpciones.map(o => {
-        const val = (o.agent || '').replace(/"/g, '&quot;');
-        const sel = o.agent === row.agent ? ' selected' : '';
-        return `<option value="${val}"${sel}>${o.agent || '?'} — ${o.rate}</option>`;
-      }).join('');
-      agentLine = `<select class="fx-agent-select" title="Varios agentes de pago para esta moneda: elige el preferido">${opts}</select>`;
-    } else if (row.agent) {
-      agentLine = `<div class="fx-agent" title="${
-          row.agentMotivo === 'preferencia' ? 'Agente preferido' : 'Sin preferencia configurada: se tomó la tasa más alta'
-        }">${row.agent}${row.agentAlternativa
-          ? ` · <span class="fx-alt" title="${row.agentAlternativa.agent} paga ${row.agentAlternativa.diffPct}% más">⚠ hay mejor tasa</span>`
-          : ''}</div>`;
-    }
-    el.innerHTML = `
-      <input type="checkbox" ${isSel ? 'checked' : ''}>
-      <span class="fx-flag">${row.flag}</span>
-      <div class="fx-info"><div class="fx-code">${row.code}</div><div class="fx-name">${row.country}</div>${agentLine}</div>
-      <input type="text" class="fx-rate-input" value="${row.rate}">`;
-    const chk = el.querySelector('input[type=checkbox]');
-    const rateInp = el.querySelector('.fx-rate-input');
-    const agentSel = el.querySelector('.fx-agent-select');
-    chk.addEventListener('change', (ev) => {
-      if (ev.target.checked) addToSelected({ ...row, rate: rateInp.value });
-      else removeFromSelected(row.code);
-    });
-    rateInp.addEventListener('input', (ev) => {
-      const s = selectedRows.find(r => r.code === row.code);
-      if (s) s.rate = ev.target.value;
-      row.rate = ev.target.value;
-    });
-    if (agentSel) {
-      agentSel.addEventListener('click', (ev) => ev.stopPropagation());
-      agentSel.addEventListener('change', (ev) => elegirAgentePreferido(row.code, ev.target.value));
-    }
+    el.className = 'fx-combo-item' + (i === fxComboIdx ? ' active' : '');
+    el.innerHTML = `<span class="fx-flag">${window.SignalosParser.isoToEmoji(o.flag)}</span>
+      <span class="fx-combo-info">${o.country} <span class="fx-combo-currency">— ${o.currency}</span></span>
+      <span class="fx-combo-code">${o.code}</span>
+      ${yaEsta ? '<span class="fx-combo-check" title="ya está en la lista">✓</span>' : ''}`;
+    el.addEventListener('mousedown', (e) => { e.preventDefault(); pickFxCombo(o); });
+    el.addEventListener('mouseenter', () => { fxComboIdx = i; marcarFxCombo(); });
     list.appendChild(el);
   });
 }
 
+function marcarFxCombo() {
+  const list = document.getElementById('fx-country-list');
+  if (!list) return;
+  [...list.children].forEach((el, i) => el.classList.toggle('active', i === fxComboIdx));
+  const act = list.children[fxComboIdx];
+  if (act) act.scrollIntoView({ block: 'nearest' });
+}
+
+function abrirFxCombo() {
+  const list = document.getElementById('fx-country-list');
+  if (!list) return;
+  renderFxCombo();
+  list.style.display = '';
+}
+function cerrarFxCombo() {
+  const list = document.getElementById('fx-country-list');
+  if (list) list.style.display = 'none';
+  fxComboIdx = -1;
+}
+
+// Añade la opción elegida y deja el foco en su tasa, que es lo único que falta.
+function pickFxCombo(o) {
+  const dup = selectedRows.some(r => r.code === o.code && r.country === o.country);
+  if (dup) { cerrarFxCombo(); return; }
+  addToSelected({ flag: window.SignalosParser.isoToEmoji(o.flag), country: o.country, currency: o.currency, code: o.code, rate: '' });
+  const inp = document.getElementById('fx-country-search');
+  if (inp) inp.value = '';
+  cerrarFxCombo();
+  const inputs = document.querySelectorAll('#selected-list .fx-rate-input');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+}
+
+// Dos entradas son la misma fila si coinciden PAÍS y código: varios países
+// comparten moneda (varios usan USD) y cada uno es una fila válida a la vez.
 function addToSelected(row) {
-  if (!selectedRows.find(r => r.code === row.code)) selectedRows.push({ ...row });
+  if (selectedRows.some(r => r.code === row.code && r.country === row.country)) return;
+  selectedRows.push({ agent: '', ...row });
   renderSelected(); updateSendBtn();
 }
-function removeFromSelected(code) {
-  selectedRows = selectedRows.filter(r => r.code !== code);
-  renderSelected(); updateSendBtn(); renderDetected();
+function removeFromSelected(row) {
+  selectedRows = selectedRows.filter(r => r !== row);
+  renderSelected(); updateSendBtn();
 }
 function renderSelected() {
   const list = document.getElementById('selected-list');
   document.getElementById('selected-count').textContent = selectedRows.length;
-  if (!selectedRows.length) { list.innerHTML = '<div class="empty-msg">Elige un módulo arriba o selecciona divisas</div>'; return; }
+  if (!selectedRows.length) { list.innerHTML = '<div class="empty-msg">Busca y añade divisas arriba</div>'; return; }
   list.innerHTML = '';
-  const cargado = !!document.getElementById('module-select').value;
   selectedRows.forEach((row) => {
     const el = document.createElement('div');
-    el.className = 'fx-row' + (row.changed ? ' changed' : '') + (cargado && row.missing ? ' missing' : '');
-    // Cuando la página ha traído una tasa distinta, se enseña la anterior
-    // tachada: publicar cotizaciones a ciegas es justo lo que hay que evitar.
+    el.className = 'fx-row' + (row.changed ? ' changed' : '');
+    // Cuando se edita la tasa a mano, se enseña la anterior tachada: publicar
+    // una cifra sin darse cuenta de que cambió es justo lo que hay que evitar.
     const was = row.changed ? `<span class="fx-was">${row.was}</span>` : '';
+    const agentVal = String(row.agent || '').replace(/"/g, '&quot;');
     el.innerHTML = `
-      <span class="fx-flag">${row.flag}</span>
-      <div class="fx-info"><div class="fx-code">${row.code}</div><div class="fx-name">${row.country}</div></div>
-      ${was}
-      <input type="text" class="fx-rate-input" value="${row.rate}"${cargado && row.missing ? ' title="No aparece en esta página; se mantiene la tasa guardada"' : ''}>
-      <button class="fx-remove" title="Quitar">&times;</button>`;
+      <div class="fx-row-main">
+        <span class="fx-flag">${row.flag}</span>
+        <div class="fx-info"><div class="fx-code">${row.code}</div><div class="fx-name">${row.country}</div></div>
+        ${was}
+        <input type="text" class="fx-rate-input" value="${row.rate}">
+        <button class="fx-remove" title="Quitar">&times;</button>
+      </div>
+      <input type="text" class="fx-agent-input" placeholder="Ventanilla (opcional): Davivienda, 4-72…" value="${agentVal}">`;
     el.querySelector('.fx-rate-input').addEventListener('input', (ev) => {
-      const r = selectedRows.find(r => r.code === row.code);
-      if (r) { r.rate = ev.target.value; r.changed = String(r.rate) !== String(r.was); }
+      row.rate = ev.target.value;
+      row.changed = String(row.rate) !== String(row.was);
     });
-    el.querySelector('.fx-remove').addEventListener('click', () => removeFromSelected(row.code));
+    el.querySelector('.fx-agent-input').addEventListener('input', (ev) => { row.agent = ev.target.value; });
+    el.querySelector('.fx-remove').addEventListener('click', () => removeFromSelected(row));
     list.appendChild(el);
   });
-  if (cargado) {
-    const n = selectedRows.filter(r => r.changed).length;
-    const sin = selectedRows.filter(r => r.missing).length;
-    const hint = document.createElement('div');
-    hint.className = 'fx-hint';
-    hint.textContent = `${n} tasa(s) actualizadas desde esta página` +
-      (sin ? ` · ${sin} sin dato aquí, conservan la guardada` : '');
-    list.appendChild(hint);
-  }
 }
 function updateSendBtn() { document.getElementById('send-btn').disabled = selectedRows.length === 0; }
 
 async function enviarAServidor() {
   const btn = document.getElementById('send-btn');
   const screenId = document.getElementById('screen-select').value;
+  // Qué módulo tocar en el servidor. Sin esto, una pantalla con más de un
+  // módulo de divisas (p.ej. Western Union y Ria) recibía el mismo cambio en
+  // los dos: el servidor no tenía forma de saber cuál de ellos era.
+  const moduleId = document.getElementById('module-select').value;
   btn.textContent = 'Enviando...'; btn.disabled = true;
   const payload = {
-    // agent: la ventanilla/agente de pago elegido (Ria y similares). Antes se
-    // calculaba solo para ayudar a elegir la tasa y se tiraba aquí; ahora viaja
-    // al servidor para que la pantalla del cliente pueda mostrarla.
-    rows: selectedRows.map(r => ({ flag: r.flag, country: r.country, currency: r.currency, code: r.code, rate: r.rate, agent: r.agent || undefined })),
+    rows: selectedRows.map(r => {
+      const row = { flag: r.flag, country: r.country, currency: r.currency, code: r.code, rate: r.rate };
+      if (r.agent && r.agent.trim()) row.agent = r.agent.trim();
+      return row;
+    }),
     screen_ids: screenId ? [screenId] : []
   };
+  if (moduleId) payload.item_id = moduleId;
   try {
     const r = await fetch(`${serverUrl}/api/fx-update`, {
       method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(payload)
@@ -320,6 +268,7 @@ async function enviarAServidor() {
   }
 }
 
+// Respaldo para códigos que no están en el listado predefinido.
 function addManual() {
   const flag = document.getElementById('m-flag').value.trim();
   const code = document.getElementById('m-code').value.trim().toUpperCase();
@@ -349,13 +298,36 @@ function setupEventListeners() {
   document.getElementById('send-btn').addEventListener('click', enviarAServidor);
   document.getElementById('m-add').addEventListener('click', addManual);
   document.getElementById('save-config').addEventListener('click', saveConfig);
-  document.getElementById('save-agent-prefs').addEventListener('click', saveAgentPrefs);
   document.getElementById('module-select').addEventListener('change', pickModule);
-  document.getElementById('rescan-btn').addEventListener('click', () => window.parent.postMessage({ type: 'SIGNALOS_RESCAN' }, '*'));
   document.getElementById('close-btn').addEventListener('click', () => window.parent.postMessage({ type: 'SIGNALOS_CLOSE' }, '*'));
   ['m-flag', 'm-code', 'm-rate'].forEach(id => {
     document.getElementById(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') addManual(); });
   });
+
+  document.getElementById('toggle-manual-btn').addEventListener('click', () => {
+    const wrap = document.getElementById('manual-row-wrap');
+    wrap.style.display = wrap.style.display === 'none' ? '' : 'none';
+  });
+
+  const searchInp = document.getElementById('fx-country-search');
+  searchInp.addEventListener('focus', abrirFxCombo);
+  searchInp.addEventListener('input', () => { fxComboIdx = 0; abrirFxCombo(); });
+  searchInp.addEventListener('keydown', (e) => {
+    const list = document.getElementById('fx-country-list');
+    const abierto = list && list.style.display !== 'none';
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!abierto) { abrirFxCombo(); return; }
+      fxComboIdx = Math.max(0, Math.min(fxComboOpts.length - 1, fxComboIdx + (e.key === 'ArrowDown' ? 1 : -1)));
+      marcarFxCombo();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const o = fxComboOpts[fxComboIdx >= 0 ? fxComboIdx : 0];
+      if (o) pickFxCombo(o);
+    } else if (e.key === 'Escape') { cerrarFxCombo(); searchInp.blur(); }
+  });
+  // mousedown en los items se adelanta al blur, así que aquí solo hay que cerrar.
+  searchInp.addEventListener('blur', () => setTimeout(cerrarFxCombo, 120));
 }
 
 setInterval(checkConnection, 30000);

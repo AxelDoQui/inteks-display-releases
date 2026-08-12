@@ -104,6 +104,182 @@ window.SignalosParser = (function () {
   const CODE_MAP = {};
   CURRENCY_DB.forEach(c => { CODE_MAP[c.code.toUpperCase()] = c; });
 
+  // ── Selector de país/moneda — COPIA EXACTA de FX_COUNTRIES en admin.html.
+  // Igual que CURRENCY_DB arriba: la extensión no puede importar del admin,
+  // así que se duplica. tests/fx-countries-sync.test.js falla si se separan.
+  // Una entrada por país (y moneda): varios países comparten moneda y algunos
+  // tienen dos (ej. Ecuador solo USD; Panamá PAB y también USD), por eso va en
+  // su propia tabla y no mezclada con CURRENCY_DB.
+  const FX_COUNTRIES = [
+    {country:"Albania",flag:"al",code:"ALL"},
+    {country:"Alemania",flag:"de",code:"EUR"},
+    {country:"Angola",flag:"ao",code:"AOA"},
+    {country:"Antigua y Barbuda",flag:"ag",code:"XCD"},
+    {country:"Arabia Saudí",flag:"sa",code:"SAR"},
+    {country:"Argelia",flag:"dz",code:"DZD"},
+    {country:"Argentina",flag:"ar",code:"ARS"},
+    {country:"Argentina",flag:"ar",code:"USD",extra:1},
+    {country:"Armenia",flag:"am",code:"AMD"},
+    {country:"Australia",flag:"au",code:"AUD"},
+    {country:"Austria",flag:"at",code:"EUR"},
+    {country:"Azerbaiyán",flag:"az",code:"AZN"},
+    {country:"Bahamas",flag:"bs",code:"BSD"},
+    {country:"Bangladesh",flag:"bd",code:"BDT"},
+    {country:"Barbados",flag:"bb",code:"BBD"},
+    {country:"Belice",flag:"bz",code:"BZD"},
+    {country:"Bielorrusia",flag:"by",code:"BYN"},
+    {country:"Bolivia",flag:"bo",code:"BOB"},
+    {country:"Bolivia",flag:"bo",code:"USD",extra:1},
+    {country:"Bosnia y Herzegovina",flag:"ba",code:"BAM"},
+    {country:"Brasil",flag:"br",code:"BRL"},
+    {country:"Bulgaria",flag:"bg",code:"EUR"},
+    {country:"Burkina Faso",flag:"bf",code:"XOF"},
+    {country:"Bélgica",flag:"be",code:"EUR"},
+    {country:"Camboya",flag:"kh",code:"KHR"},
+    {country:"Camerún",flag:"cm",code:"XAF"},
+    {country:"Canadá",flag:"ca",code:"CAD"},
+    {country:"Chequia",flag:"cz",code:"CZK"},
+    {country:"Chile",flag:"cl",code:"CLP"},
+    {country:"China",flag:"cn",code:"CNY"},
+    {country:"Colombia",flag:"co",code:"COP"},
+    {country:"Congo (Rep. Dem.)",flag:"cd",code:"CDF"},
+    {country:"Corea del Sur",flag:"kr",code:"KRW"},
+    {country:"Costa Rica",flag:"cr",code:"CRC"},
+    {country:"Costa de Marfil",flag:"ci",code:"XOF"},
+    {country:"Cuba",flag:"cu",code:"CUP"},
+    {country:"Cuba",flag:"cu",code:"USD",extra:1},
+    {country:"Dinamarca",flag:"dk",code:"DKK"},
+    {country:"Dominica",flag:"dm",code:"XCD"},
+    {country:"Ecuador",flag:"ec",code:"USD"},
+    {country:"Egipto",flag:"eg",code:"EGP"},
+    {country:"El Salvador",flag:"sv",code:"USD"},
+    {country:"Emiratos Árabes Unidos",flag:"ae",code:"AED"},
+    {country:"España",flag:"es",code:"EUR"},
+    {country:"Estados Unidos",flag:"us",code:"USD"},
+    {country:"Etiopía",flag:"et",code:"ETB"},
+    {country:"Filipinas",flag:"ph",code:"PHP"},
+    {country:"Francia",flag:"fr",code:"EUR"},
+    {country:"Gambia",flag:"gm",code:"GMD"},
+    {country:"Georgia",flag:"ge",code:"GEL"},
+    {country:"Ghana",flag:"gh",code:"GHS"},
+    {country:"Grecia",flag:"gr",code:"EUR"},
+    {country:"Grenada",flag:"gd",code:"XCD"},
+    {country:"Guatemala",flag:"gt",code:"GTQ"},
+    {country:"Guinea",flag:"gn",code:"GNF"},
+    {country:"Guyana",flag:"gy",code:"GYD"},
+    {country:"Haití",flag:"ht",code:"HTG"},
+    {country:"Honduras",flag:"hn",code:"HNL"},
+    {country:"Hungría",flag:"hu",code:"HUF"},
+    {country:"India",flag:"in",code:"INR"},
+    {country:"Indonesia",flag:"id",code:"IDR"},
+    {country:"Irlanda",flag:"ie",code:"EUR"},
+    {country:"Israel",flag:"il",code:"ILS"},
+    {country:"Italia",flag:"it",code:"EUR"},
+    {country:"Jamaica",flag:"jm",code:"JMD"},
+    {country:"Japón",flag:"jp",code:"JPY"},
+    {country:"Jordania",flag:"jo",code:"JOD"},
+    {country:"Kazajistán",flag:"kz",code:"KZT"},
+    {country:"Kenia",flag:"ke",code:"KES"},
+    {country:"Kirguizistán",flag:"kg",code:"KGS"},
+    {country:"Líbano",flag:"lb",code:"LBP"},
+    {country:"Macedonia del Norte",flag:"mk",code:"MKD"},
+    {country:"Malasia",flag:"my",code:"MYR"},
+    {country:"Mali",flag:"ml",code:"XOF"},
+    {country:"Marruecos",flag:"ma",code:"MAD"},
+    {country:"Moldavia",flag:"md",code:"MDL"},
+    {country:"Mozambique",flag:"mz",code:"MZN"},
+    {country:"Myanmar",flag:"mm",code:"MMK"},
+    {country:"México",flag:"mx",code:"MXN"},
+    {country:"Nepal",flag:"np",code:"NPR"},
+    {country:"Nicaragua",flag:"ni",code:"NIO"},
+    {country:"Nigeria",flag:"ng",code:"NGN"},
+    {country:"Noruega",flag:"no",code:"NOK"},
+    {country:"Nueva Zelanda",flag:"nz",code:"NZD"},
+    {country:"Níger",flag:"ne",code:"XOF"},
+    {country:"Pakistán",flag:"pk",code:"PKR"},
+    {country:"Panamá",flag:"pa",code:"PAB"},
+    {country:"Panamá",flag:"pa",code:"USD",extra:1},
+    {country:"Paraguay",flag:"py",code:"PYG"},
+    {country:"Paraguay",flag:"py",code:"USD",extra:1},
+    {country:"Países Bajos",flag:"nl",code:"EUR"},
+    {country:"Perú",flag:"pe",code:"PEN"},
+    {country:"Perú",flag:"pe",code:"USD",extra:1},
+    {country:"Polonia",flag:"pl",code:"PLN"},
+    {country:"Portugal",flag:"pt",code:"EUR"},
+    {country:"Reino Unido",flag:"gb",code:"GBP"},
+    {country:"República Dominicana",flag:"do",code:"DOP"},
+    {country:"Rumania",flag:"ro",code:"RON"},
+    {country:"Rusia",flag:"ru",code:"RUB"},
+    {country:"San Cristóbal y Nieves",flag:"kn",code:"XCD"},
+    {country:"San Vicente y Granadinas",flag:"vc",code:"XCD"},
+    {country:"Santa Lucía",flag:"lc",code:"XCD"},
+    {country:"Senegal",flag:"sn",code:"XOF"},
+    {country:"Serbia",flag:"rs",code:"RSD"},
+    {country:"Sri Lanka",flag:"lk",code:"LKR"},
+    {country:"Sudáfrica",flag:"za",code:"ZAR"},
+    {country:"Suecia",flag:"se",code:"SEK"},
+    {country:"Suiza",flag:"ch",code:"CHF"},
+    {country:"Surinam",flag:"sr",code:"SRD"},
+    {country:"Tailandia",flag:"th",code:"THB"},
+    {country:"Tanzania",flag:"tz",code:"TZS"},
+    {country:"Tayikistán",flag:"tj",code:"TJS"},
+    {country:"Trinidad y Tobago",flag:"tt",code:"TTD"},
+    {country:"Turquía",flag:"tr",code:"TRY"},
+    {country:"Túnez",flag:"tn",code:"TND"},
+    {country:"Ucrania",flag:"ua",code:"UAH"},
+    {country:"Uganda",flag:"ug",code:"UGX"},
+    {country:"Uruguay",flag:"uy",code:"UYU"},
+    {country:"Uzbekistán",flag:"uz",code:"UZS"},
+    {country:"Venezuela",flag:"ve",code:"VES"},
+    {country:"Venezuela",flag:"ve",code:"USD",extra:1},
+    {country:"Vietnam",flag:"vn",code:"VND"},
+    {country:"Zimbabue",flag:"zw",code:"USD"},
+  ];
+
+  // El flag de FX_COUNTRIES es un código ISO de 2 letras (como en admin.html,
+  // que lo usa para cargar /vendor/flags/{code}.svg). La extensión no empaqueta
+  // esos SVG, así que aquí se convierte a su emoji equivalente -los emoji de
+  // bandera son, letra a letra, "regional indicator symbols" que corresponden
+  // 1 a 1 con el código ISO- en vez de mantener una segunda tabla de emojis
+  // que se pueda desincronizar de FX_COUNTRIES.
+  function isoToEmoji(iso) {
+    iso = String(iso || "").trim().toUpperCase();
+    if (iso.length !== 2 || !/^[A-Z]{2}$/.test(iso)) return "🏳";
+    return String.fromCodePoint(...[...iso].map(ch => 0x1F1E6 + ch.charCodeAt(0) - 65));
+  }
+
+  // Quita acentos y pasa a minúsculas, para que "panama" encuentre "Panamá".
+  // Copia de fxNormalize() en admin.html: ̀-ͯ es el bloque Unicode
+  // de marcas diacríticas combinantes, escapado y no con los caracteres
+  // literales, para que el patrón sobreviva a cualquier cambio de codificación.
+  function fxNormalize(s) {
+    return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  }
+
+  function fxOptionKey(o) { return `${o.flag}|${o.code}`; }
+
+  // Opciones del selector: un país por entrada, con el nombre de su moneda
+  // resuelto desde CODE_MAP. Orden alfabético por país (según localeCompare en
+  // español), y con la moneda local antes que una "extra" (ej. Venezuela: VES
+  // antes que USD). Copia del criterio de fxPickerOptions() en admin.html.
+  function fxPickerOptions() {
+    return FX_COUNTRIES.map(p => {
+      const c = CODE_MAP[p.code];
+      return { country: p.country, flag: p.flag, code: p.code,
+               currency: (c && c.currency) || p.code, extra: p.extra || 0 };
+    }).sort((a, b) => a.country.localeCompare(b.country, "es") || a.extra - b.extra || a.code.localeCompare(b.code));
+  }
+
+  // Filtra las opciones por país, moneda o código. Sin texto, las devuelve todas.
+  function fxFilterOptions(options, query) {
+    const q = fxNormalize(query);
+    if (!q) return options;
+    return options.filter(o =>
+      fxNormalize(o.country).includes(q) ||
+      fxNormalize(o.currency).includes(q) ||
+      fxNormalize(o.code).includes(q));
+  }
+
   // ¿Qué moneda aparece en este texto? Primero por código ISO (fiable), luego por alias.
   function matchCurrency(text) {
     const codes = (text.toUpperCase().match(/\b[A-Z]{3}\b/g) || []);
@@ -359,5 +535,6 @@ window.SignalosParser = (function () {
   }
 
   return { CURRENCY_DB, CODE_MAP, matchCurrency, extractRate, extractAgent, detectInText, scanPage,
-           normalizeRate, normalizeAgent, agentMatches, elegirAgente };
+           normalizeRate, normalizeAgent, agentMatches, elegirAgente,
+           FX_COUNTRIES, isoToEmoji, fxNormalize, fxOptionKey, fxPickerOptions, fxFilterOptions };
 })();

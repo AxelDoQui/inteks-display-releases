@@ -1,9 +1,10 @@
 # Bot de Telegram que responde — diseño
 
-> Estado: **decisiones tomadas, diseño a medias, sin implementar.**
-> Fecha: 12 de agosto de 2026.
-> Lo que falta antes de escribir código está al final, en «Qué queda por
-> decidir». No empezar a implementar sin cerrar eso con el usuario.
+> Estado: **implementado en la 1.0.19** (2026-08-12). Las cuatro preguntas
+> abiertas de «Qué queda por decidir» se cerraron ese mismo día — ver las
+> respuestas al final del documento. Código en `_bot_loop()`,
+> `construir_estado()` y `_responder_mensaje()` en `server.py`; tests en
+> `tests/test_bot_estado.py`.
 
 ## El problema
 
@@ -72,13 +73,21 @@ manual para no vender lo que no es.
 sirve para `getUpdates`: el falso devuelve mensajes preparados y se comprueba
 qué contesta el servidor. Sin internet y sin mandarle nada a nadie.
 
-## Qué queda por decidir
+## Qué quedaba por decidir (cerrado 2026-08-12)
 
-1. **Cada cuánto se relee la configuración** y qué pasa si el token cambia con
-   el hilo ya en marcha.
-2. **Formato exacto del mensaje** de `/estado` — hay que verlo escrito en un
-   móvil antes de darlo por bueno; un mensaje largo se lee mal.
-3. **Qué contesta a lo que no entiende**: silencio, o una línea de ayuda solo
-   al chat autorizado.
-4. Si `/estado` debe incluir también **disco y versión**, que ya se calculan
-   para `/api/info`.
+1. **Cada cuánto se relee la configuración** — en cada vuelta del bucle,
+   igual que `enviar_telegram()`. Sin token o chat configurado, el hilo no
+   llama a Telegram: duerme 5 s y vuelve a mirar. Si el token cambia (se
+   activa el bot, o se reemplaza), la vuelta siguiente lo detecta y repite el
+   descarte de pendientes con `offset=-1` antes de seguir. No hace falta
+   reiniciar el servidor para que un cambio en el panel se note.
+2. **Formato del mensaje** — bloques cortos con emoji por estado (`✅`/`❌` en
+   pantallas, `✅`/`⚠` en tableros), nombre de la instalación arriba y
+   versión + disco al pie. Ver `construir_estado()`. No se validó a mano en
+   un móvil real, solo por texto — si el mensaje se ve mal en pantallas
+   pequeñas o listas largas, es lo primero a revisar.
+3. **Qué contesta a lo que no entiende** — una línea de ayuda («No entendí.
+   Escribe /estado…»), solo al chat autorizado. Silencio total a cualquier
+   otro chat, tal y como estaba decidido para el acceso.
+4. **Disco y versión** — sí, van en el mensaje, reutilizando `estado_disco()`
+   y `APP_VERSION` (los mismos que ya calcula `/api/info`).

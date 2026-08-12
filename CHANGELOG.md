@@ -8,6 +8,110 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.25 — 2026-08-12
+
+### Corregido
+
+- **Hueco vacío entre la lista de divisas seleccionadas y "Servidor/Token"
+  en el panel lateral de la extensión.** La lista tenía una altura fija de
+  150px con scroll propio; ahora usa el espacio libre real del panel
+  (`flex:1`), así que el botón de enviar y la configuración quedan pegados
+  abajo en vez de flotar en medio de una zona vacía.
+
+---
+
+## 1.0.24 — 2026-08-12
+
+### Cambiado
+
+- **La extensión de Chrome ya no detecta divisas automáticamente en la
+  página.** No se podía verificar que funcionara bien en todas las webs. En
+  su lugar, el panel lateral trae un buscador de país/moneda —igual que en
+  Divisas del panel de administración— para añadir con un clic, más un
+  formulario para escribir un código a mano si no está en la lista.
+  Consecuencia directa: el selector de varios agentes de pago (Ria y
+  similares) desaparece de la extensión, porque solo tenía sentido cuando
+  el escaneo traía varias filas de la misma moneda a la vez. El campo
+  «agente/ventanilla» de una fila se sigue pudiendo escribir a mano desde el
+  editor del admin, como siempre se pudo.
+- La extensión ahora admite varios países con la misma moneda seleccionados
+  a la vez (antes, elegir un segundo país en dólares después de uno ya
+  puesto no hacía nada).
+
+---
+
+## 1.0.23 — 2026-08-12
+
+### Nuevo
+
+- **La sección Ayuda del panel explica cómo conectar la extensión de Chrome
+  desde otro ordenador.** No hacía falta buscarlo en el manual: el panel
+  mismo dice qué poner en "Servidor" (misma red vs. acceso remoto) y dónde
+  copiar el token, con la misma información que ya usa la extensión al
+  fallar con un 401.
+
+---
+
+## 1.0.22 — 2026-08-12
+
+### Corregido
+
+- **Una pantalla que seguía funcionando podía quedar marcada "offline" en el
+  panel para siempre.** Caso real: una pantalla servía contenido con
+  normalidad -el bot de `/estado` la veía conectada- pero el panel la
+  mostraba caída. Era una carrera entre hilos: si el televisor se
+  reconectaba solo (típico tras un corte de wifi) justo antes de que el
+  servidor notara que la conexión vieja había muerto, la limpieza de esa
+  conexión vieja pisaba el estado "conectada" que acababa de poner la nueva.
+  No se corregía sola: quedaba mostrando "offline" indefinidamente aunque la
+  pantalla siguiera respondiendo. Ahora el servidor comprueba si ya hay una
+  reconexión viva antes de marcar la pantalla como caída.
+
+---
+
+## 1.0.21 — 2026-08-12
+
+### Corregido
+
+- **La casilla «Iniciar con Windows» ahora hace lo que dice.** Antes se
+  guardaba en `config.json` y no la leía nadie: desmarcarla no apagaba nada,
+  y marcarla no encendía nada — el arranque real dependía solo de si el
+  instalador había registrado la tarea programada. Ahora el panel consulta y
+  cambia esa tarea de verdad al guardar Ajustes. Si falla (hace falta ser
+  administrador para tocar el Programador de tareas de Windows), el panel lo
+  avisa en vez de fingir que se aplicó.
+
+---
+
+## 1.0.20 — 2026-08-12
+
+### Nuevo
+
+- **Prioridad en el orden aleatorio.** Se puede marcar con ⭐ un contenido de
+  la playlist (por ejemplo, el tablero de divisas) para que salga con una
+  cadencia fija — "cada 4 pases", configurable — en vez de quedar sujeto al
+  azar como el resto. El resto de la playlist se sigue barajando y sin
+  repetirse dentro de la misma vuelta; solo lo marcado ⭐ puede volver a
+  salir dentro de la misma vuelta, si hace falta para cumplir su cadencia.
+  Solo tiene efecto con "Orden aleatorio" activado — con orden fijo ya se
+  controla la posición arrastrando.
+
+---
+
+## 1.0.19 — 2026-08-12
+
+### Nuevo
+
+- **El bot de Telegram ahora contesta.** Hasta ahora solo empujaba avisos
+  (pantalla caída, tasas viejas); ahora responde `/estado` con una pasada de
+  todas las pantallas (en línea o desde cuándo caídas) y todos los tableros de
+  divisas (al día o cuánto llevan vencidos), más disco y versión. Es de solo
+  lectura — no reinicia nada ni da el PIN de emparejamiento. Responde solo al
+  `telegram_chat_id` configurado; a cualquier otro chat, silencio total. No
+  hace falta configurar nada nuevo: usa el mismo token que ya usan los avisos.
+
+---
+
 ## 1.0.18 — 2026-08-12
 
 ### Corregido

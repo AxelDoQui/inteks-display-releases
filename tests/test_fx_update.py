@@ -186,6 +186,48 @@ def main():
         ok = not fila_ars.get("agent")
         print(f"  {'ok  ' if ok else 'FALLO'} una fila sin ventanilla no se inventa una")
         failed += not ok
+
+        # ── Dos módulos FX en la misma pantalla (p.ej. Western Union y Ria) ──
+        # Antes, sin decir a cuál de los dos te referías, el servidor
+        # actualizaba TODOS los módulos tipo fx de la pantalla: un cambio para
+        # Western Union se colaba también en Ria.
+        WU = dict(MODULO, id="fx_wu", name="WU",
+                  rows=[{"flag": "ar", "country": "Argentina", "currency": "Peso", "code": "ARS", "rate": "1716"}])
+        RIA = dict(MODULO, id="fx_ria", name="Ria", title="RIA - TIPOS DE CAMBIO",
+                   rows=[{"flag": "ar", "country": "Argentina", "currency": "Peso", "code": "ARS", "rate": "1720"}])
+        json.dump({"items": [WU, RIA],
+                   "screens": {"TV": {"mode": "independent", "playlist": [WU, RIA]}}},
+                  open(cpath, "w"))
+
+        post(base + "/api/fx-update", {
+            "rows": [{"flag": "ar", "country": "Argentina", "currency": "Peso", "code": "ARS", "rate": "1900"}],
+            "screen_ids": ["TV"], "item_id": "fx_wu",
+        })
+        playlist = json.load(open(cpath))["screens"]["TV"]["playlist"]
+        wu_item = next(i for i in playlist if i["id"] == "fx_wu")
+        ria_item = next(i for i in playlist if i["id"] == "fx_ria")
+        ok = wu_item["rows"][0]["rate"] == "1900"
+        print(f"  {'ok  ' if ok else 'FALLO'} con item_id se actualiza el modulo WU")
+        failed += not ok
+        ok = ria_item["rows"][0]["rate"] == "1720"
+        print(f"  {'ok  ' if ok else 'FALLO'} y el modulo Ria NO se toca (el bug de las 2 secciones)")
+        failed += not ok
+
+        # Sin item_id y con 2 módulos en la pantalla, no se adivina: no se toca
+        # ninguno de los dos en vez de pisar el que no tocaba.
+        r = post(base + "/api/fx-update", {
+            "rows": [{"flag": "ar", "country": "Argentina", "currency": "Peso", "code": "ARS", "rate": "2000"}],
+            "screen_ids": ["TV"],
+        })
+        playlist = json.load(open(cpath))["screens"]["TV"]["playlist"]
+        wu_item = next(i for i in playlist if i["id"] == "fx_wu")
+        ria_item = next(i for i in playlist if i["id"] == "fx_ria")
+        ok = wu_item["rows"][0]["rate"] == "1900" and ria_item["rows"][0]["rate"] == "1720"
+        print(f"  {'ok  ' if ok else 'FALLO'} sin item_id y con 2 modulos, no se toca ninguno")
+        failed += not ok
+        ok = "TV" not in r.get("updated_screens", [])
+        print(f"  {'ok  ' if ok else 'FALLO'} y la respuesta no dice que se actualizo esa pantalla")
+        failed += not ok
     finally:
         proc.terminate()
         try:
