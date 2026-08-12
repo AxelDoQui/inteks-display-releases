@@ -14,6 +14,13 @@ en su propia ventana, sin barra de direcciones.
 ventana, para que nadie pueda cerrarlo por error. No hace falta iniciar sesión
 en Windows.
 
+Se enciende y se apaga con la casilla **«Iniciar con Windows»** de Ajustes. Al
+guardar, el panel toca la tarea programada de verdad, así que lo que ves en la
+casilla es lo que va a pasar cuando enciendas el equipo. Como Windows exige
+permisos de administrador para eso, **puede fallar al guardar**: si pasa, el
+panel te lo dice claramente. No es un aviso decorativo — significa que el
+cambio no se aplicó y el arranque sigue como estaba.
+
 **Si algo va mal**, el registro está en
 `C:\ProgramData\InTeks Display\server.log`. Que ese archivo exista es la señal
 de que la instalación fue bien.
@@ -125,6 +132,22 @@ En la **Playlist** de cada pantalla, arriba:
 
 Un tipo por pantalla, para todos sus pases.
 
+### Que algo salga a menudo: la estrella ⭐
+
+Con el orden aleatorio, un contenido importante puede tener mala suerte y no
+salir en un buen rato. Para eso está la **⭐** de cada elemento de la playlist:
+lo marcado sale **con una cadencia fija** —cada 4 pases por defecto,
+ajustable— en vez de quedar al azar. Lo típico es el tablero de divisas, que
+interesa que se vea a menudo aunque haya veinte promociones más.
+
+El resto de la playlist se sigue barajando y sin repetirse dentro de la misma
+vuelta. Solo lo marcado con ⭐ puede volver a salir dentro de la misma vuelta,
+que es justo lo que hace falta para cumplir su cadencia. Si marcas varios, se
+turnan en vez de amontonarse seguidos.
+
+**Solo hace algo con «Orden aleatorio» activado.** Con el orden fijo la
+posición ya la decides tú arrastrando.
+
 ---
 
 ## Tipos de cambio
@@ -219,6 +242,26 @@ de esa pantalla, para que no suene de madrugada.
 hora, hasta qué hora y cada cuánto insistir (9:00 a 22:00 cada hora, por
 defecto). Pasada la hora de fin se calla aunque sigan viejas. Con «repetir cada
 0 horas» queda un único aviso al día.
+
+### Preguntarle al bot cómo va todo: `/estado`
+
+Los avisos llegan cuando algo pasa. Si lo que quieres es mirar tú —desde casa,
+un domingo, sin encender el ordenador de la tienda— escríbele **`/estado`** al
+bot y contesta al momento con:
+
+- **Cada pantalla**, en línea o desde cuándo lleva caída.
+- **Cada tablero de divisas**, cuánto hace que se actualizó, y marcado si ya
+  está vencido.
+- **Versión instalada y espacio en disco**, al pie.
+
+No hay nada que configurar: usa el mismo token de los avisos. Si ya recibes
+avisos, `/estado` funciona.
+
+**Solo contesta a tu chat.** A cualquier otra persona que le escriba no le
+responde nada — ni siquiera un error, para no confirmarle a un desconocido que
+el bot existe. Y **solo sabe mirar**: no reinicia el programa ni da el código
+de emparejamiento. Es una ventana, no una llave, y así puedes usarlo desde el
+móvil sin preocuparte.
 
 > El token se guarda en `config.json`, que **sí** entra en la copia de
 > seguridad. Trátala como una contraseña.

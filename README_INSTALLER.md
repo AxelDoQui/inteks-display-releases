@@ -74,8 +74,12 @@ O abre `installer/setup.iss` con Inno Setup y pulsa *Compile*.
 ### 4. Resultado
 
 ```
-dist/installer/InTeks_Display_Setup_v1.0.0.exe
+dist/installer/InTeks_Display_Setup_v<VERSION>.exe
 ```
+
+El número sale de `OutputBaseFilename` en `setup.iss`, que lo pone
+`tools\subir-version.ps1`. Si el nombre no lleva la versión que esperas, es que
+no subiste la versión antes de compilar.
 
 ## La extensión de Chrome
 
@@ -194,7 +198,7 @@ causa más habitual de que la instalación acabe en el 9000.
 
 ## Distribución
 
-- Comparte `InTeks_Display_Setup_v1.0.0.exe`
+- Comparte `InTeks_Display_Setup_v<VERSION>.exe`, el de `dist/installer/`
 - Requiere Python 3.10+ en el equipo destino (ver arriba)
 - No requiere Node.js
 - Windows 10 y 11, 64 bits
