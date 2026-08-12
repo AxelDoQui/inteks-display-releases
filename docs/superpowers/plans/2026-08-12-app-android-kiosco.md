@@ -291,7 +291,9 @@ $bt = "$env:LOCALAPPDATA\Android\Sdk\build-tools\37.0.0"
 & "$bt\aapt2.exe" dump badging "c:\Users\axeld\Documents\1. Proyectos Apps\Digital Signage\android\app\build\outputs\apk\debug\app-debug.apk" | Select-String -Pattern "launchable|leanback|uses-feature"
 ```
 
-Esperado: aparecen **las dos** líneas, `launchable-activity:` y `leanback-launchable-activity:`, y esta última **con `banner=` no vacío**.
+Esperado: aparecen **las dos** líneas, `launchable-activity:` y `leanback-launchable-activity:`, y en la línea `application:` un **`banner='res/drawable/banner.xml'`**.
+
+Ojo con dónde se mira el banner: en la línea de `leanback-launchable-activity` sale `banner=''` y **está bien así**. Ese es el override por actividad; el que usa Android TV por defecto es el de `<application>`.
 
 - [ ] **Step 8: Excluir del repo lo que no se versiona**
 
