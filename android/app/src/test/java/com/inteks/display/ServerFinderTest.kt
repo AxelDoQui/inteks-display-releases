@@ -41,4 +41,26 @@ class ServerFinderTest {
         assertEquals(0, direccionesDeLaSubred(RedLocal("no-es-una-ip", 24)).size)
         assertEquals(0, direccionesDeLaSubred(RedLocal("", 24)).size)
     }
+
+    @Test
+    fun `una respuesta real de api info se reconoce`() {
+        val real = """{"version": "1.0.25", "port": 80, "ip": "192.168.0.63",
+            "mdns_host": "signage.local", "mdns_name": "signage",
+            "player_url": "http://192.168.0.63/player.html"}"""
+        assertTrue(esRespuestaDeInTeks(real))
+    }
+
+    @Test
+    fun `otro servidor web de la red no cuela`() {
+        assertTrue(!esRespuestaDeInTeks("<html><body>Router</body></html>"))
+        assertTrue(!esRespuestaDeInTeks("""{"status":"ok"}"""))
+        assertTrue(!esRespuestaDeInTeks("""{"version":"1.0.0"}"""))
+    }
+
+    @Test
+    fun `una respuesta vacia o rota no revienta`() {
+        assertTrue(!esRespuestaDeInTeks(null))
+        assertTrue(!esRespuestaDeInTeks(""))
+        assertTrue(!esRespuestaDeInTeks("{"))
+    }
 }

@@ -25,3 +25,15 @@ fun direccionesDeLaSubred(red: RedLocal): List<String> {
         "${(n shr 24) and 0xFF}.${(n shr 16) and 0xFF}.${(n shr 8) and 0xFF}.${n and 0xFF}"
     }
 }
+
+/**
+ * ¿Esta respuesta viene de un InTeks Display?
+ *
+ * Se exigen DOS campos, no uno: `mdns_name` y `player_url`. Con solo mirar
+ * `version` colaría cualquier API de la red que devuelva un número de versión,
+ * y en una tienda hay routers, impresoras y cámaras contestando en el 80.
+ */
+fun esRespuestaDeInTeks(cuerpo: String?): Boolean {
+    if (cuerpo.isNullOrBlank()) return false
+    return cuerpo.contains("\"mdns_name\"") && cuerpo.contains("\"player_url\"")
+}
