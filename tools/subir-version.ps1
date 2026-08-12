@@ -4,12 +4,13 @@ param(
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  Sube el numero de version en los tres sitios donde vive.
+#  Sube el numero de version en los cuatro sitios donde vive.
 #
 #  Por que hace falta un script para esto: la version esta en server.py (lo que
 #  reporta el panel), en installer\setup.iss (dos veces: lo que ve Windows en
-#  "Programas instalados" y el nombre del .exe) y en package.json. Son cuatro
-#  ediciones a mano en tres archivos que no se hablan, y olvidarse de una
+#  "Programas instalados" y el nombre del .exe), en package.json y en
+#  android\app\build.gradle.kts (lo que dice el APK de la caja de TV). Son cinco
+#  ediciones a mano en cuatro archivos que no se hablan, y olvidarse de una
 #  significa que el panel de una tienda dice una cosa y el instalador otra.
 #
 #  Peor todavia: dos .exe distintos con el mismo nombre. Ya paso -en un solo dia
@@ -55,9 +56,10 @@ Reemplazar "server.py" '(?m)^APP_VERSION\s*=\s*"[^"]+"' "APP_VERSION = `"$Versio
 Reemplazar "installer\setup.iss" '(?m)^AppVersion=.+$' "AppVersion=$Version" "AppVersion"
 Reemplazar "installer\setup.iss" '(?m)^OutputBaseFilename=(.*)_v[0-9.]+\s*$' "OutputBaseFilename=`$1_v$Version" "nombre del .exe"
 Reemplazar "package.json" '(?m)^(\s*"version":\s*)"[^"]+"' "`$1`"$Version`"" "version"
+Reemplazar "android\app\build.gradle.kts" '(?m)^(\s*versionName\s*=\s*)"[^"]+"' "`$1`"$Version`"" "versionName"
 
 Write-Host ""
-Write-Host "  Comprobando que los tres coinciden..."
+Write-Host "  Comprobando que los cuatro coinciden..."
 Push-Location $RAIZ
 try {
     $salida = & npm test 2>&1 | Out-String

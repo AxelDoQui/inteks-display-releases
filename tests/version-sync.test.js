@@ -30,6 +30,8 @@ const enSetup = () => unico("installer/setup.iss", /^AppVersion=(.+)$/m, "AppVer
 const enSetupNombre = () =>
   unico("installer/setup.iss", /^OutputBaseFilename=.*_v([0-9.]+)\s*$/m, "OutputBaseFilename");
 const enPackage = () => JSON.parse(leer("package.json")).version;
+const enAndroid = () =>
+  unico("android/app/build.gradle.kts", /versionName\s*=\s*"([^"]+)"/, "versionName");
 
 test("el servidor y el instalador dicen la misma versión", () => {
   assert.strictEqual(enServer(), enSetup(),
@@ -45,6 +47,13 @@ test("el nombre del .exe lleva esa misma versión", () => {
 test("package.json va al mismo paso", () => {
   assert.strictEqual(enPackage(), enServer(),
     "package.json version no coincide con APP_VERSION");
+});
+
+test("la app Android va al mismo paso", () => {
+  // Sin esto el APK saldria con la version que le tocara y no habria forma de
+  // saber que codigo tiene instalado una tienda en su caja de TV.
+  assert.strictEqual(enAndroid(), enServer(),
+    "android/app/build.gradle.kts versionName no coincide con APP_VERSION");
 });
 
 test("la versión tiene forma de versión", () => {
