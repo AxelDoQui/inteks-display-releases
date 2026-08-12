@@ -28,6 +28,7 @@ class KioskActivity : Activity() {
     private val hilo = Handler(Looper.getMainLooper())
     private var intentos = 0
     private var algoPintado = false
+    private var errorEnEstaCarga = false
     private var fallosSeguidos = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,10 +65,18 @@ class KioskActivity : Activity() {
         web.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 Log.i(TAG, "onPageStarted url=$url")
+                errorEnEstaCarga = false
             }
 
+            /**
+             * OJO: esto tambien salta con la pagina de error del WebView.
+             * Llegar aqui NO significa que la carga fuera bien, por eso manda
+             * `errorEnEstaCarga` y no el hecho de que se haya terminado.
+             */
             override fun onPageFinished(view: WebView?, url: String?) {
-                Log.i(TAG, "onPageFinished url=$url progreso=${web.progress} titulo=${web.title}")
+                Log.i(TAG, "onPageFinished url=$url progreso=${web.progress}" +
+                    " error=$errorEnEstaCarga titulo=${web.title}")
+                if (errorEnEstaCarga) { reintentar(); return }
                 algoPintado = true
                 intentos = 0
                 if (web.parent == null) setContentView(web)
@@ -77,15 +86,20 @@ class KioskActivity : Activity() {
                 }
             }
 
+            /**
+             * Solo importa que falle el MARCO PRINCIPAL.
+             *
+             * Si lo que falla es un subrecurso -una imagen, el SSE- el player
+             * sigue reproduciendo de su cache y no hay que tocar nada: recargar
+             * ahi seria tirar a la basura lo unico que mantiene vivo el
+             * escaparate cuando el servidor esta caido.
+             */
             override fun onReceivedError(
                 view: WebView?, req: WebResourceRequest?, err: WebResourceError?
             ) {
-                Log.i(TAG, "onReceivedError principal=${req?.isForMainFrame}" +
-                    " url=${req?.url} algoPintado=$algoPintado")
-                // Si YA hay algo pintado no se toca nada: el player sigue
-                // reproduciendo de su cache y taparlo empeoraria el producto.
-                if (algoPintado) return
-                reintentar()
+                Log.i(TAG, "onReceivedError principal=${req?.isForMainFrame} url=${req?.url}")
+                if (req?.isForMainFrame != true) return
+                errorEnEstaCarga = true
             }
         }
     }
