@@ -171,11 +171,23 @@ class KioskActivity : Activity() {
         Thread {
             val red = redLocalDe(this)
             val encontrada = if (red == null) null else buscarServidor(red, SondeadorHttp())
+            Log.i(TAG, "barrido red=$red encontrada=$encontrada algoPintado=$algoPintado")
             hilo.post {
                 if (encontrada != null) {
                     ajustes.base = encontrada
                     cargar(encontrada)
+                } else if (algoPintado) {
+                    // Hay una pagina cargada y viva: el player sigue
+                    // reproduciendo de su cache aunque el servidor este caido.
+                    // Cambiar a la pantalla de ajustes aqui seria TIRAR el
+                    // escaparate que funciona para poner un formulario que
+                    // nadie va a rellenar de madrugada. Se vuelve a intentar
+                    // y ya esta: es el caso de la tienda que apaga el PC por
+                    // la noche.
+                    hilo.postDelayed({ buscarYCargar() }, ESPERA_MAXIMA_MS)
                 } else {
+                    // Nunca hemos llegado a pintar nada: aqui si toca pedir la
+                    // direccion, porque no hay escaparate que estropear.
                     startActivity(Intent(this, SetupActivity::class.java))
                     finish()
                 }
