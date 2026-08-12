@@ -1,9 +1,11 @@
 # App propia de kiosco para Android — diseño
 
-> Estado: **diseñado, sin implementar** (2026-08-12). Sustituye a Fully Kiosk
-> Browser (~7 € por pantalla) en las cajas Android que reproducen el player.
-> Todo lo de «Lo medido» está comprobado por ADB contra el aparato real, no
-> supuesto.
+> Estado: **implementado y verificado en la caja real** (2026-08-13). Sustituye
+> a Fully Kiosk Browser (~7 € por pantalla) en las cajas Android que reproducen
+> el player. Todo lo de «Lo medido» está comprobado por ADB contra el aparato
+> real, no supuesto. Ver «Lo que aparecio al implementarlo» al final: dos cosas
+> de esta tabla resultaron incompletas y una de ellas era un fallo de producto
+> serio.
 
 ## El problema
 
@@ -237,6 +239,64 @@ Y hay que decirlo claro, como siempre:
 
 Ese bucle va al ritmo de quien tenga la caja delante, no al de quien escribe el
 código.
+
+## Lo que apareció al implementarlo
+
+Dos cosas de este documento resultaron incompletas al llevarlo a la caja el
+2026-08-13.
+
+### 1. La app tiene que ENCENDER la pantalla, no solo mantenerla encendida
+
+Este diseño daba por hecho que con `keepScreenOn` bastaba. **No basta.**
+`FLAG_KEEP_SCREEN_ON` impide que la pantalla se duerma; **no despierta una que
+ya está apagada.**
+
+El caso real, que es justo el que más importa en una tienda: se va la luz, la
+caja reinicia, y **tarda 118 segundos en llegar a `BOOT_COMPLETED`** (medido).
+Durante esos dos minutos nada sujeta la pantalla, así que se duerme. La app
+arrancaba después, correctamente, detrás de un display apagado: **escaparate
+negro con todo funcionando perfectamente por dentro.**
+
+Es la peor clase de fallo porque no parece un fallo del programa. El síntoma
+—captura totalmente negra— es idéntico al de un WebView que no pinta, y lleva a
+buscar donde no es. Lo que lo cerró fue `dumpsys power`: `mWakefulness=Asleep`.
+
+Arreglado con `FLAG_TURN_SCREEN_ON` más un wake lock con
+`ACQUIRE_CAUSES_WAKEUP`, que es lo que fuerza el encendido cuando el aparato ya
+estaba dormido; el flag por sí solo no siempre lo consigue en API 25.
+
+**Regla para el futuro: ante una captura en negro, mirar `dumpsys power` antes
+de culpar al WebView.**
+
+### 2. El proveedor de WebView no es el que dice la versión instalada
+
+La tabla de arriba dice «WebView 119.0.6045.193», y es cierto que ese paquete
+está instalado. Pero el proveedor que el sistema **carga de verdad** es
+`com.android.chrome` **62.0.3202.84**, de 2017. Se ve en el log al arrancar:
+
+```
+I WebViewFactory: Loading com.android.chrome version 62.0.3202.84
+```
+
+`dumpsys webviewupdate` no devuelve nada en API 25, así que la única forma de
+saberlo es mirar el `logcat`. Se puede forzar el otro con
+`cmd webviewupdate set-webview-implementation com.google.android.webview`, y se
+probó: **no cambiaba el problema de la pantalla negra**, así que no era esto.
+
+Queda anotado porque **sí afecta a qué sabe renderizar el player**: Chrome 62 no
+soporta `clamp()`, que llegó en Chrome 79. La página de emparejar se ve bien con
+los dos, pero **un tablero de divisas puede no verse igual**, y eso está sin
+comprobar. Es lo primero que hay que mirar si en una caja el tablero sale
+descuadrado.
+
+### 3. `am force-stop` no simula una caída
+
+Sirve para probar el latido tanto como desenchufar el router para probar un
+disco duro: `force-stop` deja la app en estado `stopped` y **cancela sus
+alarmas**. Con él, el latido no la levanta — y eso es correcto, no un fallo.
+Para simular una muerte por falta de memoria hay que matar el proceso
+(`kill -9`, con `adb root`, que esta ROM `userdebug` permite): así las alarmas
+sobreviven y el latido hace su trabajo.
 
 ## Fuera de alcance, a propósito
 
