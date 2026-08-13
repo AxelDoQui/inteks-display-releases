@@ -73,7 +73,11 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
    topes salían un 78% más grandes de lo que cabía y el nombre del país se
    solapaba con la cotización. */
 .mod-fx-rows{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:0 4% 3vh;gap:0;--fx-row-h:80px;--fx-box-w:1000px}
-.mod-fx-note{flex-shrink:0;max-height:18%;overflow:hidden;padding:1.5vh 4% 2.5vh;border-top:1px solid rgba(255,255,255,.12);font-size:clamp(11px,1.9vmin,22px);line-height:1.35;opacity:.75}
+/* El pie sube de 1.9vmin a 2.5vmin: en un televisor a tres metros el aviso
+   legal de las tasas no se leia. Al crecer la letra necesita mas alto, asi que
+   el tope sube de 18% a 22%; si no, una nota larga se recortaria contra el
+   overflow:hidden y saldria peor que antes. */
+.mod-fx-note{flex-shrink:0;max-height:22%;overflow:hidden;padding:1.5vh 4% 2.5vh;border-top:1px solid rgba(255,255,255,.12);font-size:clamp(13px,2.5vmin,28px);line-height:1.35;opacity:.75}
 .fx-row{flex:var(--fx-flex,1 1 0);min-height:0;display:flex;align-items:center;border-bottom:1px solid rgba(255,255,255,.07);gap:2.5%;height:var(--fx-row-h)}
 .fx-row:last-child{border-bottom:none}
 .fx-flag{font-size:min(calc(var(--fx-row-h)*.42),calc(var(--fx-box-w)*.075));width:min(calc(var(--fx-row-h)*.55),calc(var(--fx-box-w)*.10));text-align:center;flex-shrink:0}
@@ -81,6 +85,12 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 /* El nombre del país no puede empujar a la cotización: si no cabe, se recorta */
 .fx-country-name{font-size:min(calc(var(--fx-row-h)*.26),calc(var(--fx-box-w)*.055));font-weight:600;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fx-currency{font-size:min(calc(var(--fx-row-h)*.13),calc(var(--fx-box-w)*.028));opacity:.45;font-family:monospace;letter-spacing:1px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* La ventanilla en su propia linea. Iba pegada a la moneda -"Peso filipino ·
+   RIA & Palawan", 29 caracteres- y no cabia: se cortaba justo el dato que
+   distingue una ventanilla de otra. Sola dispone del ancho entero de su
+   columna, y va un punto mas opaca que la moneda porque al cliente le importa
+   mas donde cobra que como se llama el billete. */
+.fx-agent{font-size:min(calc(var(--fx-row-h)*.13),calc(var(--fx-box-w)*.028));opacity:.62;font-family:monospace;letter-spacing:1px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fx-rate{text-align:right;flex-shrink:0;min-width:0}
 .fx-rate-val{font-size:min(calc(var(--fx-row-h)*.42),calc(var(--fx-box-w)*.115));font-weight:700;font-family:monospace;letter-spacing:-1px;white-space:nowrap}
 .fx-rate-label{font-size:min(calc(var(--fx-row-h)*.10),calc(var(--fx-box-w)*.022));opacity:.4;text-align:right;letter-spacing:1px;margin-top:2px;white-space:nowrap}
@@ -749,7 +759,8 @@ function buildFxSlide(item){
       <div class="fx-flag">${flagImg(r.flag,"100%")}</div>
       <div class="fx-country">
         <div class="fx-country-name">${r.country||""}</div>
-        <div class="fx-currency">${r.currency||""}${r.agent?` · ${r.agent}`:""}</div>
+        <div class="fx-currency">${r.currency||""}</div>
+        ${r.agent?`<div class="fx-agent">${r.agent}</div>`:""}
       </div>
       <div class="fx-rate">
         <div class="fx-rate-val">${r.rate||"—"}</div>

@@ -8,6 +8,23 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.27 — 2026-08-13
+
+### Corregido
+
+- **El nombre de la ventanilla se cortaba en el tablero de divisas.** Iba
+  pegado a la moneda en la misma línea —«Peso filipino · RIA & Palawan»— y en
+  cuanto la fila se estrechaba desaparecía justo el dato que distingue una
+  ventanilla de otra: se leía «RIA & Pala…». Ahora va en su propia línea, con
+  el ancho entero para él, y se ve entero.
+
+### Cambiado
+
+- **El aviso del pie del tablero se ve más grande.** El texto legal de las
+  tasas era demasiado pequeño para leerlo desde el otro lado del mostrador.
+
+---
+
 ## 1.0.26 — 2026-08-13
 
 ### Nuevo
