@@ -149,7 +149,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .fx-combo-item.active{background:var(--s3)}
 /* La primera columna es el asa de arrastre: el orden de las divisas lo fija el
    usuario y ninguna actualizacion de tasas lo cambia. */
-.fx-row-edit{display:grid;grid-template-columns:18px 40px minmax(0,1fr) minmax(0,1fr) 80px 80px minmax(0,.9fr) 32px;gap:6px;padding:8px 10px;border-bottom:1px solid var(--b);align-items:center}
+.fx-row-edit{display:grid;grid-template-columns:18px 26px 40px minmax(0,1fr) minmax(0,1fr) 80px 80px minmax(0,.9fr) 32px;gap:6px;padding:8px 10px;border-bottom:1px solid var(--b);align-items:center}
+.fx-mover{display:flex;flex-direction:column;gap:2px}
+.fx-mover .btn{padding:1px 4px;line-height:1;font-size:9px}
+.fx-mover .btn[disabled]{opacity:.25;cursor:default}
 .fx-row-edit.dragging{opacity:.3}
 .fx-row-edit.drag-over{border-color:var(--accent);background:rgba(255,127,0,.06)}
 .fx-handle{color:var(--muted);opacity:.35;font-size:12px;cursor:grab;text-align:center}
@@ -436,7 +439,8 @@ JPY  Yen        162.5"></textarea>
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:18px 40px minmax(0,1fr) minmax(0,1fr) 80px 80px minmax(0,.9fr) 32px;gap:6px;padding:6px 10px;margin-bottom:4px">
+    <div class="fx-cabecera" style="display:grid;grid-template-columns:18px 26px 40px minmax(0,1fr) minmax(0,1fr) 80px 80px minmax(0,.9fr) 32px;gap:6px;padding:6px 10px;margin-bottom:4px">
+      <span></span>
       <span></span>
       <span style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace">BANDERA</span>
       <span style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace">PAÍS</span>
@@ -2460,7 +2464,9 @@ function renderFxRows(){
   const c=document.getElementById("fx-rows");c.innerHTML="";
   fxRows.forEach((r,i)=>{
     const el=document.createElement("div");el.className="fx-row-edit";el.dataset.i=i;
-    el.innerHTML=`<span class="fx-handle" title="Arrastra para reordenar"><i class="fa-solid fa-grip-vertical"></i></span><input value="${r.flag||''}" oninput="fxRows[${i}].flag=this.value;updateFxPreview()" placeholder="VE" maxlength="2" title="Código de país de 2 letras (VE, US, MX...)" style="text-align:center;text-transform:uppercase"><input value="${r.country}" oninput="fxRows[${i}].country=this.value;updateFxPreview()" placeholder="País"><input value="${r.currency}" oninput="fxRows[${i}].currency=this.value;updateFxPreview()" placeholder="Moneda"><input value="${r.code}" oninput="fxRows[${i}].code=this.value;updateFxPreview()" placeholder="USD"><input value="${r.rate}" oninput="fxRows[${i}].rate=this.value;updateFxPreview()" placeholder="1.08"><input value="${r.agent||''}" oninput="fxRows[${i}].agent=this.value;updateFxPreview()" placeholder="Opcional" title="Punto de pago/ventanilla (p. ej. Davivienda). Se muestra en pantalla bajo el país. Déjalo vacío en un tablero de cambio normal."><button class="btn btn-danger btn-sm" onclick="rmFxRow(${i})"><i class="fa-solid fa-xmark"></i></button>`;
+    const sube=`<button class="btn btn-ghost btn-sm" ${i===0?"disabled":""} title="Subir" onclick="moverFxRow(${i},${i-1})"><i class="fa-solid fa-chevron-up"></i></button>`;
+    const baja=`<button class="btn btn-ghost btn-sm" ${i===fxRows.length-1?"disabled":""} title="Bajar" onclick="moverFxRow(${i},${i+1})"><i class="fa-solid fa-chevron-down"></i></button>`;
+    el.innerHTML=`<span class="fx-handle" title="Arrastra para reordenar"><i class="fa-solid fa-grip-vertical"></i></span><div class="fx-mover">${sube}${baja}</div><input value="${r.flag||''}" oninput="fxRows[${i}].flag=this.value;updateFxPreview()" placeholder="VE" maxlength="2" title="Código de país de 2 letras (VE, US, MX...)" style="text-align:center;text-transform:uppercase"><input value="${r.country}" oninput="fxRows[${i}].country=this.value;updateFxPreview()" placeholder="País"><input value="${r.currency}" oninput="fxRows[${i}].currency=this.value;updateFxPreview()" placeholder="Moneda"><input value="${r.code}" oninput="fxRows[${i}].code=this.value;updateFxPreview()" placeholder="USD"><input value="${r.rate}" oninput="fxRows[${i}].rate=this.value;updateFxPreview()" placeholder="1.08"><input value="${r.agent||''}" oninput="fxRows[${i}].agent=this.value;updateFxPreview()" placeholder="Opcional" title="Punto de pago/ventanilla (p. ej. Davivienda). Se muestra en pantalla bajo el país. Déjalo vacío en un tablero de cambio normal."><button class="btn btn-danger btn-sm" onclick="rmFxRow(${i})"><i class="fa-solid fa-xmark"></i></button>`;
 
     const asa=el.querySelector(".fx-handle");
     asa.addEventListener("mousedown",()=>{ el.draggable=true; });
