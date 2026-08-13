@@ -2462,6 +2462,21 @@ function renderFxRows(){
   updateFxPreview();
 }
 
+// Mueve un elemento de una lista de sitio. La usan el arrastre y los botones
+// subir/bajar, que es lo que garantiza que las dos formas de reordenar hagan
+// exactamente lo mismo en vez de ser dos splice parecidos que se separan al
+// primer arreglo. Devuelve si movió algo, para no repintar de balde.
+function moverEnLista(lista,desde,hasta){
+  if(!Array.isArray(lista)) return false;
+  if(desde==null||hasta==null) return false;
+  if(desde===hasta) return false;
+  if(desde<0||desde>=lista.length) return false;
+  if(hasta<0||hasta>=lista.length) return false;
+  const [x]=lista.splice(desde,1);
+  lista.splice(hasta,0,x);
+  return true;
+}
+
 // Mueve una divisa de sitio. Se reconstruye la lista entera porque los oninput
 // llevan el índice incrustado: dejarlos desfasados haría que editar una fila
 // escribiera en otra.
