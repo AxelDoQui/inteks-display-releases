@@ -163,6 +163,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .fx-mover .btn[disabled]{opacity:.25;cursor:default}
 /* En escritorio la fila enseña sus ocho campos: ni resumen ni boton de editar. */
 .fx-resumen,.fx-editar{display:none}
+/* Los rotulos de las columnas. La rejilla estaba en un style EN LINEA, y lo en
+   linea gana a cualquier regla: el display:none del movil no tenia efecto y la
+   cabecera salia aplastada encima de las filas. Aqui si se puede ocultar. */
+.fx-cabecera{display:grid;grid-template-columns:18px 26px 40px minmax(0,1fr) minmax(0,1fr) 80px 80px minmax(0,.9fr) 32px;gap:6px;padding:6px 10px;margin-bottom:4px}
 .fx-row-edit.dragging{opacity:.3}
 .fx-row-edit.drag-over{border-color:var(--accent);background:rgba(255,127,0,.06)}
 .fx-handle{color:var(--muted);opacity:.35;font-size:12px;cursor:grab;text-align:center}
@@ -279,6 +283,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
      grid-area compartido se apilarian los cinco en la misma celda, unos encima
      de otros; con grid-column:1/-1 la rejilla les crea una fila a cada uno. */
   .fx-row-edit.abierta>.fx-sec{display:block;grid-column:1/-1;margin-top:6px}
+
+  /* La previa a tamano de pantalla ya nace plegada -la enciende la casilla
+     fx-prev-on-, asi que aqui solo hay que asegurar que QUEPA al abrirla: el
+     escenario tiene max-width:440px, mas ancho que un movil de 390. */
+  #fx-prev-stage{max-width:100%}
+  #fx-prev-preset{max-width:100%}
 }
 </style>
 </head>
@@ -530,7 +540,7 @@ JPY  Yen        162.5"></textarea>
       </div>
     </div>
 
-    <div class="fx-cabecera" style="display:grid;grid-template-columns:18px 26px 40px minmax(0,1fr) minmax(0,1fr) 80px 80px minmax(0,.9fr) 32px;gap:6px;padding:6px 10px;margin-bottom:4px">
+    <div class="fx-cabecera">
       <span></span>
       <span></span>
       <span style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace">BANDERA</span>
