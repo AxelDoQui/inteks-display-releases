@@ -20,6 +20,13 @@ const val LATIDO_MS = 2 * 60 * 1000L
  */
 class LatidoReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
+        // Si alguien pidio la salida de mantenimiento, dejarle sus cinco
+        // minutos: si no, la app volveria sola y no se podria ni cambiar el
+        // wifi de la caja.
+        if (SystemClock.elapsedRealtime() < SettingsStore(context).mantenimientoHasta) {
+            programarLatido(context)
+            return
+        }
         context.startActivity(Intent(context, KioskActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             // singleTask + esta bandera: si ya esta delante, no hace nada

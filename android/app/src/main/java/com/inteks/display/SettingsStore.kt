@@ -16,4 +16,14 @@ class SettingsStore(context: Context) {
     var nombrePantalla: String?
         get() = prefs.getString("pantalla", null)
         set(v) { prefs.edit().putString("pantalla", v).apply() }
+
+    /**
+     * Hasta cuándo dejar la caja en paz (`SystemClock.elapsedRealtime`).
+     *
+     * Lo lee también `LatidoReceiver`, que vive en otro proceso al saltar la
+     * alarma: por eso está aquí y no en un campo de la actividad.
+     */
+    var mantenimientoHasta: Long
+        get() = prefs.getLong("mantenimiento", 0L)
+        set(v) { prefs.edit().putLong("mantenimiento", v).apply() }
 }

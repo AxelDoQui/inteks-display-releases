@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import android.util.Log
 import android.view.Gravity
 import android.view.View
@@ -15,9 +16,11 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.TextView
+import android.widget.Toast
 
 const val VIGILANCIA_MS = 60_000L
 const val FALLOS_ANTES_DE_REBARRER = 3
+const val VOLVER_AL_FRENTE_MS = 4_000L
 const val TAG = "InTeksKiosco"
 
 class KioskActivity : Activity() {
@@ -30,6 +33,7 @@ class KioskActivity : Activity() {
     private var algoPintado = false
     private var errorEnEstaCarga = false
     private var fallosSeguidos = 0
+    private var pulsacionesAtras = emptyList<Long>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -239,37 +243,61 @@ class KioskActivity : Activity() {
     }
 
     /**
-     * La tecla ATRAS no hace nada. A proposito.
+     * La tecla ATRAS no saca de la app. A proposito: es la mas facil de pulsar
+     * sin querer y la que mas cerca esta del boton de encendido en los mandos
+     * baratos. Tampoco navega hacia atras en el historial, que en una pantalla
+     * de tienda no hay «atras» al que ir.
      *
-     * Sin esto, un toque en el mando cierra la actividad y deja el lanzador de
-     * la caja en el escaparate hasta que salte el latido, que puede tardar dos
-     * minutos. Es la tecla mas facil de pulsar sin querer y la que mas cerca
-     * esta del boton de encendido en los mandos baratos.
-     *
-     * Tampoco se navega hacia atras en el historial del WebView: en una
-     * pantalla de tienda no hay «atras» al que ir, y volver a la pagina
-     * anterior seria salirse del player.
+     * Cinco pulsaciones seguidas SI abren la salida de mantenimiento: sin eso,
+     * cambiar el wifi de la caja exigiria un PC con ADB.
      */
     override fun onBackPressed() {
-        Log.i(TAG, "tecla ATRAS ignorada")
+        pulsacionesAtras = registrarPulsacion(pulsacionesAtras, SystemClock.elapsedRealtime())
+        if (esSalidaDeMantenimiento(pulsacionesAtras, SystemClock.elapsedRealtime())) {
+            abrirMantenimiento()
+        } else {
+            Log.i(TAG, "tecla ATRAS ignorada (${pulsacionesAtras.size}/$PULSACIONES_SALIDA)")
+        }
+    }
+
+    override fun onKeyDown(codigo: Int, evento: android.view.KeyEvent?): Boolean {
+        if (codigo == android.view.KeyEvent.KEYCODE_APP_SWITCH) return true
+        return super.onKeyDown(codigo, evento)
+    }
+
+    private fun abrirMantenimiento() {
+        ajustes.mantenimientoHasta = SystemClock.elapsedRealtime() + MANTENIMIENTO_MS
+        Log.i(TAG, "salida de mantenimiento: 5 minutos")
+        Toast.makeText(this, R.string.mantenimiento, Toast.LENGTH_LONG).show()
+        finish()
     }
 
     /**
-     * Cualquier tecla que sacaria de la app se traga aqui: ATRAS por si algun
-     * fabricante no pasa por onBackPressed, y la de aplicaciones recientes.
+     * Volver al frente sola si algo la tapa.
+     *
+     * INICIO y RECIENTES no se pueden bloquear desde una app normal: el sistema
+     * los intercepta antes de que lleguen a onKeyDown. Solo lo evitarian ser el
+     * lanzador o el modo lock task. Asi que en vez de impedir la salida, se
+     * vuelve enseguida: el escaparate reaparece en segundos en lugar de esperar
+     * hasta dos minutos al latido.
      */
-    override fun onKeyDown(codigo: Int, evento: android.view.KeyEvent?): Boolean {
-        if (codigo == android.view.KeyEvent.KEYCODE_BACK ||
-            codigo == android.view.KeyEvent.KEYCODE_APP_SWITCH
-        ) {
-            Log.i(TAG, "tecla $codigo ignorada")
-            return true
+    override fun onPause() {
+        super.onPause()
+        if (isFinishing) return
+        if (SystemClock.elapsedRealtime() < ajustes.mantenimientoHasta) {
+            Log.i(TAG, "en mantenimiento: no vuelvo al frente")
+            return
         }
-        return super.onKeyDown(codigo, evento)
+        hilo.postDelayed({
+            startActivity(Intent(this, KioskActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+            })
+        }, VOLVER_AL_FRENTE_MS)
     }
 
     override fun onResume() {
         super.onResume()
+        pulsacionesAtras = emptyList()
         aplicarPantallaCompleta()
     }
 
