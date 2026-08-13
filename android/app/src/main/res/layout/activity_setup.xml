@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="48dp"
+    android:background="#07182b">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/no_encontrado"
+        android:textColor="#FF7F00"
+        android:textSize="20sp"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/escribe_direccion"
+        android:textColor="#7a8ca3"
+        android:textSize="15sp"
+        android:layout_marginBottom="24dp" />
+
+    <EditText
+        android:id="@+id/direccion"
+        android:layout_width="420dp"
+        android:layout_height="wrap_content"
+        android:text="http://192.168.0."
+        android:inputType="textUri"
+        android:textColor="#eaf1f9"
+        android:textSize="18sp"
+        android:focusable="true"
+        android:focusableInTouchMode="true" />
+
+    <Button
+        android:id="@+id/conectar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/conectar"
+        android:layout_marginTop="24dp"
+        android:focusable="true" />
+</LinearLayout>

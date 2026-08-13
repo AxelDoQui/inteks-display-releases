@@ -40,3 +40,9 @@ Thumbs.db
 # NOTA sobre config.json: SÍ se versiona a propósito. setup.iss lo instala con
 # la marca onlyifdoesntexist, así que hace de plantilla de valores por defecto
 # y no contiene secretos. Si algún día guarda credenciales, sácalo de aquí.
+
+# App Android: artefactos de compilacion y ruta local del SDK
+android/build/
+android/.gradle/
+android/app/build/
+android/local.properties

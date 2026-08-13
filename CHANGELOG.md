@@ -8,6 +8,31 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.26 — 2026-08-13
+
+### Nuevo
+
+- **App propia para las cajas Android de TV**, para no depender de Fully Kiosk
+  Browser ni pagar sus 7 € por pantalla. Se instala en la caja y hace tres
+  cosas que un navegador normal no hace:
+  - **Encuentra el servidor sola.** Busca InTeks Display por la red y se
+    conecta; no hay que escribir ninguna dirección con el mando. Si no lo
+    encuentra, entonces sí la pide.
+  - **Arranca al encender el televisor y enciende la pantalla**, así que tras
+    un corte de luz el escaparate vuelve solo, sin que nadie toque nada.
+  - **Se levanta sola si se cierra**, en menos de dos minutos.
+  - A pantalla completa, sin barras de navegador: se gana el 12 % de pantalla
+    que se comía la barra de direcciones.
+  - Si el ordenador cambia de dirección en la red, la pantalla **la vuelve a
+    buscar y sigue siendo la misma pantalla**, con su playlist y su horario.
+    Con el enlace pegado a mano había que reconfigurarla una por una.
+
+  Está probada en una caja Android de las más básicas del mercado (1 GB de RAM,
+  Android 7.1). Se instala con un archivo `.apk`; de momento hace falta un
+  ordenador para pasarlo.
+
+---
+
 ## 1.0.25 — 2026-08-12
 
 ### Corregido

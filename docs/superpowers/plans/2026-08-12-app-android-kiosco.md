@@ -291,7 +291,9 @@ $bt = "$env:LOCALAPPDATA\Android\Sdk\build-tools\37.0.0"
 & "$bt\aapt2.exe" dump badging "c:\Users\axeld\Documents\1. Proyectos Apps\Digital Signage\android\app\build\outputs\apk\debug\app-debug.apk" | Select-String -Pattern "launchable|leanback|uses-feature"
 ```
 
-Esperado: aparecen **las dos** líneas, `launchable-activity:` y `leanback-launchable-activity:`, y esta última **con `banner=` no vacío**.
+Esperado: aparecen **las dos** líneas, `launchable-activity:` y `leanback-launchable-activity:`, y en la línea `application:` un **`banner='res/drawable/banner.xml'`**.
+
+Ojo con dónde se mira el banner: en la línea de `leanback-launchable-activity` sale `banner=''` y **está bien así**. Ese es el override por actividad; el que usa Android TV por defecto es el de `<application>`.
 
 - [ ] **Step 8: Excluir del repo lo que no se versiona**
 
@@ -1644,19 +1646,54 @@ Esperado tras el reinicio, **sin tocar el mando**: `mResumedActivity: … com.in
 
 - [ ] **Step 5: Comprobar que el latido la resucita**
 
+**`am force-stop` NO sirve para esta prueba.** Deja la app en estado `stopped` y
+**cancela sus alarmas**, así que simula que el usuario la detiene desde Ajustes,
+no una muerte por falta de memoria — que es justo para lo que existe el latido.
+Con `force-stop` el latido no la levanta, y eso es correcto, no un fallo. Hay
+que matar el proceso:
+
+```powershell
+$adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+$d = "192.168.0.64:5555"
+& $adb -s $d root ; Start-Sleep -Seconds 4 ; & $adb connect $d   # la ROM es userdebug
+$pid1 = ((& $adb -s $d shell "pidof com.inteks.display") -join "").Trim()
+& $adb -s $d shell "kill -9 $pid1"
+Start-Sleep -Seconds 4
+& $adb -s $d shell "dumpsys package com.inteks.display | grep -m1 'stopped='"
+& $adb -s $d shell "dumpsys alarm | grep -c -i inteks"
+"--- esperando el latido (hasta 2 minutos) ---"
+Start-Sleep -Seconds 140
+& $adb -s $d shell "pidof com.inteks.display"
+& $adb -s $d shell "dumpsys window windows | grep -m1 mCurrentFocus"
+```
+
+Esperado: tras el `kill` sale `stopped=false` y **3** alarmas vivas; a los ~2
+minutos hay un **pid distinto** del de antes y `mCurrentFocus` vuelve a ser
+`com.inteks.display/.KioskActivity`.
+
+- [ ] **Step 6: Comprobar que enciende la pantalla si estaba dormida**
+
+Esta es la prueba que destapó el fallo de producto más gordo del proyecto, así
+que no se salta:
+
 ```powershell
 $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 $d = "192.168.0.64:5555"
 & $adb -s $d shell "am force-stop com.inteks.display"
-& $adb -s $d shell "dumpsys activity activities | grep -m1 mResumedActivity"
-"--- esperando el latido (hasta 2 minutos) ---"
-Start-Sleep -Seconds 130
-& $adb -s $d shell "dumpsys activity activities | grep -m1 mResumedActivity"
+& $adb -s $d shell "input keyevent KEYCODE_SLEEP"
+Start-Sleep -Seconds 3
+& $adb -s $d shell "dumpsys power | grep -m1 mWakefulness"     # Asleep
+& $adb -s $d shell "am start -n com.inteks.display/.KioskActivity"
+Start-Sleep -Seconds 12
+& $adb -s $d shell "dumpsys power | grep -m1 mWakefulness"     # Awake
+& $adb -s $d shell "dumpsys display | grep -m1 mScreenState"   # ON
 ```
 
-Esperado: justo después del `force-stop` la actividad resumida **no** es la nuestra; a los ~2 minutos, **sí** lo es otra vez.
+**Y al mirar una captura en negro, comprobar SIEMPRE `dumpsys power` antes de
+culpar al WebView.** `screencap` devuelve negro puro cuando el display está
+apagado, y el síntoma es idéntico al de una página que no pinta.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add android/app/src/main/java/com/inteks/display/BootReceiver.kt android/app/src/main/java/com/inteks/display/LatidoReceiver.kt android/app/src/main/java/com/inteks/display/KioskActivity.kt android/app/src/main/AndroidManifest.xml
