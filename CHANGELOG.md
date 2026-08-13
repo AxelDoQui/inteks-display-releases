@@ -8,6 +8,26 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.29 — 2026-08-13
+
+### Nuevo
+
+- **El panel se usa desde el móvil.** Antes estaba pensado solo para el
+  ordenador: la barra lateral se comía media pantalla y el editor de divisas
+  no cabía. Ahora:
+  - El menú se abre con un botón y se cierra solo al elegir sección.
+  - **Actualizar tasas desde el móvil**: cada divisa muestra su país y su
+    código, y un campo grande para la tasa. El resto de datos —bandera,
+    moneda, ventanilla— se despliega con el botón del lápiz cuando hace falta.
+  - Las ventanas de playlist se abren a pantalla completa.
+  - Los campos son lo bastante grandes para que el móvil no haga zoom solo al
+    tocarlos.
+- **Botones para subir y bajar** contenidos de una playlist y divisas de un
+  tablero. Arrastrar sigue funcionando con el ratón, pero con el dedo no era
+  posible; y para mover una cosa **un** puesto, el botón es más rápido.
+
+---
+
 ## 1.0.28 — 2026-08-13
 
 ### Corregido
