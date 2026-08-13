@@ -1,6 +1,6 @@
 # InTeks Display — Contexto para Claude Code
 
-> Actualizado: 13 de agosto de 2026 (v1.0.30). Este documento describe el estado **real** del
+> Actualizado: 13 de agosto de 2026 (v1.0.31). Este documento describe el estado **real** del
 > código. Si algo aquí no cuadra con lo que ves en los archivos, gana el código:
 > avísalo y se corrige el documento.
 
@@ -325,7 +325,7 @@ solas al arrancar (`migrar_datos_antiguos()`), sin borrar la copia vieja.
 |---|---|---|
 | `config.json` | puerto, alternativo, nombre mDNS, autoarranque | Sí, es la plantilla por defecto |
 | `content.json` | items, pantallas, paquetes, `rev` | No — lo crea vacío `init_file` |
-| `screens.json` | registro de pantallas vistas | No — ídem |
+| `screens.json` | registro de pantallas vistas, y `unlink_pending` | No — ídem |
 | `admin.json` | salt, hash de contraseña, secret de sesión, api_token | **No — secretos** |
 | `pin.json` | PIN activo, intentos fallidos, bloqueo | **No — secreto** |
 | `uploads/` | archivos subidos | No |
@@ -396,7 +396,7 @@ python server.py                  REM usa el puerto de config.json
 python server.py --port 8080      REM override
 
 npm test                          REM 248 tests de logica (Node stdlib)
-python tests\test_<nombre>.py     REM 18 suites que arrancan el servidor
+python tests\test_<nombre>.py     REM 19 suites que arrancan el servidor
 cd android ^&^& gradlew.bat test  REM 31 tests de la app, sin aparato
 ```
 
@@ -526,6 +526,29 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
    1.0.19.** Ver «Bot de Telegram» más abajo.
 
 ## Gotchas de despliegue
+
+- **No te fíes de «el aviso por SSE se entregó» (desde 1.0.31).** El servidor
+  **no sabe que una conexión está muerta hasta que le falla una escritura**, y
+  las primeras se limitan a encolarse en el búfer del sistema sin dar error
+  (ver `tests/test_sse_reconexion.py`). Así que contar a cuántos clientes se
+  escribió **no distingue una tele viva de una cuyo wifi acaba de caerse**.
+
+  Mordió al arreglar el desenlace: desenlazar era un *mensaje al aire*, no un
+  estado — se mandaba `unlink:<sid>` a quien escuchara en ese instante y no
+  quedaba constancia. Con la tele apagada el aviso se perdía en silencio, el
+  aparato volvía creyéndose la misma pantalla y el nombre quedaba ocupado: «a
+  veces al desvincular no se desvincula y no me deja reciclarla». La primera
+  versión del arreglo solo apuntaba el desenlace *si no se había podido
+  entregar*, y el propio test la tumbó por lo de arriba.
+
+  **Ahora `unlink_pending` se apunta SIEMPRE** en `screens.json` y se entrega en
+  la primera conexión `/api/events` del aparato, en el mismo sitio y con la
+  misma forma que la «anti-resurrección» de las pantallas borradas. Se borra al
+  entregarlo —si no, un aparato reenlazado se desenlazaría en bucle— y también
+  al reenlazar, porque `pair-claim` rehace la entrada entera. **El player no
+  cambió**: ya sabía reaccionar a `unlink:`, así que las pantallas instaladas se
+  benefician sin tocarlas. Regla general: **si algo tiene que pasar sí o sí, no
+  puede depender de que el aparato esté escuchando justo entonces.**
 
 - **Dos instalaciones con el mismo token de Telegram se pelean por el bot.**
   Visto el 2026-08-13 en el registro: `[bot] no se pudo leer mensajes: HTTP
