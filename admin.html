@@ -237,6 +237,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
   .stats-row{grid-template-columns:repeat(2,1fr)}
   .pl-editor{grid-template-columns:minmax(0,1fr)}
   .main{padding:14px}
+  /* Filas de botones que en escritorio caben de sobra y en un movil se salen
+     por la derecha: "Guardar cambios / Reiniciar servidor / Comprobar" llegaba
+     a 504px en un viewport de 390, con el tercer boton cortado. */
+  .fila-botones{flex-wrap:wrap}
 
   /* 44px es el minimo por debajo del cual se empieza a fallar el toque. */
   .btn{min-height:44px}
@@ -869,7 +873,7 @@ JPY  Yen        162.5"></textarea>
       <div>IP del portátil: <strong id="set-current-ip" style="color:var(--text)">—</strong></div>
       <div>Disco: <strong id="set-disk" style="color:var(--text)">—</strong></div>
     </div>
-    <div style="display:flex;gap:8px">
+    <div class="fila-botones" style="display:flex;gap:8px">
       <button class="btn btn-accent" onclick="saveSettings()"><i class="fa-solid fa-floppy-disk"></i> Guardar cambios</button>
       <button class="btn btn-a2 btn-sm" onclick="restartServer()"><i class="fa-solid fa-rotate-right"></i> Reiniciar servidor</button>
       <button class="btn btn-ghost btn-sm" onclick="comprobarActualizacion(true)"><i class="fa-solid fa-cloud-arrow-down"></i> Comprobar actualizaciones</button>
