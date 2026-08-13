@@ -238,6 +238,36 @@ class KioskActivity : Activity() {
         }
     }
 
+    /**
+     * La tecla ATRAS no hace nada. A proposito.
+     *
+     * Sin esto, un toque en el mando cierra la actividad y deja el lanzador de
+     * la caja en el escaparate hasta que salte el latido, que puede tardar dos
+     * minutos. Es la tecla mas facil de pulsar sin querer y la que mas cerca
+     * esta del boton de encendido en los mandos baratos.
+     *
+     * Tampoco se navega hacia atras en el historial del WebView: en una
+     * pantalla de tienda no hay «atras» al que ir, y volver a la pagina
+     * anterior seria salirse del player.
+     */
+    override fun onBackPressed() {
+        Log.i(TAG, "tecla ATRAS ignorada")
+    }
+
+    /**
+     * Cualquier tecla que sacaria de la app se traga aqui: ATRAS por si algun
+     * fabricante no pasa por onBackPressed, y la de aplicaciones recientes.
+     */
+    override fun onKeyDown(codigo: Int, evento: android.view.KeyEvent?): Boolean {
+        if (codigo == android.view.KeyEvent.KEYCODE_BACK ||
+            codigo == android.view.KeyEvent.KEYCODE_APP_SWITCH
+        ) {
+            Log.i(TAG, "tecla $codigo ignorada")
+            return true
+        }
+        return super.onKeyDown(codigo, evento)
+    }
+
     override fun onResume() {
         super.onResume()
         aplicarPantallaCompleta()
