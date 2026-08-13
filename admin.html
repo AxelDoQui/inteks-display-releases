@@ -29,6 +29,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .btn-a4{background:rgba(61,155,224,.12);color:var(--a4);border:1px solid rgba(61,155,224,.25)}.btn-a4:hover{background:rgba(61,155,224,.2)}
 .btn-sm{padding:5px 10px;font-size:11px}
 .btn-danger{background:transparent;border:1px solid transparent;color:var(--danger);padding:5px 8px}.btn-danger:hover{background:rgba(240,80,80,.1);border-color:var(--danger)}
+/* Las dos piezas del cajon movil. Van AQUI, despues de .btn, y no junto al
+   logo: .btn declara display:inline-flex, asi que una regla anterior con la
+   misma especificidad pierde por orden y el boton se veria en escritorio.
+   Y .menu-fondo necesita su display:none base porque es hijo de la rejilla
+   .app: sin el, en escritorio cuenta como celda y CORRE UNA COLUMNA a todo lo
+   demas, dejando el contenido en los 220px de la barra lateral. */
+.menu-btn{display:none}
+.menu-fondo{display:none}
 .sidebar{background:var(--s1);border-right:1px solid var(--b);padding:12px 0;display:flex;flex-direction:column;gap:1px;overflow-y:auto}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--muted);font-size:13px;border:none;background:none;width:100%;text-align:left;transition:all .15s}
 .nav-item:hover{background:var(--s2);color:var(--text)}
@@ -77,8 +85,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
    contenido. Con nombres de archivo largos la columna crecia y arrastraba al
    modal entero fuera de la ventana. */
 .pl-editor{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:14px;margin-top:14px;min-width:0}
-/* En ventanas estrechas, una columna debajo de otra en vez de recortarse */
-@media (max-width:700px){ .pl-editor{grid-template-columns:minmax(0,1fr)} }
+/* En ventanas estrechas, una columna debajo de otra: ver la CAPA RESPONSIVE
+   del final del <style>, donde viven todos los puntos de corte juntos. */
 /* flex-wrap para que las fechas de vigencia bajen a su propia linea. Sin esto
    comparten fila con el nombre y, como .pl-info tiene min-width:0, lo aplastan
    hasta cero: el nombre del contenido desaparecia del todo. */
@@ -192,12 +200,66 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .fx-prev-row{display:flex;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);gap:8px;color:#fff}
 .fx-prev-row:last-child{border-bottom:none}
 .weather-preview{background:#0a1628;border-radius:var(--r);padding:14px;text-align:center;margin-bottom:12px;color:#fff;border:1px solid var(--b)}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   CAPA RESPONSIVE. Todo lo que hace usable el panel en tableta y movil vive
+   AQUI, y nada de esto toca el CSS de escritorio de arriba: si un cambio
+   obliga a modificar una regla de las de arriba, es senal de que se esta
+   haciendo mal.
+
+   Reparto de los dos puntos de corte:
+     <= 860px  sobra ancho de LAYOUT    (barra lateral, columnas)
+     <= 560px  falta sitio para el DEDO (campos, objetivos tactiles, modal)
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* dvh y no vh: con 100vh la barra de direcciones del movil se come el final de
+   la pagina y el ultimo boton queda fuera de alcance. El 100vh se queda de
+   reserva para navegadores que no entiendan dvh. */
+.app{height:100vh;height:100dvh}
+
+@media (max-width:860px){
+  /* Una sola columna: la lateral sale del flujo y pasa a cajon. */
+  .app{grid-template-columns:minmax(0,1fr)}
+  .sidebar{position:fixed;top:52px;left:0;bottom:0;width:240px;z-index:60;
+           transform:translateX(-100%);transition:transform .2s ease;
+           box-shadow:0 0 24px rgba(0,0,0,.5)}
+  .sidebar.abierta{transform:translateX(0)}
+  .menu-btn{display:inline-flex}
+  .menu-fondo{display:none;position:fixed;inset:52px 0 0 0;background:rgba(0,0,0,.5);z-index:55}
+  .menu-fondo.visible{display:block}
+
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+  .pl-editor{grid-template-columns:minmax(0,1fr)}
+  .main{padding:14px}
+
+  /* 44px es el minimo por debajo del cual se empieza a fallar el toque. */
+  .btn{min-height:44px}
+  .btn-sm{min-height:36px}
+  .nav-item{padding:14px 16px}
+  /* Los pares de flechas no siguen la regla: son dos botones apilados dentro
+     de una fila, y estirarlos a 44px cada uno rompe el alto de la fila. */
+  .pl-mover .btn,.fx-mover .btn{min-height:0}
+}
+
+@media (max-width:560px){
+  .form-row{grid-template-columns:minmax(0,1fr)}
+
+  /* A 375px un modal "centrado" son margenes desperdiciados. */
+  .modal{width:100%;max-width:100%;height:100%;max-height:100%;border-radius:0;padding:16px}
+  .modal-bd{align-items:stretch;justify-content:stretch}
+
+  /* 16px o iOS hace zoom al enfocar el campo, y hay que alejar a mano cada
+     vez. Es de las cosas que hacen que una web responsive se sienta rota
+     aunque el layout este perfecto. */
+  input,select,textarea{font-size:16px}
+}
 </style>
 </head>
 <body>
 <div class="app">
 
 <div class="topbar">
+  <button class="btn btn-ghost btn-sm menu-btn" onclick="toggleMenu()" title="Menú"><i class="fa-solid fa-bars"></i></button>
   <div class="logo">INTEKS<span> DISPLAY</span></div>
   <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
     <div class="sdot" id="srv-dot"></div>
@@ -206,6 +268,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     <button class="btn btn-accent btn-sm" onclick="openPlayer()"><i class="fa-solid fa-play"></i> Player</button>
   </div>
 </div>
+
+<div class="menu-fondo" id="menu-fondo" onclick="toggleMenu(false)"></div>
 
 <div class="sidebar">
   <div class="nav-section">GESTIÓN</div>
@@ -1124,6 +1188,20 @@ function showPage(id,btn){
   if(btn) btn.classList.add("active");
   if(id==="packages"){ renderPkgPicker(); renderPackages(); }  // refrescar con la librería actual
   if(id==="fx"){ loadFxPreviewSize(); }                        // recuperar la resolución elegida
+  toggleMenu(false);                                           // en móvil, cerrar el cajón
+}
+
+// El cajón de navegación. Se cierra al elegir sección y al tocar el fondo:
+// dejarlo abierto tapando el contenido que acabas de pedir es el fallo clásico
+// de los menús deslizantes. Por encima de 860px no hace nada visible, porque
+// ahí la barra lateral no está desplazada.
+function toggleMenu(abrir){
+  const lat=document.querySelector(".sidebar");
+  const fondo=document.getElementById("menu-fondo");
+  if(!lat||!fondo) return;
+  const ver=(abrir===undefined)?!lat.classList.contains("abierta"):!!abrir;
+  lat.classList.toggle("abierta",ver);
+  fondo.classList.toggle("visible",ver);
 }
 function updateStats(){
   const sids=new Set([...Object.keys(regScreens),...Object.keys(content.screens||{})]);
