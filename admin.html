@@ -92,6 +92,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .pl-item.drag-over{border-color:var(--a2)}
 .pl-item.dragging{opacity:.3}
 .pl-handle{color:var(--muted);opacity:.35;font-size:13px}
+/* Los botones de reordenar van SIEMPRE, tambien en escritorio: mantener dos
+   comportamientos segun el ancho hace que el de movil solo se pruebe en movil,
+   y por ahi se pudre una funcion sin que nadie lo note. */
+.pl-mover{display:flex;flex-direction:column;gap:2px;flex-shrink:0}
+.pl-mover .btn{padding:2px 6px;line-height:1}
+.pl-mover .btn[disabled]{opacity:.25;cursor:default}
 .pl-thumb{width:56px;height:36px;border-radius:4px;background:#000;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:16px}
 .pl-thumb img,.pl-thumb video{width:100%;height:100%;object-fit:cover}
 /* flex-basis 140px y no 0: con basis 0 el nombre es lo PRIMERO que se encoge y
@@ -1797,16 +1803,26 @@ function renderPlList(sid){
     const prioBtn=`<button class="btn ${item.priority?'btn-accent':'btn-ghost'} btn-sm" `+
       `title="Prioridad: con orden aleatorio, sale cada X pases en vez de quedar al azar" `+
       `onclick="togglePriority('${sid}',${i})"><i class="fa-solid fa-star"></i></button>`;
-    el.innerHTML=`<span class="pl-handle"><i class="fa-solid fa-grip-vertical"></i></span><div class="pl-thumb">${thumb}</div><div class="pl-info"><div class="pl-name">${item.name}</div><span class="pl-tbadge ${tc}">${item.type.toUpperCase()}</span>${marca}</div>${durControl}${prioBtn}<button class="btn btn-danger btn-sm" onclick="rmFromPl('${sid}',${i})"><i class="fa-solid fa-xmark"></i></button>${fechas}`;
+    const arriba=`<button class="btn btn-ghost btn-sm" ${i===0?"disabled":""} title="Subir" onclick="moverPlItem('${sid}',${i},${i-1})"><i class="fa-solid fa-chevron-up"></i></button>`;
+    const abajo=`<button class="btn btn-ghost btn-sm" ${i===pl.length-1?"disabled":""} title="Bajar" onclick="moverPlItem('${sid}',${i},${i+1})"><i class="fa-solid fa-chevron-down"></i></button>`;
+    el.innerHTML=`<span class="pl-handle"><i class="fa-solid fa-grip-vertical"></i></span><div class="pl-mover">${arriba}${abajo}</div><div class="pl-thumb">${thumb}</div><div class="pl-info"><div class="pl-name">${item.name}</div><span class="pl-tbadge ${tc}">${item.type.toUpperCase()}</span>${marca}</div>${durControl}${prioBtn}<button class="btn btn-danger btn-sm" onclick="rmFromPl('${sid}',${i})"><i class="fa-solid fa-xmark"></i></button>${fechas}`;
     el.addEventListener("dragstart",()=>{dragSrc=i;setTimeout(()=>el.classList.add("dragging"),0);});
     el.addEventListener("dragend",()=>el.classList.remove("dragging"));
     el.addEventListener("dragover",e=>{e.preventDefault();el.classList.add("drag-over");});
     el.addEventListener("dragleave",()=>el.classList.remove("drag-over"));
     el.addEventListener("drop",e=>{e.preventDefault();el.classList.remove("drag-over");
-      if(dragSrc!==null&&dragSrc!==i){const pl=content.screens[sid].playlist;const m=pl.splice(dragSrc,1)[0];pl.splice(i,0,m);renderPlList(sid);}
+      if(dragSrc!==null) moverPlItem(sid,dragSrc,i);
     });
     c.appendChild(el);
   });
+}
+// Reordena la playlist de una pantalla. NO guarda: el guardado sigue estando
+// donde estaba, en el botón de la ventana. Esto solo toca la copia en memoria y
+// repinta, exactamente lo que hacía el arrastre.
+function moverPlItem(sid,desde,hasta){
+  const pl=((content.screens||{})[sid]||{}).playlist;
+  if(!pl) return;
+  if(moverEnLista(pl,desde,hasta)) renderPlList(sid);
 }
 function updVigencia(sid,i,campo,valor){
   const pl=(content.screens[sid]||{}).playlist||[];
