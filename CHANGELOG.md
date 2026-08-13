@@ -8,6 +8,15 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.30 — 2026-08-13
+
+### Nuevo
+
+- **Resolución 4K vertical (2160×3840) en la vista previa del tablero de
+  divisas**, junto a las que ya había. Para pantallas 4K giradas.
+
+---
+
 ## 1.0.29 — 2026-08-13
 
 ### Nuevo
