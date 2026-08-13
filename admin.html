@@ -161,6 +161,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .fx-mover{display:flex;flex-direction:column;gap:2px}
 .fx-mover .btn{padding:1px 4px;line-height:1;font-size:9px}
 .fx-mover .btn[disabled]{opacity:.25;cursor:default}
+/* En escritorio la fila enseña sus ocho campos: ni resumen ni boton de editar. */
+.fx-resumen,.fx-editar{display:none}
 .fx-row-edit.dragging{opacity:.3}
 .fx-row-edit.drag-over{border-color:var(--accent);background:rgba(255,127,0,.06)}
 .fx-handle{color:var(--muted);opacity:.35;font-size:12px;cursor:grab;text-align:center}
@@ -252,6 +254,31 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
      vez. Es de las cosas que hacen que una web responsive se sienta rota
      aunque el layout este perfecto. */
   input,select,textarea{font-size:16px}
+
+  /* De los ocho campos de una fila de divisas, el UNICO que cambia a diario es
+     la tasa. Aqui se enseña eso y el resto se pliega: actualizar un tablero de
+     ocho divisas son ocho toques y ocho numeros, en vez de pelearse con ocho
+     columnas que necesitan 450px para entrar. */
+  .fx-cabecera{display:none}
+  /* El resumen en SU PROPIA fila. Compartiendo linea con la tasa y los tres
+     botones le quedaban unos 100px y "Colombia · COP" salia como "Colombi...":
+     justo el dato que te dice de que fila es la tasa que estas tecleando. */
+  .fx-row-edit{grid-template-columns:26px minmax(0,1fr) 40px 40px;
+               grid-template-areas:"resumen resumen resumen resumen"
+                                   "mov tasa editar borrar";
+               gap:8px;padding:10px}
+  .fx-row-edit>.fx-handle{display:none}
+  .fx-row-edit>.fx-mover{grid-area:mov}
+  .fx-row-edit>.fx-resumen{grid-area:resumen;display:block;font-size:13px;
+                           overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fx-row-edit>.fx-tasa{grid-area:tasa}
+  .fx-row-edit>.fx-editar{grid-area:editar;display:inline-flex}
+  .fx-row-edit>.btn-danger{grid-area:borrar}
+  .fx-row-edit>.fx-sec{display:none}
+  /* Desplegada: cada secundario en SU PROPIA fila a ancho completo. Con un
+     grid-area compartido se apilarian los cinco en la misma celda, unos encima
+     de otros; con grid-column:1/-1 la rejilla les crea una fila a cada uno. */
+  .fx-row-edit.abierta>.fx-sec{display:block;grid-column:1/-1;margin-top:6px}
 }
 </style>
 </head>
@@ -2544,7 +2571,11 @@ function renderFxRows(){
     const el=document.createElement("div");el.className="fx-row-edit";el.dataset.i=i;
     const sube=`<button class="btn btn-ghost btn-sm" ${i===0?"disabled":""} title="Subir" onclick="moverFxRow(${i},${i-1})"><i class="fa-solid fa-chevron-up"></i></button>`;
     const baja=`<button class="btn btn-ghost btn-sm" ${i===fxRows.length-1?"disabled":""} title="Bajar" onclick="moverFxRow(${i},${i+1})"><i class="fa-solid fa-chevron-down"></i></button>`;
-    el.innerHTML=`<span class="fx-handle" title="Arrastra para reordenar"><i class="fa-solid fa-grip-vertical"></i></span><div class="fx-mover">${sube}${baja}</div><input value="${r.flag||''}" oninput="fxRows[${i}].flag=this.value;updateFxPreview()" placeholder="VE" maxlength="2" title="Código de país de 2 letras (VE, US, MX...)" style="text-align:center;text-transform:uppercase"><input value="${r.country}" oninput="fxRows[${i}].country=this.value;updateFxPreview()" placeholder="País"><input value="${r.currency}" oninput="fxRows[${i}].currency=this.value;updateFxPreview()" placeholder="Moneda"><input value="${r.code}" oninput="fxRows[${i}].code=this.value;updateFxPreview()" placeholder="USD"><input value="${r.rate}" oninput="fxRows[${i}].rate=this.value;updateFxPreview()" placeholder="1.08"><input value="${r.agent||''}" oninput="fxRows[${i}].agent=this.value;updateFxPreview()" placeholder="Opcional" title="Punto de pago/ventanilla (p. ej. Davivienda). Se muestra en pantalla bajo el país. Déjalo vacío en un tablero de cambio normal."><button class="btn btn-danger btn-sm" onclick="rmFxRow(${i})"><i class="fa-solid fa-xmark"></i></button>`;
+    // El resumen y el boton de editar solo se ven en movil (ver la capa
+    // responsive): alli la fila enseña pais y codigo como texto mas la tasa, y
+    // el resto de campos se despliegan. De los ocho campos, el unico que cambia
+    // a diario es la tasa.
+    el.innerHTML=`<span class="fx-handle" title="Arrastra para reordenar"><i class="fa-solid fa-grip-vertical"></i></span><div class="fx-mover">${sube}${baja}</div><span class="fx-resumen">${(r.country||"sin país")} · ${(r.code||"—")}</span><input class="fx-sec" value="${r.flag||''}" oninput="fxRows[${i}].flag=this.value;updateFxPreview()" placeholder="VE" maxlength="2" title="Código de país de 2 letras (VE, US, MX...)" style="text-align:center;text-transform:uppercase"><input class="fx-sec" value="${r.country}" oninput="fxRows[${i}].country=this.value;updateFxPreview()" placeholder="País"><input class="fx-sec" value="${r.currency}" oninput="fxRows[${i}].currency=this.value;updateFxPreview()" placeholder="Moneda"><input class="fx-sec" value="${r.code}" oninput="fxRows[${i}].code=this.value;updateFxPreview()" placeholder="USD"><input class="fx-tasa" value="${r.rate}" oninput="fxRows[${i}].rate=this.value;updateFxPreview()" placeholder="1.08"><input class="fx-sec" value="${r.agent||''}" oninput="fxRows[${i}].agent=this.value;updateFxPreview()" placeholder="Opcional" title="Punto de pago/ventanilla (p. ej. Davivienda). Se muestra en pantalla bajo el país. Déjalo vacío en un tablero de cambio normal."><button class="btn btn-ghost btn-sm fx-editar" onclick="toggleFxFila(${i})" title="Editar el resto de campos"><i class="fa-solid fa-pen"></i></button><button class="btn btn-danger btn-sm" onclick="rmFxRow(${i})"><i class="fa-solid fa-xmark"></i></button>`;
 
     const asa=el.querySelector(".fx-handle");
     asa.addEventListener("mousedown",()=>{ el.draggable=true; });
@@ -2575,6 +2606,15 @@ function moverEnLista(lista,desde,hasta){
   const [x]=lista.splice(desde,1);
   lista.splice(hasta,0,x);
   return true;
+}
+
+// Despliega los campos secundarios de una fila en el móvil. Es estado
+// transitorio a propósito: no se guarda en ningún sitio y todas las filas
+// vuelven a plegarse al recargar. Es una comodidad de edición, no una
+// preferencia del usuario, y guardarla obligaría a decidir dónde y a migrarla.
+function toggleFxFila(i){
+  const fila=document.querySelector('.fx-row-edit[data-i="'+i+'"]');
+  if(fila) fila.classList.toggle("abierta");
 }
 
 // Mueve una divisa de sitio. Se reconstruye la lista entera porque los oninput
