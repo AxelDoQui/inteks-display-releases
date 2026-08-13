@@ -289,7 +289,33 @@ los dos, pero **un tablero de divisas puede no verse igual**, y eso está sin
 comprobar. Es lo primero que hay que mirar si en una caja el tablero sale
 descuadrado.
 
-### 3. `am force-stop` no simula una caída
+### 3. El bloqueo del mando: qué se puede y qué no
+
+El diseño decía «kiosco reversible, no reemplaza el lanzador» y daba el tema
+por cerrado. Al probarlo con el mando aparecieron dos cosas:
+
+- **`ATRAS` sacaba del escaparate con una sola pulsación.** Era un descuido, no
+  una decisión: nunca se sobrescribió `onBackPressed`. Es además la tecla más
+  fácil de rozar sin querer. Arreglado: se traga.
+- **`INICIO` y `RECIENTES` no se pueden bloquear** desde una app normal. El
+  sistema los intercepta antes de que lleguen a `onKeyDown`; solo lo evitan ser
+  el lanzador o el modo *lock task* con device owner.
+
+Como no se puede impedir la salida, se **vuelve enseguida**: `onPause` relanza
+la actividad a los 4 segundos, así que el escaparate reaparece en unos 5 en vez
+de esperar hasta dos minutos al latido.
+
+**Y eso obliga a una salida deliberada.** Una app que vuelve cada cuatro
+segundos deja la caja inutilizable: no se podría ni cambiar el wifi sin un PC
+con ADB. De ahí las **cinco pulsaciones de `ATRAS` en menos de tres segundos**,
+que apartan la app cinco minutos. Se apoya en la tecla que el kiosco ya ignora,
+así que no hay forma de dispararlo sin querer.
+
+El plazo se guarda en `SharedPreferences` y no en un campo de la actividad
+porque **lo lee también `LatidoReceiver`**: si no, el latido devolvería la app a
+los dos minutos y no habría mantenimiento que valiera.
+
+### 4. `am force-stop` no simula una caída
 
 Sirve para probar el latido tanto como desenchufar el router para probar un
 disco duro: `force-stop` deja la app en estado `stopped` y **cancela sus

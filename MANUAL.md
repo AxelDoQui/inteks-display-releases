@@ -90,6 +90,24 @@ caso de arriba.
 Los nombres son los de la app en inglés y pueden cambiar un poco de una versión
 a otra.
 
+### La app propia de InTeks (desde la 1.0.26)
+
+Hay una alternativa a Fully Kiosk hecha a medida, que se instala en la caja
+como un archivo `.apk`. Hace lo mismo y dos cosas más: **encuentra el ordenador
+sola** —no hay que escribir ninguna dirección con el mando— y **si el ordenador
+cambia de dirección en la red, la pantalla lo vuelve a buscar** en vez de
+quedarse muerta.
+
+Al encender la caja arranca sola, enciende el televisor y se pone a reproducir.
+Si alguien se sale con el mando, vuelve en unos segundos.
+
+> **Para poder tocar la caja** —cambiar el wifi, entrar en sus ajustes— pulsa
+> **cinco veces seguidas la tecla «atrás»**. El reproductor se aparta cinco
+> minutos y luego vuelve solo. Una pulsación suelta no hace nada: es a propósito,
+> para que nadie se salga sin querer.
+
+De momento se instala desde un ordenador. Pídela cuando quieras probarla.
+
 **No hace falta configurar nada más.** El reproductor ya se ocupa solo del
 resto: se reconecta cuando vuelve la red, guarda las imágenes y los vídeos en
 el propio aparato para sobrevivir a un arranque con el servidor apagado, y se

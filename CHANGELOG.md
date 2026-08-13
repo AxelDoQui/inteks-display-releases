@@ -27,6 +27,13 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
     buscar y sigue siendo la misma pantalla**, con su playlist y su horario.
     Con el enlace pegado a mano había que reconfigurarla una por una.
 
+  - **Nadie saca el escaparate con el mando sin querer.** La tecla «atrás» no
+    hace nada, y si alguien pulsa «inicio», el reproductor vuelve solo en unos
+    segundos.
+  - **Para poder tocar la caja** (cambiar el wifi, entrar en sus ajustes):
+    pulsa **cinco veces seguidas «atrás»** y el reproductor te deja cinco
+    minutos tranquilo. Pasado ese rato vuelve solo.
+
   Está probada en una caja Android de las más básicas del mercado (1 GB de RAM,
   Android 7.1). Se instala con un archivo `.apk`; de momento hace falta un
   ordenador para pasarlo.
