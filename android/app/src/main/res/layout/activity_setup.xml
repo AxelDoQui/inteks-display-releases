@@ -41,4 +41,16 @@
         android:text="@string/conectar"
         android:layout_marginTop="24dp"
         android:focusable="true" />
+
+    <!-- Deja claro que la app no se ha rendido: sigue barriendo la red de
+         fondo y continuara sola en cuanto aparezca el servidor. -->
+    <TextView
+        android:id="@+id/buscando"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/sigo_buscando"
+        android:textColor="#5d7a99"
+        android:textSize="13sp"
+        android:gravity="center"
+        android:layout_marginTop="36dp" />
 </LinearLayout>

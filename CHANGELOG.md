@@ -8,6 +8,20 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.28 — 2026-08-13
+
+### Corregido
+
+- **La app de la caja de TV se rendía si el ordenador tardaba en arrancar.**
+  Al volver la luz, la caja arranca en unos dos minutos y el ordenador de la
+  tienda tarda más —primero Windows, luego el programa—. La app buscaba, no
+  encontraba nada, y se quedaba con la pantalla de «escribe la dirección»
+  puesta en el escaparate hasta que alguien fuera con el mando. Ahora **esa
+  pantalla sigue buscando de fondo** y continúa sola en cuanto el ordenador
+  aparece, sin perder el nombre de la pantalla.
+
+---
+
 ## 1.0.27 — 2026-08-13
 
 ### Corregido

@@ -5,5 +5,6 @@
     <string name="no_encontrado">No se ha encontrado el servidor</string>
     <string name="escribe_direccion">Escribe la dirección del servidor</string>
     <string name="conectar">Conectar</string>
+    <string name="sigo_buscando">Sigo buscándolo. Si enciendes el ordenador ahora, esta pantalla continuará sola.</string>
     <string name="mantenimiento">Mantenimiento: 5 minutos sin volver al reproductor</string>
 </resources>
