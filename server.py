@@ -22,7 +22,7 @@ import urllib.request
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.30"
+APP_VERSION = "1.0.31"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -1102,13 +1102,20 @@ def notify_unlink(screen_id):
     existiendo con su playlist, su horario y su rotación, y lo único que se
     suelta es el dispositivo. Sirve para reenlazar un televisor desde el panel
     sin ir a tocarlo con el mando.
+
+    Devuelve a CUÁNTOS aparatos se le pudo entregar. Quien llama lo necesita:
+    si no había nadie escuchando —la tele estaba apagada— hay que apuntar el
+    desenlace para dárselo cuando aparezca, o se pierde en silencio.
     """
+    entregados = 0
     with sse_lock:
         for wfile in list(sse_clients.get(screen_id, [])):
             try:
                 wfile.write(f"data: unlink:{screen_id}\n\n".encode())
                 wfile.flush()
+                entregados += 1
             except: pass
+    return entregados
 
 def load_json(path):
     with file_lock:
@@ -1642,6 +1649,20 @@ class Handler(BaseHTTPRequestHandler):
                     self.wfile.write(f"data: deleted:{sid}\n\n".encode()); self.wfile.flush()
                 except: pass
                 return
+            # Desenlace pendiente: se pidio soltar el aparato mientras estaba
+            # apagado, asi que el aviso no llego a nadie y quedo apuntado. Es la
+            # primera oportunidad de darselo. Se borra la marca al entregarla: si
+            # no, un aparato reenlazado a este mismo nombre se desenlazaria solo
+            # una y otra vez.
+            if sid != "admin" and screens.get(sid, {}).get("unlink_pending"):
+                try:
+                    self.wfile.write(f"data: unlink:{sid}\n\n".encode()); self.wfile.flush()
+                except: pass
+                screens[sid].pop("unlink_pending", None)
+                screens[sid]["connected"] = False
+                save_json(SCREENS_FILE, screens)
+                log(f"  [enlace] '{sid}' encendio: se le entrega el desenlace pendiente")
+                return
             # Registrar cliente
             with sse_lock:
                 if sid not in sse_clients: sse_clients[sid] = []
@@ -2109,13 +2130,28 @@ class Handler(BaseHTTPRequestHandler):
                 content = load_json(CONTENT_FILE)
                 if not sid or (sid not in screens and sid not in content.get("screens", {})):
                     jresp(400, {"ok": False, "error": "Esa pantalla no existe"}); return
-                notify_unlink(sid)
+                entregados = notify_unlink(sid)
                 with sse_lock:
                     sse_clients.pop(sid, None)
                 if sid in screens:
                     screens[sid]["connected"] = False
+                    # Se apunta SIEMPRE, aunque el aviso pareciera entregado.
+                    #
+                    # No se puede confiar en el recuento: el servidor no sabe que
+                    # una conexion esta muerta hasta que le falla una escritura, y
+                    # las primeras se limitan a encolarse en el buffer del sistema
+                    # sin error (ver tests/test_sse_reconexion.py). Una tele cuyo
+                    # wifi acaba de caerse contaria como "entregado" y el desenlace
+                    # se perderia igual.
+                    #
+                    # Dejarlo puesto no molesta: "desenlazada" es un estado que
+                    # dura hasta que alguien reenlace ese nombre, y pair-claim
+                    # rehace la entrada entera, con lo que la marca desaparece.
+                    screens[sid]["unlink_pending"] = True
                     save_json(SCREENS_FILE, screens)
-                log(f"  [enlace] '{sid}' desenlazada: su dispositivo volvera a pedir codigo")
+                log(f"  [enlace] '{sid}' desenlazada"
+                    + (": su dispositivo volvera a pedir codigo" if entregados
+                       else ": estaba apagada, se le dira al encender"))
                 ok({"screen": sid})
             except Exception as e: err(e)
             return

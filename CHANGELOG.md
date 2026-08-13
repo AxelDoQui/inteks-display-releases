@@ -8,6 +8,18 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.31 — 2026-08-13
+
+### Corregido
+
+- **Desenlazar una pantalla apagada no servía de nada.** El aviso se le mandaba
+  al televisor en ese momento y, si estaba apagado o sin red, se perdía: al
+  encenderlo volvía a creerse la misma pantalla, el nombre seguía ocupado y no
+  se podía reutilizar. Ahora el desenlace **queda apuntado** y se le entrega al
+  aparato en cuanto vuelve a encender, aunque pasen días.
+
+---
+
 ## 1.0.30 — 2026-08-13
 
 ### Nuevo
