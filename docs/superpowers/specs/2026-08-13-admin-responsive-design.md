@@ -113,9 +113,14 @@ ventanilla:
   [↑] [↓]                    editar
 ```
 
-La previa del tablero —hoy un iframe dimensionado a la resolución de la
-pantalla— se pliega en móvil detrás de un botón **«ver previa»**: ocupa
-demasiado justo cuando lo que quieres es teclear ocho números.
+**Corrección al escribir el plan:** este documento decía que la previa del
+tablero se plegaría en móvil detrás de un botón «ver previa». **Ya está
+plegada**: vive en `#fx-prev-wrap`, que nace con `display:none` y se enciende
+con la casilla `#fx-prev-on`, manejada por una `toggleFxPreview()` que ya
+existe. Añadir otro botón sería duplicar un control con un nombre casi
+idéntico. Lo que sí queda por hacer es que **quepa** cuando el usuario la
+enciende: `#fx-prev-stage` tiene `max-width:440px`, más ancho que un móvil de
+390 px.
 
 **Playlist.** Se edita en un modal, que en móvil pasa a pantalla completa. Cada
 contenido gana sus botones subir/bajar.
