@@ -1,6 +1,6 @@
 # InTeks Display — Contexto para Claude Code
 
-> Actualizado: 12 de agosto de 2026 (v1.0.25). Este documento describe el estado **real** del
+> Actualizado: 13 de agosto de 2026 (v1.0.30). Este documento describe el estado **real** del
 > código. Si algo aquí no cuadra con lo que ves en los archivos, gana el código:
 > avísalo y se corrige el documento.
 
@@ -24,7 +24,7 @@ restaurantes, casas de cambio y similares.
 
 ## Arquitectura
 
-### Servidor — `server.py` (~99 KB, stdlib pura)
+### Servidor — `server.py` (~113 KB, stdlib pura)
 
 `ThreadingHTTPServer`: cada conexión en su propio hilo, imprescindible porque
 las conexiones SSE de `/api/events` viven indefinidamente y bloquearían al
@@ -46,8 +46,8 @@ línea 403). Quien necesite saber el puerto real no puede fiarse de
 |---|---|
 | `index.html` | Raíz `/`. Router de arranque: si el dispositivo ya está enlazado (localStorage) redirige al player; si no, a emparejar. |
 | `login.html` | Puerta de autenticación. En el primer arranque cambia a modo "crear contraseña". |
-| `admin.html` | Panel de administración (~212 KB, monolito). |
-| `player.html` | Reproductor para pantallas y tablets (~69 KB). |
+| `admin.html` | Panel de administración (~226 KB, monolito). Responsive desde la 1.0.29. |
+| `player.html` | Reproductor para pantallas y tablets (~72 KB). |
 | `pair.html` | Emparejamiento por PIN. |
 | `sw.js` | Service worker de la PWA. Solo se activa bajo HTTPS o localhost. |
 
@@ -68,8 +68,13 @@ no coincide con ninguno de los anteriores (`player.html:911`).
 
 Cada fila de `fx` admite un `agent` opcional (la ventanilla/agente de pago,
 caso Ria y similares con varios puntos de pago por moneda): si viene, el
-player la muestra bajo el país (`COP · Davivienda`); si no, la fila se ve
-igual que un tablero de cambio normal. La extensión de Chrome ya elegía un
+player la muestra **en su propia línea** bajo la moneda; si no, la fila se ve
+igual que un tablero de cambio normal. Iba pegada a la moneda en la misma línea
+hasta la 1.0.27, dentro de un `.fx-currency` con `nowrap` + `ellipsis`, y en
+cuanto la fila se estrechaba se cortaba justo el dato que distingue una
+ventanilla de otra («Peso filipino · RIA & Pala…»). De las ocho ventanillas
+configuradas en campo, siete pasan de 21 caracteres y el corte empezaba sobre
+los 27. La extensión de Chrome ya elegía un
 agente para decidir la tasa (`elegirAgente` en `parser.js`) pero lo
 descartaba antes de mandarlo — desde 1.0.11 viaja hasta la pantalla. También
 se puede escribir a mano en el editor de filas del admin.
@@ -219,6 +224,48 @@ relee la configuración en cada vuelta) descarta con `offset=-1` lo que
 Telegram tuviera pendiente de hasta 24 h atrás, para no contestar un
 `/estado` de ayer con los datos de ahora como si fuera de este momento.
 
+### App de kiosco Android — `android/` (desde 1.0.26)
+
+Sustituye a Fully Kiosk Browser en las cajas Android que reproducen el player.
+Kotlin, sin dependencias de terceros (`HttpURLConnection` de la stdlib, nada de
+OkHttp ni Compose). **Es lo único del repo que necesita compilarse**, y por eso
+está acotada a su carpeta: el servidor y las páginas se siguen editando y
+sirviendo tal cual.
+
+La app es pequeña a propósito porque la inteligencia de producto ya estaba en la
+web —identidad, emparejamiento, caché offline, SSE, recarga por versión—. Solo
+aporta lo que un navegador no puede:
+
+- **Encuentra el servidor sola**: barre la subred contra `/api/info` (puertos 80
+  y 9000, 32 sondas en paralelo, 8 s de tope) y valida que la respuesta trae
+  `mdns_name` y `player_url`. Sin mDNS y sin tocar `server.py`. Solo barre redes
+  de /24 o menores; en una más grande pide la dirección a mano.
+- **Arranca al encender y ENCIENDE LA PANTALLA.** `FLAG_KEEP_SCREEN_ON` solo
+  impide que se duerma; no despierta una apagada. Tras un corte de luz la caja
+  tarda ~118 s en llegar a `BOOT_COMPLETED` y se duerme por el camino, así que
+  hace falta `FLAG_TURN_SCREEN_ON` más un wake lock con `ACQUIRE_CAUSES_WAKEUP`.
+- **Se levanta sola** con un latido de `AlarmManager` (2 min), que vive en el
+  sistema y sobrevive a que muera el proceso. En API 25 no existe
+  `onRenderProcessGone`, así que un render sin memoria se lleva la app entera.
+- **Sobrevive a un cambio de IP**: guarda el nombre de pantalla en
+  `SharedPreferences`, **fuera del WebView**, porque `localStorage` y las
+  cookies van por origen y un cambio de IP dejaría la pantalla sin identidad.
+- **Kiosco reversible**: pantalla completa inmersiva, `ATRAS` ignorada, y vuelve
+  al frente a los 4 s si algo la tapa. `INICIO` y `RECIENTES` **no se pueden
+  bloquear** desde una app normal. Salida de mantenimiento: **cinco pulsaciones
+  de `ATRAS` en menos de tres segundos** apartan la app cinco minutos.
+
+Ajustes del `WebView` que, si faltan, dan fallos que no parecen lo que son:
+`usesCleartextTraffic` (el servidor es HTTP plano), `domStorageEnabled` (sin él
+la pantalla pierde su identidad en cada reinicio) y
+`mediaPlaybackRequiresUserGesture=false` (sin él los vídeos no arrancan solos).
+
+**Compilar:** `JAVA_HOME` al JDK de Android Studio y `gradlew assembleDebug`.
+AGP 9 **trae Kotlin dentro**: aplicar `org.jetbrains.kotlin.android` aparte
+revienta. `local.properties` lleva las barras **dobles** o el build muere con un
+`java.io.IOException: Invalid file path` que no menciona ni el SDK ni las
+barras. `tools/subir-version.ps1` toca también su `versionName`.
+
 ### Empaquetado
 
 `electron/main.js` arranca `server.py` como proceso hijo y da icono de bandeja.
@@ -315,14 +362,52 @@ Azul marino con acento naranja. Los valores vivos están en `:root` de
 
 Fuentes: Space Mono (monospace, títulos y datos), DM Sans (cuerpo).
 
+**Responsive desde la 1.0.29.** Todo lo que hace usable el panel en tableta y
+móvil vive en un bloque propio al final del `<style>`, y **no toca ninguna
+regla del CSS de escritorio**: si un cambio obliga a modificar una de arriba,
+es señal de que se está haciendo mal. Dos puntos de corte con reparto fijo:
+
+- **≤860 px** — lo que sobra es *ancho de layout*: la barra lateral de 220 px
+  pasa a cajón deslizante (`toggleMenu()`), las rejillas fijas se estrechan y
+  los botones suben a 44 px.
+- **≤560 px** — lo que falta es *sitio para el dedo*: modal a pantalla
+  completa, y **campos a 16 px porque iOS hace zoom al enfocar uno con letra
+  menor**, lo que obliga a alejar a mano en cada toque.
+
+El **arrastrar y soltar de HTML5 no existe en táctil**, así que playlists y
+filas de divisas llevan botones subir/bajar que llaman a `moverPlItem()` /
+`moverFxRow()` — las mismas funciones que usa el arrastre, sin abrir rutas de
+escritura nuevas. Van también en escritorio a propósito: mantener dos
+comportamientos según el ancho hace que el de móvil solo se pruebe en móvil.
+
+**Para fotografiar el panel** hace falta un arnés, por tres razones que no son
+obvias: exige sesión (se entra por `/api/login` desde una página del mismo
+origen); **abre un `EventSource` que no termina nunca**, y con una petición
+viva el presupuesto de tiempo virtual de Chrome no avanza y la captura se
+cuelga —hay que inyectar un stub de `EventSource` antes de su JS, que es el
+equivalente del `?preview=1` del player—; y **Chrome headless impone un ancho
+mínimo de ventana de ~504 px**, así que `--window-size=390` no da un viewport
+de 390: hay que meterlo en un **iframe** del tamaño exacto.
+
 ## Desarrollo
 
 ```cmd
 python server.py                  REM usa el puerto de config.json
 python server.py --port 8080      REM override
 
-npm test                          REM tests de lógica del player (Node stdlib)
+npm test                          REM 248 tests de logica (Node stdlib)
+python tests\test_<nombre>.py     REM 18 suites que arrancan el servidor
+cd android ^&^& gradlew.bat test  REM 31 tests de la app, sin aparato
 ```
+
+Para los de la app hay que poner antes `JAVA_HOME` al JDK de Android Studio
+(`C:\Program Files\Android\Android Studio\jbr`): no hay `java` en el PATH, así
+que un `where java` da falso negativo.
+
+**Trampa al ejecutar las suites de Python:** tener **otro servidor InTeks
+levantado** hace fallar `test_reset_password.py` con un `has_password: True`
+engañoso. No es el test ni el código: es que se cuela el servidor de al lado.
+Pararlo antes de sacar conclusiones.
 
 Admin en `/admin.html`, player en `/player.html?screen=NOMBRE`, emparejar en
 `/pair`.
@@ -379,12 +464,17 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
    el panel lo dice explícitamente en vez de fingir que se aplicó.
 
    **En este equipo de desarrollo concreto, la tarea sigue sin registrar**
-   (comprobado el 2026-08-12: `_tarea_autoarranque_estado()` devuelve
-   `existe: False`). La sesión de Claude Code no tiene permisos de
-   administrador para registrarla desde aquí; se le pasó al usuario el
-   comando exacto para correrlo él mismo elevado
-   (`installer\registrar-tarea.ps1 -AppDir "D:\Digital Signage"`), sin
-   confirmación todavía de que lo haya hecho. Si este PC pierde corriente,
+   (comprobado de nuevo el 2026-08-13: `Get-ScheduledTask "InTeks Display"` no
+   encuentra nada). La sesión de Claude Code no tiene permisos de
+   administrador para registrarla desde aquí; el comando, que hay que correr
+   elevado y **apuntando a la instalación, no a la copia de desarrollo**, es:
+
+   ```powershell
+   & "C:\Program Files\InTeks Display\registrar-tarea.ps1" -AppDir "C:\Program Files\InTeks Display"
+   ```
+
+   Se le ha dado ya varias veces, sin confirmación de que lo haya hecho. Si
+   este PC pierde corriente,
    el servidor no arrancaría solo hasta que se registre.
 
 2. **Unificar las dos rutas de distribución** (Python vs Electron) o decidir
@@ -401,7 +491,7 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
    manos. Se arregla el día que haya dos empleados editando a la vez; el
    arreglo de raíz es guardado granular por entidad (`/api/items/<id>`), que
    hoy es desproporcionado: `saveContentLocal()` se llama desde doce sitios de
-   un `admin.html` de 214 KB.
+   un `admin.html` de 226 KB.
 
    **No confundir con el arreglo de la 1.0.11**, que es otro fallo distinto:
    `/api/screens/config` (crear pantalla, asignar playlist, videowall —
@@ -412,53 +502,60 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
    de pantallas. Ya tiene el mismo `rev`/409 que `/api/content`. El punto 4
    de aquí arriba sigue sin arreglar: es el caso, más raro, de estar
    tecleando en el mismo instante en que llega un SSE.
-5. **App propia de reproductor para Android TV** — un navegador de kiosco
-   hecho a medida, para sticks tipo Xiaomi/Google TV. El núcleo es pequeño:
-   un `WebView` a pantalla completa apuntado a
-   `/player.html?screen=NOMBRE`, `keepScreenOn`, un receptor de
-   `BOOT_COMPLETED` para arrancar al enchufar la tele, y reintento con espera
-   creciente en `onReceivedError`. El `WebView` es Chromium, así que soporta
-   SSE, IndexedDB y el caché offline que ya usa el player.
+5. ~~**App propia de reproductor para Android TV.**~~ — **hecha en la 1.0.26**
+   (2026-08-13). Ver «App de kiosco Android» más arriba. Se escribio y se probo
+   en una caja real -MXQ PRO 4K, Amlogic S905W, Android 7.1.2 API 25, 990 MB de
+   RAM, la mas basica del mercado- y no en un emulador.
 
-   **No se hace como parche de un fallo**, y menos del punto 3: la
-   alternativa de mercado (Fully Kiosk Browser, ~7 €) lleva años resolviendo
-   lo que de verdad muerde —fiabilidad del arranque automático en cada
-   fabricante, restricciones de segundo plano, recuperación tras un cierre—,
-   y eso no son 200 líneas.
+   La vara de medir que se puso aqui era «igual de fiable que Fully, sin pagar
+   7 EUR por pantalla». En dos cosas la supera y conviene saber por que: Fully
+   necesita que alguien pegue la URL a mano, y si el PC cambia de IP hay que ir
+   pantalla por pantalla. Esta la encuentra sola y se rebusca.
 
-   **Ya no es hipotética: está en producción desde el 2026-08-11.** La tienda
-   del LG funciona con una caja Android y Fully Kiosk. Eso rebaja la urgencia
-   de escribir la app propia —lo que había que arreglar ya está arreglado— y a
-   la vez da lo que faltaba para decidirlo bien: una referencia de campo
-   contra la que comparar. El día que se escriba, la vara de medir no es «un
-   WebView que pinta el player», es «igual de fiable que Fully, sin pagar 7 €
-   por pantalla ni explicarle a nadie qué es un APK». Además mete un segundo lenguaje y un SDK con
-   Gradle en un proyecto cuya regla fundacional es *sin paso de compilación*.
+   **Lo que sigue sin poder responderse desde aqui** es lo que ya decia este
+   punto: si aguanta dias encendida, si vuelve tras un corte de luz de verdad
+   -no un `adb reboot` ordenado- y como renderiza el tablero de divisas con el
+   WebView que carga esa caja, que resulta ser **Chrome 62 y no soporta
+   `clamp()`**. Ese bucle va al ritmo de quien tenga el aparato delante.
 
-   **Se hace el día que el problema sea la instalación en tienda nueva**, no
-   una tele concreta: con app propia el cliente enchufa el stick y le sale la
-   pantalla de emparejar, sin explicarle a nadie qué es un APK, la app
-   Downloader ni un navegador de kiosco. Ahí deja de ser un parche y pasa a
-   ser mejor producto.
-
-   **Coste real, medido el 2026-08-11: menor de lo estimado.** El toolchain ya
-   está instalado en el equipo de desarrollo —Android Studio con su JDK, SDK
-   `android-36.1`, build-tools hasta `37.0.0`, `adb` y licencias aceptadas—,
-   así que la descarga de 3-4 GB que se contaba como el grueso no existe.
-   Ninguno está en el PATH: hay que invocarlos por ruta.
-
-   Lo que sí manda sobre el calendario es que **esto no se puede probar sin el
-   aparato**. Escribir la app y compilar el APK cabe en una sesión; que arranque
-   y pinte el player, el mismo día. Pero fiarse de dejarla desatendida en una
-   tienda son días de *observación*, no de trabajo: si vuelve tras un corte de
-   luz, si aguanta que el WiFi caiga de madrugada, si arranca de verdad al
-   encender el televisor. Ese bucle va al ritmo de quien tenga el stick
-   delante, no al de quien escribe el código.
+   Queda tambien **distribuir el APK**: hoy se instala con `adb install`, y va
+   firmado con la clave de depuracion, asi que el dia que se firme con otra
+   habra que desinstalar antes.
 
 6. ~~**Bot de Telegram que responda, no solo que avise.**~~ — **hecho en la
    1.0.19.** Ver «Bot de Telegram» más abajo.
 
 ## Gotchas de despliegue
+
+- **Dos instalaciones con el mismo token de Telegram se pelean por el bot.**
+  Visto el 2026-08-13 en el registro: `[bot] no se pudo leer mensajes: HTTP
+  Error 409: Conflict`, cada pocos segundos. **`sendMessage` admite muchos
+  emisores a la vez —por eso los avisos llegan de todas las tiendas— pero
+  `getUpdates` solo admite UN lector por token.** Así que `/estado` lo contesta
+  la instalación que tenga la conexión en ese instante, y la otra ni se entera
+  de que le preguntaron. No es que el bot «no detecte» una tienda.
+
+  Viene de montar la tienda restaurando una copia: `config.json` viaja con el
+  token **y el nombre de instalación** dentro, así que además las dos firman
+  igual y cuesta saber cuál te contestó. Arreglo de quince minutos y cero
+  código: **un bot por instalación**, otro token de @BotFather. Se propuso un
+  bot central que agregara todas y el usuario lo aparcó el 2026-08-13.
+
+- **El proveedor de WebView que carga una caja Android no es el que dice la
+  versión instalada.** En la MXQ de pruebas está instalado
+  `com.google.android.webview` 119, pero el sistema carga
+  `com.android.chrome` **62**, de 2017. `dumpsys webviewupdate` no devuelve
+  nada en API 25: la única forma de saberlo es el `logcat`
+  (`WebViewFactory: Loading …`). Importa porque **Chrome 62 no soporta
+  `clamp()`**, que llegó en el 79, y el player lo usa para dimensionar el
+  tablero. Se puede forzar el otro con
+  `cmd webviewupdate set-webview-implementation com.google.android.webview`.
+
+- **Una captura en negro no significa que el WebView no pinte.** `screencap`
+  devuelve negro puro con el display apagado. **Mirar `dumpsys power`
+  (`mWakefulness`) antes de culpar al renderizador**, y medir el píxel en vez
+  de mirarlo: el fondo del player es `#07182b`, muy oscuro, y a ojo pasa por
+  negro.
 
 - **Una pantalla viva podía quedar marcada «offline» para siempre (cerrado en
   la 1.0.21).** Caso real: «Pantalla Exterior (LG)» servía contenido con
