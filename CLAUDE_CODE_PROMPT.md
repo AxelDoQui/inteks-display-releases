@@ -531,6 +531,50 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
 6. ~~**Bot de Telegram que responda, no solo que avise.**~~ — **hecho en la
    1.0.19.** Ver «Bot de Telegram» más abajo.
 
+7. **IDEA APARCADA — carta de productos a la carta, lanzada a una pantalla.**
+   Planteada el 2026-09-01 y **aparcada por coste**: «después veo si la
+   implemento, ya que sale algo cara». **No empezar sin que lo pida.**
+
+   Lo que quiere: enseñarle al cliente un listado de productos con sus sabores
+   en una pantalla concreta, **manejándolo él desde el móvil** mientras
+   atiende, y que la pantalla vuelva luego sola a su programación.
+
+   **Son dos piezas de coste muy distinto, y por eso sale cara:**
+
+   - **El mando a distancia — pequeño.** Casi todo existe: `notify_screen(sid)`
+     ya empuja a una sola pantalla, `/api/playlist` ya es el embudo donde el
+     servidor decide qué ve cada una (el mismo por el que se resuelven los
+     paquetes), y el player repregunta cada 15 s por su cuenta. Si el estado
+     («la pantalla 3 muestra X hasta las 18:42») vive en el servidor, **la
+     vuelta atrás sale gratis y funciona aunque el SSE no llegue nunca** — que
+     es la lección de la 1.0.31 aplicada: el temporizador no puede estar dentro
+     del televisor, o una tele que se apaga y enciende se queda con la carta
+     puesta para siempre.
+   - **El módulo de carta — esto es lo caro, y no por el player.** Añadir un
+     tipo de diapositiva es rutina, hay diez y todos siguen el mismo patrón. Lo
+     costoso es **su editor en el panel**: sería el formulario más complejo que
+     tendría `admin.html` —una lista dentro de otra lista, productos con sus
+     sabores— en un monolito de 226 KB, y el único precedente parecido son las
+     filas de divisas.
+
+   **Orden natural si se retoma:** módulo primero, mando después. El mando sin
+   nada que lanzar no se puede probar de verdad.
+
+   **Botón físico: viable, y hay una opción claramente mejor.** Un botón wifi
+   (Shelly Button o similar, ~10-15 €) que haga una petición HTTP con
+   `X-SignalOS-Token` — **el mismo camino que ya usa la extensión de Chrome**,
+   sin tocar el servidor ni la app Android. Un mando Bluetooth emparejado a la
+   caja también valdría, pero hablaría con la *pantalla* en vez de con el
+   *servidor*, que es donde vive la verdad, y limita el alcance a unos metros.
+   Límite de cualquier botón: **es un solo bit**, así que la pantalla y el
+   contenido van preconfigurados; para elegir entre varias cartas, gana el
+   móvil.
+
+   **Dos decisiones que hay que tomar antes de escribir código:** caducidad en
+   el servidor **sí o sí** (que el escaparate no amanezca con la carta puesta
+   porque alguien no pulsó «Terminar»), y qué hacer al lanzar a una pantalla
+   apagada o fuera de horario — avisar, no fallar en silencio.
+
 ## Gotchas de despliegue
 
 - **No te fíes de «el aviso por SSE se entregó» (desde 1.0.31).** El servidor
