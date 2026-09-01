@@ -149,6 +149,19 @@ Si **todo** el contenido de una pantalla ha caducado, se sigue mostrando lo que
 hay y la tarjeta lo avisa. Una promo vieja en el escaparate es malo; un
 escaparate apagado es peor y no se distingue de una avería.
 
+### Si el televisor recorta los bordes
+
+Algunos televisores se comen un poco de cada borde de la imagen y no hay forma
+de evitarlo desde el mando. Si te pasa —ves que falta un trozo del título o que
+las cotizaciones llegan al filo—, en la ventana de la playlist hay un
+**margen de seguridad** de 0 a 5 %.
+
+Súbelo **solo en la pantalla que lo necesite**, y lo justo: el margen separa el
+contenido de los bordes, pero también le quita sitio, y en un tablero con
+muchas divisas eso se nota. Por defecto está a 0 y lo normal es dejarlo así.
+
+---
+
 ### Transiciones y orden
 
 En la **Playlist** de cada pantalla, arriba:
