@@ -12,7 +12,16 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 #player{width:100vw;height:100vh;position:fixed;top:0;left:0;transform-origin:top left;background:#000;overflow:hidden}
 
 /* ── Slides normales */
-.slide{position:absolute;inset:0;opacity:0;display:flex;align-items:center;justify-content:center;background:#000;
+/* Los cuatro longhands y no inset:0, por DOS motivos. Uno: inset es Chrome 87
+   y la caja de la tienda carga Chrome 62, donde la declaracion se descarta
+   entera y la diapositiva se encoge al tamaño de su contenido -medido:
+   1116x106 en vez de 1280x720, con las filas desbordando y la letra a 16px-.
+   Dos: aqui es donde entra el margen de seguridad, y este es el sitio bueno
+   para meterlo: en un elemento absoluto los porcentajes de top/bottom se
+   miden contra el ALTO del contenedor y los de left/right contra el ANCHO,
+   asi que un 3% es un 3% real por cada lado. Con padding:3% en #player los
+   cuatro lados se medirian contra el ancho y en apaisado saldria torcido. */
+.slide{position:absolute;top:var(--safe,0px);right:var(--safe,0px);bottom:var(--safe,0px);left:var(--safe,0px);opacity:0;display:flex;align-items:center;justify-content:center;background:#000;
   transition:opacity var(--trans-ms,1000ms) ease-in-out, transform var(--trans-ms,1000ms) ease-in-out}
 .slide.active{opacity:1}
 
