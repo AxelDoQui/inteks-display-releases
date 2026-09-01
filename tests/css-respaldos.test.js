@@ -86,45 +86,45 @@ test("toda declaracion con clamp()/min()/max() lleva su respaldo delante", () =>
 });
 
 /**
- * La trampa de las custom properties.
+ * Una custom property NO puede llevar sintaxis moderna dentro. No es que
+ * convenga evitarlo: es que **no tiene respaldo posible**.
  *
- * `--fx-title-size:clamp(...)` NO falla al declararse: una custom property
- * admite cualquier secuencia de tokens aunque el navegador no la entienda. El
- * fallo llega donde se USA: al sustituir, `font-size:clamp(...)` es invalida y
- * la propiedad se queda con lo heredado o con su valor inicial.
+ * Hay dos formas distintas de que una declaracion falle, y solo una permite
+ * poner algo delante:
  *
- * Y eso no es un detalle cosmetico: `.mod-fx-logo{height:var(--fx-title-size)}`
- * se quedaria con `height:auto`, que es exactamente el fallo ya documentado del
- * logo saliendo a 99px donde su CSS pedia 20, comiendose el 26% del ancho y
- * dejando el titulo en «TIPOS DE…».
+ * - `font-size:clamp(28px,6vw,96px)` en Chrome 62 es un ERROR DE PARSEO. La
+ *   declaracion se descarta y gana la anterior. Por eso el resto de respaldos
+ *   de este archivo funcionan.
+ * - `font-size:var(--x)` donde `--x` vale `clamp(...)` es INVALIDA EN TIEMPO DE
+ *   VALOR CALCULADO. Eso NO vuelve a la declaracion anterior: pone la propiedad
+ *   en «heredado» (o en su valor inicial). El respaldo de delante se ignora.
  *
- * Quien revise esto mirando solo el :root no encontrara nada roto.
+ * Se descubrio renderizando, no leyendo: con el respaldo puesto y todo, el
+ * titulo del tablero seguia saliendo a 16px. Un test que solo exigiera «una
+ * declaracion de la misma propiedad delante» habria dado esto por bueno.
+ *
+ * Y no es cosmetico: `.mod-fx-logo{height:var(--fx-title-size)}` se quedaba con
+ * `height:auto`, que es el fallo ya documentado del logo a 99px donde su CSS
+ * pedia 20, comiendose el 26% del ancho y dejando el titulo en «TIPOS DE…».
+ *
+ * La salida es escribir el valor en el sitio de uso: alli el clamp vuelve a ser
+ * un error de parseo y el respaldo de delante si funciona.
  */
-test("usar una variable con sintaxis moderna dentro tambien lleva respaldo", () => {
-  const todas = reglas();
-  const sospechosas = new Set();
-  for (const r of todas) {
+test("ninguna custom property lleva clamp()/min()/max() dentro", () => {
+  const fallos = [];
+  for (const r of reglas()) {
     for (const d of r.decls) {
-      if (d.prop.startsWith("--") && FUNCIONES_MODERNAS.test(d.valor)) {
-        sospechosas.add(d.prop);
+      if (!d.prop.startsWith("--")) continue;
+      if (FUNCIONES_MODERNAS.test(d.valor)) {
+        fallos.push(`${r.selector} { ${d.prop}: ${d.valor} }`);
       }
     }
   }
-  const fallos = [];
-  for (const r of todas) {
-    r.decls.forEach((d, i) => {
-      if (d.prop.startsWith("--")) return;
-      const usa = [...sospechosas].some(v => d.valor.includes("var(" + v));
-      if (!usa) return;
-      if (!tieneRespaldoAntes(r.decls, i)) {
-        fallos.push(`${r.selector} { ${d.prop}: ${d.valor} }`);
-      }
-    });
-  }
   assert.deepStrictEqual(fallos, [],
-    "Estas variables llevan clamp()/min()/max() dentro: " + [...sospechosas].join(", ") +
-    "\nEn Chrome 62 la sustitucion es invalida y la propiedad se queda sin valor.\n" +
-    "Pon delante la misma propiedad con el termino de en medio:\n  " + fallos.join("\n  "));
+    "Una variable con sintaxis moderna dentro NO tiene respaldo posible: al\n" +
+    "sustituirla, la propiedad se queda en «heredado» y se salta la declaracion\n" +
+    "anterior. Escribe el valor en el sitio de uso, donde el clamp vuelve a ser\n" +
+    "un error de parseo y el respaldo si funciona:\n  " + fallos.join("\n  "));
 });
 
 test("no se usa inset: en ninguna regla", () => {
