@@ -83,3 +83,18 @@ test("el Fire TV Stick sigue marcado como no probado", () => {
     "La tarjeta del Fire TV Stick ha perdido el aviso de que no está probado.\n" +
     "Si es que ya se probó, quita también este test. Si no, devuélvelo.");
 });
+
+const SINTOMAS = [
+  "Faltan trozos por los bordes",
+  "No llena la pantalla",
+  "No carga en la caja Android",
+  "No responde al tacto",
+  "Desde otro aparato no entra"
+];
+
+test("la ayuda cubre los fallos que ya han pasado en tienda", () => {
+  const h = ayuda();
+  const faltan = SINTOMAS.filter(s => !h.includes(s));
+  assert.deepStrictEqual(faltan, [],
+    "Faltan sintomas en la tarjeta de diagnostico:\n  " + faltan.join("\n  "));
+});
