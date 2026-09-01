@@ -106,6 +106,15 @@ Si alguien se sale con el mando, vuelve en unos segundos.
 > minutos y luego vuelve solo. Una pulsación suelta no hace nada: es a propósito,
 > para que nadie se salga sin querer.
 
+**Si se va la luz**, la caja vuelve antes que el ordenador —ella tarda unos dos
+minutos y el ordenador más—. Mientras tanto pone «Buscando InTeks Display en la
+red…» y **se engancha sola** en cuanto el ordenador termina de arrancar, aunque
+tarde. No hay que ir con el mando ni escribir nada.
+
+> Si alguna vez hiciera falta escribir la dirección a mano —por ejemplo si te
+> llevas la caja a otra red—, pulsa **OK** en el mando mientras está esa pantalla
+> de «Buscando…».
+
 De momento se instala desde un ordenador. Pídela cuando quieras probarla.
 
 **No hace falta configurar nada más.** El reproductor ya se ocupa solo del

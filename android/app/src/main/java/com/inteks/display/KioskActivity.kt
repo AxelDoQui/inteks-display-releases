@@ -42,7 +42,7 @@ class KioskActivity : Activity() {
         programarLatido(this)
 
         aviso = TextView(this).apply {
-            text = getString(R.string.buscando)
+            text = getString(R.string.buscando) + "\n\n" + getString(R.string.pulsa_ok)
             setBackgroundColor(0xFF07182B.toInt())
             setTextColor(0xFF7A8CA3.toInt())
             textSize = 18f
@@ -180,23 +180,39 @@ class KioskActivity : Activity() {
                 if (encontrada != null) {
                     ajustes.base = encontrada
                     cargar(encontrada)
-                } else if (algoPintado) {
-                    // Hay una pagina cargada y viva: el player sigue
-                    // reproduciendo de su cache aunque el servidor este caido.
-                    // Cambiar a la pantalla de ajustes aqui seria TIRAR el
-                    // escaparate que funciona para poner un formulario que
-                    // nadie va a rellenar de madrugada. Se vuelve a intentar
-                    // y ya esta: es el caso de la tienda que apaga el PC por
-                    // la noche.
-                    hilo.postDelayed({ buscarYCargar() }, ESPERA_MAXIMA_MS)
-                } else {
-                    // Nunca hemos llegado a pintar nada: aqui si toca pedir la
-                    // direccion, porque no hay escaparate que estropear.
-                    startActivity(Intent(this, SetupActivity::class.java))
-                    finish()
+                    return@post
+                }
+                when (queHacerSinServidor(algoPintado, ajustes.base)) {
+                    // Un escaparate en marcha o una caja ya instalada: se
+                    // espera lo que haga falta. Tras un corte de luz el PC de
+                    // la tienda tarda MINUTOS en volver, y hasta la 1.0.32
+                    // esto se rendia a los 40 segundos y ponia el formulario
+                    // de la direccion en el escaparate.
+                    SinServidor.SEGUIR_ESPERANDO ->
+                        hilo.postDelayed(
+                            { esperarYVolverAIntentar() }, esperaSinServidorMs(algoPintado))
+                    // Nunca ha visto un servidor: la estan instalando y hay
+                    // alguien delante con el mando.
+                    SinServidor.PEDIR_DIRECCION -> {
+                        startActivity(Intent(this, SetupActivity::class.java))
+                        finish()
+                    }
                 }
             }
         }.start()
+    }
+
+    /**
+     * A que volver despues de esperar.
+     *
+     * Con el escaparate en marcha solo se rebarre: un `loadUrl` tiraria la
+     * pagina viva, que es lo unico que sostiene la tienda con el servidor
+     * caido. Sin nada pintado se vuelve a la direccion conocida, que tras un
+     * corte de luz es la apuesta buena -el PC vuelve donde estaba-.
+     */
+    private fun esperarYVolverAIntentar() {
+        val base = ajustes.base
+        if (!algoPintado && base != null) cargar(base) else buscarYCargar()
     }
 
     private fun cargar(base: String) {
@@ -209,8 +225,11 @@ class KioskActivity : Activity() {
         val espera = esperaMs(intentos)
         intentos++
         // Cada 5 fallos seguidos se vuelve a barrer: puede que el PC haya
-        // cambiado de IP.
-        if (intentos % 5 == 0) { ajustes.base = null; buscarYCargar(); return }
+        // cambiado de IP. Pero NO se borra la direccion conocida: si el
+        // barrido tampoco encuentra nada nos quedariamos sin el unico dato
+        // bueno que teniamos. La sobreescribe el barrido cuando encuentra
+        // otra, que es cuando de verdad sabemos que la vieja ya no vale.
+        if (intentos % 5 == 0) { buscarYCargar(); return }
         hilo.postDelayed({ ajustes.base?.let { cargar(it) } ?: buscarYCargar() }, espera)
     }
 
@@ -233,7 +252,7 @@ class KioskActivity : Activity() {
                         fallosSeguidos = 0
                     } else if (++fallosSeguidos >= FALLOS_ANTES_DE_REBARRER) {
                         fallosSeguidos = 0
-                        ajustes.base = null
+                        // Sin borrar `base`: ver el comentario de reintentar().
                         buscarYCargar()
                     }
                     hilo.postDelayed(this, VIGILANCIA_MS)
@@ -260,8 +279,21 @@ class KioskActivity : Activity() {
         }
     }
 
+    /**
+     * OK sobre la pantalla de busqueda abre el formulario de la direccion.
+     *
+     * Es la unica puerta que queda al formulario para una caja ya instalada,
+     * y hace falta: si se muda a una red que el barrido no cubre, sin esto
+     * solo se podria arreglar con ADB.
+     */
     override fun onKeyDown(codigo: Int, evento: android.view.KeyEvent?): Boolean {
         if (codigo == android.view.KeyEvent.KEYCODE_APP_SWITCH) return true
+        if (esPeticionDeDireccion(codigo, algoPintado)) {
+            Log.i(TAG, "OK en la pantalla de busqueda: abro el formulario")
+            startActivity(Intent(this, SetupActivity::class.java))
+            finish()
+            return true
+        }
         return super.onKeyDown(codigo, evento)
     }
 

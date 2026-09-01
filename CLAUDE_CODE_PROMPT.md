@@ -1,6 +1,6 @@
 # InTeks Display — Contexto para Claude Code
 
-> Actualizado: 13 de agosto de 2026 (v1.0.31). Este documento describe el estado **real** del
+> Actualizado: 1 de septiembre de 2026 (v1.0.32). Este documento describe el estado **real** del
 > código. Si algo aquí no cuadra con lo que ves en los archivos, gana el código:
 > avísalo y se corrige el documento.
 
@@ -64,7 +64,7 @@ Ajustes · Ayuda
 
 `fx` (divisas) · `weather` · `ticker` · `text` · `url` · `video` · `comparison` ·
 `countdown` · `qr` · `product`. La imagen es la rama por defecto cuando el tipo
-no coincide con ninguno de los anteriores (`player.html:911`).
+no coincide con ninguno de los anteriores (`player.html:960`).
 
 Cada fila de `fx` admite un `agent` opcional (la ventanilla/agente de pago,
 caso Ria y similares con varios puntos de pago por moneda): si viene, el
@@ -149,7 +149,7 @@ logo y la fecha. Dos cosas que hay que saber antes de tocarla:
   `height:100%`: salía a 99 px donde su CSS pedía 20, se llevaba el 26 % del
   ancho y dejaba el título en «TIPOS DE…». Les pasaba igual a las imágenes de
   `product` y `comparison`.
-- `ajustarCabeceraFx()` (`player.html:1104`) apila el título en su propia fila
+- `ajustarCabeceraFx()` (`player.html:1158`) apila el título en su propia fila
   cuando ocupa dos líneas, para pantallas verticales. Corre **antes** de medir
   el hueco de las filas, porque la cabecera cambia de alto al apilarse.
   Preguntar al DOM si el texto está recortado **no funciona**:
@@ -250,6 +250,12 @@ aporta lo que un navegador no puede:
 - **Sobrevive a un cambio de IP**: guarda el nombre de pantalla en
   `SharedPreferences`, **fuera del WebView**, porque `localStorage` y las
   cookies van por origen y un cambio de IP dejaría la pantalla sin identidad.
+- **Nunca pide la direccion en un escaparate (desde 1.0.32).** Ver el gotcha
+  del corte de luz mas abajo. `queHacerSinServidor()` (`Arranque.kt`) decide:
+  solo se abre el formulario si la caja **no ha visto un servidor jamas** —la
+  estan instalando— o si alguien **pulsa OK** en la pantalla de busqueda. Y la
+  direccion guardada **ya no se borra nunca**: solo la reemplaza un barrido que
+  encuentre otra.
 - **Kiosco reversible**: pantalla completa inmersiva, `ATRAS` ignorada, y vuelve
   al frente a los 4 s si algo la tapa. `INICIO` y `RECIENTES` **no se pueden
   bloquear** desde una app normal. Salida de mantenimiento: **cinco pulsaciones
@@ -397,7 +403,7 @@ python server.py --port 8080      REM override
 
 npm test                          REM 248 tests de logica (Node stdlib)
 python tests\test_<nombre>.py     REM 19 suites que arrancan el servidor
-cd android ^&^& gradlew.bat test  REM 31 tests de la app, sin aparato
+cd android ^&^& gradlew.bat test  REM 40 tests de la app, sin aparato
 ```
 
 Para los de la app hay que poner antes `JAVA_HOME` al JDK de Android Studio
@@ -549,6 +555,34 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
   cambió**: ya sabía reaccionar a `unlink:`, así que las pantallas instaladas se
   benefician sin tocarlas. Regla general: **si algo tiene que pasar sí o sí, no
   puede depender de que el aparato esté escuchando justo entonces.**
+
+- **Un corte de luz ponia el formulario de la direccion en el escaparate
+  (cerrado en la 1.0.32).** Caso real en tienda: vuelve la luz, la caja Android
+  arranca en ~118 s, el PC tarda mas —Windows y luego el servidor—, y el
+  escaparate amanecia con «Escribe la direccion del servidor» y un campo de
+  texto a la vista de la calle. **No era una carrera desafortunada: pasaba
+  siempre.** La escalera de reintentos (2-4-8-16 s) esta calibrada para «el
+  servidor se ha reiniciado», que son segundos; a los ~35 s daba por mala una
+  IP guardada perfectamente buena, **la borraba**, barria 8 s sin exito y —como
+  `algoPintado` seguia en `false`— concluia que tocaba pedir la direccion.
+
+  Dos errores encadenados, y el segundo es el que enseña algo: **`algoPintado`
+  era la pregunta equivocada.** Pedir una direccion solo tiene sentido si hay
+  **alguien delante**, y «¿he pintado algo?» no responde a eso — en un arranque
+  en frio es `false` justo cuando mas desatendida esta la pantalla. Ahora la
+  señal es explicita: `base == null` (nadie la ha instalado todavia) o una
+  **pulsacion de OK** en el mando, que un escaparate no produce solo.
+
+  Y el primero: **no se tira un dato bueno antes de tener con que sustituirlo.**
+  `base` solo se reemplaza cuando un barrido encuentra otra cosa. Ojo al
+  arreglar esto de nuevo: la espera de reintento **no puede ser la misma** con
+  el escaparate en marcha (60 s, la tienda ya esta servida desde la cache) que
+  con la pantalla en gris (15 s, cada segundo es escaparate vacio) —
+  `esperaSinServidorMs()`.
+
+  **Sin verificar en aparato:** el arreglo esta cubierto por
+  `ArranqueTest.kt` (9 tests) pero **no se ha reproducido un corte de luz real**
+  con la 1.0.32 instalada. Es lo que falta para darlo por cerrado.
 
 - **Dos instalaciones con el mismo token de Telegram se pelean por el bot.**
   Visto el 2026-08-13 en el registro: `[bot] no se pudo leer mensajes: HTTP

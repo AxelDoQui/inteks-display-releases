@@ -6,5 +6,6 @@
     <string name="escribe_direccion">Escribe la dirección del servidor</string>
     <string name="conectar">Conectar</string>
     <string name="sigo_buscando">Sigo buscándolo. Si enciendes el ordenador ahora, esta pantalla continuará sola.</string>
+    <string name="pulsa_ok">Pulsa OK en el mando si quieres escribir la dirección a mano</string>
     <string name="mantenimiento">Mantenimiento: 5 minutos sin volver al reproductor</string>
 </resources>

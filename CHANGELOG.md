@@ -8,6 +8,28 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.32 — 2026-09-01
+
+### Corregido
+
+- **Tras un corte de luz, la caja de TV pedía la dirección del servidor en el
+  escaparate.** Al volver la luz la caja arranca en unos dos minutos y el
+  ordenador de la tienda tarda más. La app probaba la dirección que ya conocía
+  durante **40 segundos**, la daba por mala, la **borraba**, y como todavía no
+  había pintado nada ponía el formulario de «escribe la dirección» en la
+  pantalla del escaparate. Ahora **no tira nunca la dirección que funcionaba**
+  —solo la reemplaza cuando encuentra otra— y una caja ya instalada **se queda
+  esperando el tiempo que haga falta**, con el aviso de «Buscando…», hasta que
+  el ordenador aparece. El formulario solo sale al instalar una caja nueva.
+
+### Cambiado
+
+- **Se puede pedir el formulario de la dirección a propósito**: pulsando OK en
+  el mando mientras la pantalla dice «Buscando…». Hacía falta porque, con lo
+  anterior, una caja que se lleve a otra red ya no lo abre sola.
+
+---
+
 ## 1.0.31 — 2026-08-13
 
 ### Corregido
