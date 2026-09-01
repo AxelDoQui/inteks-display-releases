@@ -89,7 +89,11 @@ const SINTOMAS = [
   "No llena la pantalla",
   "No carga en la caja Android",
   "No responde al tacto",
-  "Desde otro aparato no entra"
+  "Desde otro aparato no entra",
+  // Estaba en MANUAL.md y se perdio al recortar la seccion: se recupero aqui.
+  // Importa porque sin ella alguien va con el mando a una caja que iba a
+  // arreglarse sola en cuanto arrancara el ordenador.
+  "Tras un corte de luz pone «Buscando"
 ];
 
 test("la ayuda cubre los fallos que ya han pasado en tienda", () => {
@@ -97,4 +101,28 @@ test("la ayuda cubre los fallos que ya han pasado en tienda", () => {
   const faltan = SINTOMAS.filter(s => !h.includes(s));
   assert.deepStrictEqual(faltan, [],
     "Faltan sintomas en la tarjeta de diagnostico:\n  " + faltan.join("\n  "));
+});
+
+const MANUAL = path.join(__dirname, "..", "MANUAL.md");
+
+/**
+ * No puede haber dos textos largos sobre lo mismo.
+ *
+ * Este proyecto ya se ha llevado ese golpe dos veces -las divisas duplicadas
+ * entre libreria y playlist, y CURRENCY_DB entre admin.html y parser.js-, y sin
+ * paso de compilacion no hay forma de generar uno a partir del otro. Asi que el
+ * texto largo vive en el panel y el manual remite a el.
+ */
+test("el manual no duplica la guia de aparatos, remite al panel", () => {
+  const m = fs.readFileSync(MANUAL, "utf8");
+  const i = m.indexOf("## Con qué reproducir");
+  assert.ok(i >= 0, "no se encuentra la sección de aparatos en MANUAL.md");
+  const j = m.indexOf("\n## ", i + 5);
+  const seccion = m.slice(i, j > 0 ? j : m.length);
+
+  assert.ok(seccion.toLowerCase().includes("ayuda"),
+    "La sección del manual debe remitir a la Ayuda del panel.");
+  assert.ok(seccion.split("\n").length < 30,
+    `La sección del manual ha vuelto a crecer (${seccion.split("\n").length} líneas).\n` +
+    "El texto largo va en la Ayuda del panel; aquí solo el resumen.");
 });
