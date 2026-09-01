@@ -999,6 +999,79 @@ JPY  Yen        162.5"></textarea>
     </div>
   </div>
   <div class="card">
+    <div class="card-title">Con qué reproducir</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.9;margin-bottom:12px">
+      Cualquier pantalla con navegador vale para empezar. Lo que cambia entre unas y
+      otras es cuánto aguantan encendidas. Abre la que tengas:
+    </div>
+
+    <details class="aparato">
+      <summary>Tablet o móvil</summary>
+      <p>Lo más fácil y lo que mejor va para probar. Abre el navegador, entra en
+      <code>/pair</code>, escribe el PIN y listo. No hay que instalar nada.</p>
+      <p>Ponle que no se apague la pantalla en los ajustes del propio aparato, y
+      déjalo enchufado a la corriente.</p>
+    </details>
+
+    <details class="aparato">
+      <summary>Televisor con su propio navegador</summary>
+      <p>Sirve para empezar y va bien en una pantalla que se apaga por la noche.
+      Pero <strong>el navegador de fábrica de un televisor no está pensado para
+      tener una página abierta doce horas seguidas</strong>, y cuando falla no
+      avisa: cierra la página y deja el escaparate en negro.</p>
+      <p><strong style="color:var(--text)">Pasó de verdad en una tienda, con un LG:</strong>
+      el navegador se cerraba solo cada dos minutos. Se descartaron el protector de
+      pantalla, el ahorro de energía, el HDMI-CEC y el propio programa —se probó con
+      la versión corregida y siguió igual—. <strong>Se resolvió cambiando el aparato,
+      no la página.</strong></p>
+      <p>Si la pantalla tiene que estar encendida todo el día, vete a una cajita.</p>
+    </details>
+
+    <details class="aparato">
+      <summary>Caja Android TV</summary>
+      <p><strong style="color:var(--text)">Es lo recomendado para un escaparate.</strong>
+      Una caja barata enchufada al HDMI: el televisor pasa a ser solo la pantalla.
+      Dos formas de montarla:</p>
+      <p><strong style="color:var(--text)">Con la app de InTeks</strong> (un archivo
+      <code>.apk</code>, pídela). Encuentra el ordenador sola —no hay que escribir
+      ninguna dirección con el mando—, arranca al encender la caja y enciende el
+      televisor. Si el ordenador cambia de dirección, lo vuelve a buscar.</p>
+      <ul>
+        <li>Para tocar la caja —cambiar el wifi, entrar en sus ajustes—:
+        <strong>cinco veces seguidas la tecla «atrás»</strong>. Se aparta cinco
+        minutos y vuelve sola.</li>
+        <li>Si alguna vez hace falta escribir la dirección a mano, pulsa
+        <strong>OK</strong> mientras pone «Buscando…».</li>
+      </ul>
+      <p><strong style="color:var(--text)">Con Fully Kiosk Browser</strong> (unos 7 €,
+      pago único). Copia el enlace directo de la pantalla desde su tarjeta y pégalo en
+      <em>Start URL</em>. Activa <em>Keep Screen On</em>, <em>Start on Boot</em> y
+      <em>Kiosk Mode</em>, y <strong>desactiva el salvapantallas</strong> de la propia
+      app, que viene puesto y taparía el contenido.</p>
+      <p>Dos cosas que despistan: estas cajas <strong>no tienen táctil</strong> aunque
+      el televisor sí lo tenga, y hay que usar <strong>la IP</strong> y nunca
+      <code>signage.local</code>.</p>
+    </details>
+
+    <details class="aparato">
+      <summary>Amazon Fire TV Stick</summary>
+      <p>Por dentro es Android, así que en principio vale lo mismo que para una caja
+      Android: se le instalan aplicaciones desde un ordenador y le aplican las mismas
+      pegas —la IP en vez de <code>signage.local</code>, y nada de táctil—.</p>
+      <p><strong style="color:var(--text)">Aviso honesto: no lo hemos probado todavía.</strong>
+      No sabemos si la app de InTeks arranca bien ahí. Si vas a montar una tienda con
+      uno, pruébalo antes en casa; y si funciona, dilo y quitamos este aviso.</p>
+    </details>
+
+    <details class="aparato">
+      <summary>Mini PC</summary>
+      <p>El más caro y el más previsible. Un ordenador pequeño con el navegador en
+      modo pantalla completa arrancando solo. Si ya tienes que poner un ordenador
+      para el programa, a veces sale a cuenta que sea el mismo.</p>
+    </details>
+  </div>
+
+  <div class="card">
     <div class="card-title">Extensión de Chrome (divisas) desde otro ordenador</div>
     <div style="font-size:13px;color:var(--muted);line-height:1.9">
       <p>Detecta tablas de tipos de cambio en cualquier web (Western Union, Ria...)

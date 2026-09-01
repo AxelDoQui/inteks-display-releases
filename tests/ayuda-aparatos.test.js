@@ -49,3 +49,37 @@ test("la ayuda explica el emparejamiento por PIN, que es el flujo real", () => {
   const h = ayuda().toLowerCase();
   assert.ok(h.includes("pin"), "la ayuda no menciona el PIN de emparejamiento");
 });
+
+const FAMILIAS = [
+  "Tablet o móvil",
+  "Televisor con su propio navegador",
+  "Caja Android TV",
+  "Amazon Fire TV Stick",
+  "Mini PC"
+];
+
+test("hay una tarjeta por familia de aparato", () => {
+  const h = ayuda();
+  const faltan = FAMILIAS.filter(f => !h.includes(f));
+  assert.deepStrictEqual(faltan, [],
+    "Faltan tarjetas de aparato en la ayuda:\n  " + faltan.join("\n  "));
+});
+
+/**
+ * Del Fire TV Stick NO hay ninguna comprobacion. Fire OS es Android y admite
+ * instalar APKs de lado, asi que la app deberia funcionar — pero «deberia» no
+ * es «funciona», y la app declara leanback y apunta a API 28.
+ *
+ * Prometer lo que nadie ha visto manda a alguien a una tienda con un aparato
+ * que no arranca. Cuando alguien lo pruebe de verdad, se quita el aviso Y se
+ * quita este test, en el mismo commit.
+ */
+test("el Fire TV Stick sigue marcado como no probado", () => {
+  const h = ayuda();
+  const i = h.indexOf("Amazon Fire TV Stick");
+  assert.ok(i >= 0, "no está la tarjeta del Fire TV Stick");
+  const tarjeta = h.slice(i, i + 2000).toLowerCase();
+  assert.ok(tarjeta.includes("no lo hemos probado"),
+    "La tarjeta del Fire TV Stick ha perdido el aviso de que no está probado.\n" +
+    "Si es que ya se probó, quita también este test. Si no, devuélvelo.");
+});
