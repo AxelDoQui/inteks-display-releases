@@ -139,7 +139,11 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 .qr-text{font-size:2.5vw;font-size:clamp(16px,2.5vw,32px);margin-top:4vh;text-align:center}
 
 /* ── Ficha de producto */
-.mod-product{width:100%;height:100%;display:grid;grid-template-columns:1fr 1fr;gap:6vw;align-items:center;padding:6vw}
+.mod-product{width:100%;height:100%;display:grid;grid-template-columns:1fr 1fr;grid-gap:6vw;gap:6vw;align-items:center;padding:6vw}
+/* aspect-ratio es Chrome 88 y en la caja de la tienda se descarta. Se acepta
+   a proposito: son IMAGENES, y sin el se dibujan con su proporcion natural,
+   que es justo lo que se les pedia. NO poner el truco de
+   height:0;padding-bottom:100% — rompe el object-fit de al lado. */
 .product-image{width:100%;aspect-ratio:1;object-fit:contain;border-radius:2vw}
 .product-info{display:flex;flex-direction:column;justify-content:center}
 .product-name{font-size:5vw;font-size:clamp(32px,5vw,64px);font-weight:700;margin-bottom:1vh;line-height:1.1}
@@ -149,7 +153,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 .product-badge{display:inline-block;padding:.5em 1em;background:rgba(255,255,255,.2);border-radius:1vw;font-size:1.5vw;font-size:clamp(12px,1.5vw,18px);margin-bottom:2vh;font-weight:600}
 
 /* ── Comparativa */
-.mod-comparison{width:100%;height:100%;display:grid;grid-template-columns:1fr 1fr;gap:4vw;padding:4vw;align-items:center}
+.mod-comparison{width:100%;height:100%;display:grid;grid-template-columns:1fr 1fr;grid-gap:4vw;gap:4vw;padding:4vw;align-items:center}
 .comparison-product{display:flex;flex-direction:column;align-items:center;text-align:center}
 .comparison-image{width:90%;aspect-ratio:1;object-fit:contain;margin-bottom:2vh;border-radius:1vw}
 .comparison-name{font-size:3.5vw;font-size:clamp(24px,3.5vw,44px);font-weight:700;margin-bottom:1vh}
@@ -168,6 +172,27 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 body.rot-90 #player{ width:100vh;height:100vw; transform:rotate(90deg) translateY(-100%); }
 body.rot-180 #player{ transform:rotate(180deg) translate(-100%,-100%); }
 body.rot-270 #player{ width:100vh;height:100vw; transform:rotate(270deg) translateX(-100%); }
+
+/* ── Huecos de flex para navegadores sin `gap` ──────────────────────────────
+   `gap` en flex es Chrome 84 y no tiene equivalente antiguo, asi que hay que
+   separar los hijos con margenes, como se hacia antes de que existiera. Pero
+   el margen NO puede ir suelto: se sumaria al gap en los navegadores modernos
+   y el 3% de la cabecera pasaria a 6%, que se ve.
+
+   @supports existe desde Chrome 28, asi que la caja lo entiende. Y como en
+   Chrome 62 `gap` no existe ni siquiera en grid, la consulta es falsa alli
+   -entran los margenes- y verdadera en cualquier navegador moderno, que se
+   queda con su gap y no suma nada.
+
+   Hueco conocido y asumido: entre Chrome 66 y 83 `gap` valia en grid pero no
+   en flex, asi que ahi esto no entra y los huecos de flex quedan a cero. El
+   objetivo es la caja de 2017, no toda la historia de Chrome. */
+@supports not (gap:1px){
+  .mod-fx-header>*+*{margin-left:3%}
+  .fx-row>*+*{margin-left:2.5%}
+  .weather-details>*+*{margin-left:4vw}
+  #waiting>*+*{margin-top:16px}
+}
 </style>
 </head>
 <body>
