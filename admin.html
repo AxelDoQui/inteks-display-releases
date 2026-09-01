@@ -984,13 +984,18 @@ JPY  Yen        162.5"></textarea>
 <div class="page" id="page-help">
   <h1 style="font-size:18px;font-weight:500;margin-bottom:16px">Cómo usar</h1>
   <div class="card">
-    <div class="card-title">Conectar pantallas</div>
+    <div class="card-title">Conectar una pantalla</div>
     <div style="font-size:13px;color:var(--muted);line-height:1.9">
-      <p>1. Ejecuta <code style="background:var(--s2);padding:2px 6px;border-radius:4px;font-family:monospace">python server.py</code> en el portátil</p>
-      <p>2. En cada tablet abre Chrome con un nombre único:</p>
-      <code style="display:block;background:var(--s2);padding:10px;border-radius:var(--r);margin:6px 0;font-size:11px">http://IP:8080/player.html?screen=pantalla1<br>http://IP:8080/player.html?screen=pantalla2</code>
-      <p>3. Para girar la pantalla añade <code style="background:var(--s2);padding:2px 6px;border-radius:4px;font-family:monospace">&rotation=90</code> (0, 90, 180 o 270):</p>
-      <code style="display:block;background:var(--s2);padding:10px;border-radius:var(--r);margin:6px 0;font-size:11px">http://IP/player.html?screen=pantalla3&rotation=90</code>
+      <p><strong style="color:var(--text)">1.</strong> En el aparato —tablet, televisor o caja— abre el navegador
+      y entra en <code style="background:var(--s2);padding:2px 6px;border-radius:4px;font-family:monospace">http://IP-DEL-ORDENADOR/pair</code></p>
+      <p><strong style="color:var(--text)">2.</strong> Escribe el <strong style="color:var(--text)">PIN</strong> que aparece
+      en <em>Ajustes &rarr; Seguridad</em> de este panel. Vale 10 minutos.</p>
+      <p><strong style="color:var(--text)">3.</strong> Ponle nombre a la pantalla y ya est&aacute; reproduciendo.</p>
+      <p style="margin-top:10px">Para girarla, en la tarjeta de la pantalla tienes la rotaci&oacute;n (0, 90, 180 o 270).
+      No hace falta tocar la direcci&oacute;n.</p>
+      <p style="margin-top:10px"><strong style="color:var(--text)">En una caja Android usa la IP</strong>, no
+      <code style="background:var(--s2);padding:2px 6px;border-radius:4px;font-family:monospace">signage.local</code>:
+      Android no resuelve esos nombres. En iPhone y Mac s&iacute; funcionan.</p>
     </div>
   </div>
   <div class="card">
