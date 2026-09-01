@@ -1131,6 +1131,13 @@ JPY  Yen        162.5"></textarea>
                value="4" style="width:56px" title="Cada cuántos pases sale un contenido marcado con ⭐">
         <span style="color:var(--muted)">pases</span>
       </span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:12px">
+        <span style="color:var(--muted)">margen de seguridad</span>
+        <input class="finput" id="plm-safe-margin" type="number" min="0" max="5" step="1"
+               value="0" style="width:56px"
+               title="Separa el contenido de los bordes. Solo hace falta en televisores que recortan la imagen. 0 = sin margen.">
+        <span style="color:var(--muted)">%</span>
+      </span>
     </div>
     <div style="font-size:11px;color:var(--muted);margin-bottom:10px">
       Se aplica a todos los pases de esta pantalla. Con orden aleatorio, cada vuelta
@@ -1850,6 +1857,7 @@ function openPlModal(sid){
     (cfg.transition_ms===undefined||cfg.transition_ms===null)?1000:cfg.transition_ms;
   document.getElementById("plm-shuffle").checked=!!cfg.shuffle;
   document.getElementById("plm-priority-every").value=cfg.priority_every||4;
+  document.getElementById("plm-safe-margin").value=cfg.safe_margin||0;
   cambioTransicion();
   cambioShuffle();
   renderPlList(sid);renderPlLib(sid);
@@ -2011,6 +2019,13 @@ async function savePlModal(){
     const cada=parseInt(document.getElementById("plm-priority-every").value,10);
     content.screens[editingScreen].priority_every=
       isNaN(cada)?4:Math.max(2,Math.min(50,cada));
+    // El recorte se repite en margenSeguroCss() del player a proposito: el
+    // panel no es el unico que escribe content.json -esta la extension, estan
+    // las copias restauradas de otra tienda-, asi que el player no puede
+    // fiarse de que le llegue un numero sano.
+    const margen=parseInt(document.getElementById("plm-safe-margin").value,10);
+    content.screens[editingScreen].safe_margin=
+      isNaN(margen)?0:Math.max(0,Math.min(5,margen));
   }
   await saveScreensConfig();closePlModal();renderScreens();toast("Playlist guardada ✓");
 }

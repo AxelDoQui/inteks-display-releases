@@ -8,6 +8,26 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.33 — 2026-09-01
+
+### Corregido
+
+- **El contenido se veía mal en las cajas de TV con navegador antiguo.** No
+  llenaba la pantalla, la letra salía diminuta y el tablero de divisas se
+  desbordaba. Pasaba solo en algunas pantallas, lo que despistaba: el panel lo
+  enseñaba bien porque el ordenador tiene un navegador moderno, y la caja de la
+  tienda carga uno de 2017 que se saltaba en silencio medio centenar de reglas
+  de estilo. Ahora se ve **igual en cualquier pantalla**.
+
+### Nuevo
+
+- **Margen de seguridad por pantalla** (de 0 a 5 %), en la ventana de playlist.
+  Para televisores que recortan los bordes de la imagen y se comen lo que haya
+  pegado al filo. **Por defecto está a 0**: solo hay que tocarlo en la pantalla
+  que lo necesite.
+
+---
+
 ## 1.0.32 — 2026-09-01
 
 ### Corregido

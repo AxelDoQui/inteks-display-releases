@@ -1,6 +1,6 @@
 # InTeks Display — Contexto para Claude Code
 
-> Actualizado: 1 de septiembre de 2026 (v1.0.32). Este documento describe el estado **real** del
+> Actualizado: 1 de septiembre de 2026 (v1.0.33). Este documento describe el estado **real** del
 > código. Si algo aquí no cuadra con lo que ves en los archivos, gana el código:
 > avísalo y se corrige el documento.
 
@@ -401,7 +401,7 @@ de 390: hay que meterlo en un **iframe** del tamaño exacto.
 python server.py                  REM usa el puerto de config.json
 python server.py --port 8080      REM override
 
-npm test                          REM 248 tests de logica (Node stdlib)
+npm test                          REM 260 tests de logica (Node stdlib)
 python tests\test_<nombre>.py     REM 19 suites que arrancan el servidor
 cd android ^&^& gradlew.bat test  REM 40 tests de la app, sin aparato
 ```
@@ -555,6 +555,48 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
   cambió**: ya sabía reaccionar a `unlink:`, así que las pantallas instaladas se
   benefician sin tocarlas. Regla general: **si algo tiene que pasar sí o sí, no
   puede depender de que el aparato esté escuchando justo entonces.**
+
+- **El player usaba CSS que el navegador de la caja no entiende (cerrado en la
+  1.0.33).** Aviso de campo: «a veces el contenido no se ve como debe», y
+  «depende del televisor». No era sobrebarrido: la caja carga
+  `com.android.chrome` **62**, de 2017, y en CSS **una declaracion con propiedad
+  desconocida o valor invalido se descarta entera y en silencio**. El `<style>`
+  de `player.html` tenia **58** de esas.
+
+  Medido con el arnés de render, mismo tablero a 1280x720: `.slide` salia
+  **1116x106** en vez de 1280x720, las filas desbordaban (300 px en un hueco de
+  23) y toda la letra caia a 16 px. La causa estructural era **una linea**:
+  `.slide{position:absolute;inset:0}` — `inset` es Chrome 87, y sin el un
+  elemento absoluto se encoge al tamaño de su contenido.
+
+  **Por que no se vio antes:** la previa del admin corre en el navegador del
+  usuario, que es moderno. **Lo que el panel enseña no es lo que pinta la caja.**
+
+  Lo que hay que saber al tocar el `<style>`, y lo vigila
+  `tests/css-respaldos.test.js`:
+
+  - El respaldo va **delante** y la declaracion moderna **detras**. Al reves no
+    hace nada.
+  - El respaldo de `clamp(A,B,C)` es **B**, el termino de en medio, no el
+    minimo: `vw`/`vh`/`vmin` son de Chrome 26 y asi una pantalla vieja conserva
+    la letra fluida. Con A, un 4K se quedaria con letra de movil.
+  - **Hay dos formas de fallar y solo una admite respaldo.** `font-size:clamp(…)`
+    es un **error de parseo**: se descarta y gana la anterior. Pero
+    `font-size:var(--x)` con un `clamp()` dentro de `--x` es **invalida en tiempo
+    de valor calculado**, y eso **no** vuelve a la anterior: pone la propiedad en
+    «heredado». Por eso **ninguna custom property puede llevar sintaxis moderna
+    dentro** — el test lo prohibe. Se descubrio renderizando: con el respaldo
+    puesto, el titulo seguia saliendo a 16 px.
+  - Los seis `min()` del tablero **no tenian respaldo estatico posible** (en
+    horizontal manda el alto, en vertical el ancho). Los resuelve `fitRows()`,
+    que ya medía ambos, publicando el resultado en variables.
+  - En **grid** hay respaldo exacto y gratis: `grid-gap`, de Chrome 57. En
+    **flex** no, y los margenes van dentro de `@supports not (gap:1px)`: sueltos
+    se sumarian al `gap` en los navegadores modernos.
+
+  Resultado medido: Chrome 62 y un navegador moderno dan **el mismo pixel** en
+  las seis medidas del tablero. **Sin verificar en aparato**: falta instalarlo y
+  mirar la caja de la tienda.
 
 - **Un corte de luz ponia el formulario de la direccion en el escaparate
   (cerrado en la 1.0.32).** Caso real en tienda: vuelve la luz, la caja Android

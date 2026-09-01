@@ -34,6 +34,7 @@ function loadResiliencia(localStorageStub) {
     // con ReferenceError y no se probaria la cache, que es el tema.
     sincronizarMedios() {},
     aplicarTransicion() {},
+    aplicarMargenSeguro() {},
     // restoreFromCache arranca el ciclo por la lista de orden. Aqui no
     // interesa que orden sale; solo que la playlist se recupere entera.
     rehacerOrden() {},
