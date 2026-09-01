@@ -233,6 +233,41 @@ const URL_ROTATION = params.get("rotation")!==null ? parseInt(params.get("rotati
                    : (params.get("vertical")==="1" ? 90 : null);
 
 // Aplica la orientación física de la pantalla (0/90/180/270)
+// ── Margen de seguridad
+/**
+ * Cuanto separar el contenido de los bordes, en CSS.
+ *
+ * Hay televisores que recortan un 3-5% de cada borde (sobrebarrido) y se comen
+ * lo que haya pegado al filo. Va POR PANTALLA y por defecto a cero: un margen
+ * donde no hace falta le quita sitio a un tablero que ya va justo, asi que solo
+ * lo paga quien lo pide.
+ *
+ * Se recorta a 5 a proposito: mas que eso no es un margen, es un televisor mal
+ * configurado, y dejarlo subir mas solo esconderia el sintoma.
+ *
+ * Tolera basura porque el panel no es el unico que escribe content.json: esta
+ * la extension y estan las copias restauradas de otra tienda.
+ */
+function margenSeguroCss(cfg){
+  const n=Math.floor(Number(cfg&&cfg.safe_margin));
+  if(!isFinite(n)||n<=0) return "0px";
+  return Math.min(5,n)+"%";
+}
+
+/**
+ * Lo escribe en #player, que es el bloque contenedor de las diapositivas.
+ *
+ * Lo consume `.slide` con top/right/bottom/left:var(--safe,0px) — y no un
+ * padding aqui — porque en un elemento absoluto los porcentajes verticales se
+ * miden contra el alto y los horizontales contra el ancho. Ver el comentario
+ * de la regla.
+ */
+function aplicarMargenSeguro(cfg){
+  const p=document.getElementById("player");
+  if(p) p.style.setProperty("--safe",margenSeguroCss(cfg));
+}
+// ── fin del margen de seguridad
+
 function applyRotation(deg){
   deg=(((parseInt(deg)||0)%360)+360)%360;
   document.body.classList.remove("rot-90","rot-180","rot-270");
@@ -561,6 +596,9 @@ function restoreFromCache(){
   screenSchedule=(d.config&&d.config.schedule)||null;   // sin esto se encendería fuera de horario
   playlist=d.playlist;
   aplicarTransicion(screenConfig);   // la caché también recuerda cómo transiciona
+  aplicarMargenSeguro(screenConfig); // y el margen: si solo se aplicara al
+                                     // refrescar, una pantalla que arranca sin
+                                     // servidor pintaria sin el y luego saltaria
   rebuildSlides();
   rehacerOrden();
   showSlide(orden[0]||0);
@@ -669,6 +707,7 @@ async function loadPlaylist(){
     const prioCadaAntes=screenConfig&&screenConfig.priority_every;
     screenConfig=d.config||null;
     aplicarTransicion(screenConfig);
+    aplicarMargenSeguro(screenConfig);
     lastContact=Date.now();
     updateScreenStatus();
     if(changed){playlist=d.playlist;rebuildSlides();}
