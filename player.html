@@ -51,8 +51,8 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 
 /* ── Texto */
 .text-slide{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:8vw;text-align:center}
-.text-slide h2{font-size:clamp(28px,6vw,96px);font-weight:700;line-height:1.1;margin-bottom:.3em}
-.text-slide p{font-size:clamp(16px,3vw,48px);opacity:.75;line-height:1.5}
+.text-slide h2{font-size:6vw;font-size:clamp(28px,6vw,96px);font-weight:700;line-height:1.1;margin-bottom:.3em}
+.text-slide p{font-size:3vw;font-size:clamp(16px,3vw,48px);opacity:.75;line-height:1.5}
 
 /* ── Módulo divisas */
 .mod-fx{width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden}
@@ -60,14 +60,14 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
    CSS, vw se refiere al viewport sin rotar y todo sale desproporcionado. El
    título se recorta antes que partir en tres líneas y montarse sobre el logo. */
 .mod-fx-header{padding:3vh 4% 2vh;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:3%;--fx-title-size:clamp(16px,3.4vmin,40px)}
-.mod-fx-title{font-size:var(--fx-title-size);font-weight:700;letter-spacing:2px;text-transform:uppercase;min-width:0;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.15}
-.mod-fx-date{font-size:clamp(11px,1.7vmin,20px);opacity:.4;font-family:monospace;letter-spacing:1px;white-space:nowrap}
+.mod-fx-title{font-size:3.4vmin;font-size:var(--fx-title-size);font-weight:700;letter-spacing:2px;text-transform:uppercase;min-width:0;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.15}
+.mod-fx-date{font-size:1.7vmin;font-size:clamp(11px,1.7vmin,20px);opacity:.4;font-family:monospace;letter-spacing:1px;white-space:nowrap}
 /* Tasas pasadas de plazo. Parpadeo lento y discreto: lo ve el personal al
    pasar, pero no monta un cartel delante del cliente. */
 .mod-fx-date.caducada{opacity:.85;animation:fxCaducada 2.4s ease-in-out infinite}
 @keyframes fxCaducada{0%,100%{opacity:.85}50%{opacity:.3}}
-.mod-fx-page{font-size:clamp(11px,1.7vmin,20px);opacity:.55;font-family:monospace;letter-spacing:1px;padding:2px 10px;border:1px solid rgba(255,255,255,.2);border-radius:99px;white-space:nowrap}
-.mod-fx-logo{height:var(--fx-title-size);max-width:26%;object-fit:contain;flex-shrink:0}
+.mod-fx-page{font-size:1.7vmin;font-size:clamp(11px,1.7vmin,20px);opacity:.55;font-family:monospace;letter-spacing:1px;padding:2px 10px;border:1px solid rgba(255,255,255,.2);border-radius:99px;white-space:nowrap}
+.mod-fx-logo{height:3.4vmin;height:var(--fx-title-size);max-width:26%;object-fit:contain;flex-shrink:0}
 /* Cabecera apilada: el título en su propia línea y debajo el logo con la fecha.
    La activa ajustarCabeceraFx() cuando el título no cabe compitiendo con ellos,
    que es lo que pasa en pantallas verticales. En horizontal no se activa y la
@@ -86,49 +86,49 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
    legal de las tasas no se leia. Al crecer la letra necesita mas alto, asi que
    el tope sube de 18% a 22%; si no, una nota larga se recortaria contra el
    overflow:hidden y saldria peor que antes. */
-.mod-fx-note{flex-shrink:0;max-height:22%;overflow:hidden;padding:1.5vh 4% 2.5vh;border-top:1px solid rgba(255,255,255,.12);font-size:clamp(13px,2.5vmin,28px);line-height:1.35;opacity:.75}
+.mod-fx-note{flex-shrink:0;max-height:22%;overflow:hidden;padding:1.5vh 4% 2.5vh;border-top:1px solid rgba(255,255,255,.12);font-size:2.5vmin;font-size:clamp(13px,2.5vmin,28px);line-height:1.35;opacity:.75}
 .fx-row{flex:var(--fx-flex,1 1 0);min-height:0;display:flex;align-items:center;border-bottom:1px solid rgba(255,255,255,.07);gap:2.5%;height:var(--fx-row-h)}
 .fx-row:last-child{border-bottom:none}
-.fx-flag{font-size:min(calc(var(--fx-row-h)*.42),calc(var(--fx-box-w)*.075));width:min(calc(var(--fx-row-h)*.55),calc(var(--fx-box-w)*.10));text-align:center;flex-shrink:0}
+.fx-flag{font-size:var(--fx-s-flag);width:var(--fx-w-flag);text-align:center;flex-shrink:0}
 .fx-country{flex:1;min-width:0}
 /* El nombre del país no puede empujar a la cotización: si no cabe, se recorta */
-.fx-country-name{font-size:min(calc(var(--fx-row-h)*.26),calc(var(--fx-box-w)*.055));font-weight:600;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fx-currency{font-size:min(calc(var(--fx-row-h)*.13),calc(var(--fx-box-w)*.028));opacity:.45;font-family:monospace;letter-spacing:1px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fx-country-name{font-size:var(--fx-s-pais);font-weight:600;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fx-currency{font-size:var(--fx-s-moneda);opacity:.45;font-family:monospace;letter-spacing:1px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* La ventanilla en su propia linea. Iba pegada a la moneda -"Peso filipino ·
    RIA & Palawan", 29 caracteres- y no cabia: se cortaba justo el dato que
    distingue una ventanilla de otra. Sola dispone del ancho entero de su
    columna, y va un punto mas opaca que la moneda porque al cliente le importa
    mas donde cobra que como se llama el billete. */
-.fx-agent{font-size:min(calc(var(--fx-row-h)*.13),calc(var(--fx-box-w)*.028));opacity:.62;font-family:monospace;letter-spacing:1px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fx-agent{font-size:var(--fx-s-moneda);opacity:.62;font-family:monospace;letter-spacing:1px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fx-rate{text-align:right;flex-shrink:0;min-width:0}
-.fx-rate-val{font-size:min(calc(var(--fx-row-h)*.42),calc(var(--fx-box-w)*.115));font-weight:700;font-family:monospace;letter-spacing:-1px;white-space:nowrap}
-.fx-rate-label{font-size:min(calc(var(--fx-row-h)*.10),calc(var(--fx-box-w)*.022));opacity:.4;text-align:right;letter-spacing:1px;margin-top:2px;white-space:nowrap}
+.fx-rate-val{font-size:var(--fx-s-tasa);font-weight:700;font-family:monospace;letter-spacing:-1px;white-space:nowrap}
+.fx-rate-label{font-size:var(--fx-s-etiqueta);opacity:.4;text-align:right;letter-spacing:1px;margin-top:2px;white-space:nowrap}
 
 /* ── Módulo clima */
 .mod-weather{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6vw;text-align:center}
-.weather-city{font-size:clamp(18px,3vw,40px);font-weight:500;opacity:.5;letter-spacing:3px;text-transform:uppercase;margin-bottom:1vh}
-.weather-icon{font-size:clamp(80px,18vw,200px);line-height:1;margin:2vh 0}
-.weather-temp{font-size:clamp(64px,14vw,180px);font-weight:700;font-family:monospace;line-height:1}
-.weather-unit{font-size:clamp(28px,5vw,64px);opacity:.4;vertical-align:super}
-.weather-desc{font-size:clamp(16px,2.5vw,36px);opacity:.55;margin-top:1.5vh;letter-spacing:2px}
-.weather-details{display:flex;gap:4vw;margin-top:3vh;opacity:.4;font-size:clamp(12px,1.8vw,22px);font-family:monospace}
+.weather-city{font-size:3vw;font-size:clamp(18px,3vw,40px);font-weight:500;opacity:.5;letter-spacing:3px;text-transform:uppercase;margin-bottom:1vh}
+.weather-icon{font-size:18vw;font-size:clamp(80px,18vw,200px);line-height:1;margin:2vh 0}
+.weather-temp{font-size:14vw;font-size:clamp(64px,14vw,180px);font-weight:700;font-family:monospace;line-height:1}
+.weather-unit{font-size:5vw;font-size:clamp(28px,5vw,64px);opacity:.4;vertical-align:super}
+.weather-desc{font-size:2.5vw;font-size:clamp(16px,2.5vw,36px);opacity:.55;margin-top:1.5vh;letter-spacing:2px}
+.weather-details{display:flex;gap:4vw;margin-top:3vh;opacity:.4;font-size:1.8vw;font-size:clamp(12px,1.8vw,22px);font-family:monospace}
 
 /* ── Módulo noticias ticker */
 .mod-ticker{width:100%;height:100%;display:flex;flex-direction:column}
 .ticker-header{padding:3vh 4vw 2vh;flex-shrink:0}
-.ticker-title{font-size:clamp(14px,2vw,28px);font-weight:700;letter-spacing:3px;text-transform:uppercase;opacity:.5}
+.ticker-title{font-size:2vw;font-size:clamp(14px,2vw,28px);font-weight:700;letter-spacing:3px;text-transform:uppercase;opacity:.5}
 .ticker-items{flex:1;overflow:hidden;display:flex;flex-direction:column;justify-content:center;padding:0 4vw}
-.ticker-item{padding:clamp(12px,2.5vh,32px) 0;border-bottom:1px solid rgba(255,255,255,.06);opacity:0;transform:translateY(20px);transition:opacity .6s,transform .6s}
+.ticker-item{padding:2.5vh 0;padding:clamp(12px,2.5vh,32px) 0;border-bottom:1px solid rgba(255,255,255,.06);opacity:0;transform:translateY(20px);transition:opacity .6s,transform .6s}
 .ticker-item.visible{opacity:1;transform:translateY(0)}
-.ticker-item-source{font-size:clamp(10px,1.2vw,16px);opacity:.35;letter-spacing:2px;text-transform:uppercase;font-family:monospace;margin-bottom:.4em}
-.ticker-item-text{font-size:clamp(16px,2.8vw,40px);font-weight:500;line-height:1.35}
+.ticker-item-source{font-size:1.2vw;font-size:clamp(10px,1.2vw,16px);opacity:.35;letter-spacing:2px;text-transform:uppercase;font-family:monospace;margin-bottom:.4em}
+.ticker-item-text{font-size:2.8vw;font-size:clamp(16px,2.8vw,40px);font-weight:500;line-height:1.35}
 
 /* ── Pantalla de espera */
 #offline-dot{position:absolute;right:10px;bottom:10px;width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.22);z-index:60;pointer-events:none}
 #waiting{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:16px;background:#000}
-#waiting .sid{font-size:clamp(48px,12vw,120px);font-weight:700;color:#fff;letter-spacing:4px;font-family:monospace}
-#waiting .slabel{font-size:clamp(12px,2vw,20px);color:rgba(255,255,255,.25);letter-spacing:6px;text-transform:uppercase;font-family:monospace}
-#waiting .shint{font-size:clamp(10px,1.4vw,15px);color:rgba(255,255,255,.14);letter-spacing:2px;font-family:monospace;margin-top:6px}
+#waiting .sid{font-size:12vw;font-size:clamp(48px,12vw,120px);font-weight:700;color:#fff;letter-spacing:4px;font-family:monospace}
+#waiting .slabel{font-size:2vw;font-size:clamp(12px,2vw,20px);color:rgba(255,255,255,.25);letter-spacing:6px;text-transform:uppercase;font-family:monospace}
+#waiting .shint{font-size:1.4vw;font-size:clamp(10px,1.4vw,15px);color:rgba(255,255,255,.14);letter-spacing:2px;font-family:monospace;margin-top:6px}
 
 /* ── Progress bar */
 #pbar{position:absolute;bottom:0;left:0;width:0;height:3px;background:rgba(255,255,255,.45);transition:width linear;z-index:100}
@@ -136,33 +136,33 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 /* ── Módulo QR */
 .mod-qr{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6vw}
 .qr-code-container{margin-bottom:4vh}
-.qr-text{font-size:clamp(16px,2.5vw,32px);margin-top:4vh;text-align:center}
+.qr-text{font-size:2.5vw;font-size:clamp(16px,2.5vw,32px);margin-top:4vh;text-align:center}
 
 /* ── Ficha de producto */
 .mod-product{width:100%;height:100%;display:grid;grid-template-columns:1fr 1fr;gap:6vw;align-items:center;padding:6vw}
 .product-image{width:100%;aspect-ratio:1;object-fit:contain;border-radius:2vw}
 .product-info{display:flex;flex-direction:column;justify-content:center}
-.product-name{font-size:clamp(32px,5vw,64px);font-weight:700;margin-bottom:1vh;line-height:1.1}
-.product-price{font-size:clamp(28px,4vw,52px);font-weight:700;margin-bottom:2vh}
-.product-old-price{text-decoration:line-through;opacity:.5;font-size:clamp(16px,2.5vw,28px);margin-bottom:1vh}
-.product-specs{font-size:clamp(14px,2vw,24px);line-height:1.8;opacity:.8}
-.product-badge{display:inline-block;padding:.5em 1em;background:rgba(255,255,255,.2);border-radius:1vw;font-size:clamp(12px,1.5vw,18px);margin-bottom:2vh;font-weight:600}
+.product-name{font-size:5vw;font-size:clamp(32px,5vw,64px);font-weight:700;margin-bottom:1vh;line-height:1.1}
+.product-price{font-size:4vw;font-size:clamp(28px,4vw,52px);font-weight:700;margin-bottom:2vh}
+.product-old-price{text-decoration:line-through;opacity:.5;font-size:2.5vw;font-size:clamp(16px,2.5vw,28px);margin-bottom:1vh}
+.product-specs{font-size:2vw;font-size:clamp(14px,2vw,24px);line-height:1.8;opacity:.8}
+.product-badge{display:inline-block;padding:.5em 1em;background:rgba(255,255,255,.2);border-radius:1vw;font-size:1.5vw;font-size:clamp(12px,1.5vw,18px);margin-bottom:2vh;font-weight:600}
 
 /* ── Comparativa */
 .mod-comparison{width:100%;height:100%;display:grid;grid-template-columns:1fr 1fr;gap:4vw;padding:4vw;align-items:center}
 .comparison-product{display:flex;flex-direction:column;align-items:center;text-align:center}
 .comparison-image{width:90%;aspect-ratio:1;object-fit:contain;margin-bottom:2vh;border-radius:1vw}
-.comparison-name{font-size:clamp(24px,3.5vw,44px);font-weight:700;margin-bottom:1vh}
-.comparison-price{font-size:clamp(20px,3vw,40px);font-weight:700;color:#4ff0c0;margin-bottom:2vh}
-.comparison-features{text-align:left;font-size:clamp(12px,1.8vw,22px);line-height:1.7;opacity:.8}
-.comparison-badge{position:absolute;top:2vw;right:2vw;background:#ff7040;padding:.5em 1.2em;border-radius:1vw;font-weight:700;font-size:clamp(12px,1.5vw,18px)}
+.comparison-name{font-size:3.5vw;font-size:clamp(24px,3.5vw,44px);font-weight:700;margin-bottom:1vh}
+.comparison-price{font-size:3vw;font-size:clamp(20px,3vw,40px);font-weight:700;color:#4ff0c0;margin-bottom:2vh}
+.comparison-features{text-align:left;font-size:1.8vw;font-size:clamp(12px,1.8vw,22px);line-height:1.7;opacity:.8}
+.comparison-badge{position:absolute;top:2vw;right:2vw;background:#ff7040;padding:.5em 1.2em;border-radius:1vw;font-weight:700;font-size:1.5vw;font-size:clamp(12px,1.5vw,18px)}
 
 /* ── Cuenta atrás */
 .mod-countdown{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6vw;text-align:center}
-.countdown-message{font-size:clamp(20px,3vw,40px);margin-bottom:3vh;opacity:.8}
-.countdown-timer{font-size:clamp(72px,16vw,200px);font-weight:700;font-family:monospace;letter-spacing:-2px}
-.countdown-unit{font-size:clamp(14px,2vw,28px);opacity:.5;margin-left:1vw;display:inline-block;vertical-align:top}
-.countdown-end{font-size:clamp(18px,2.5vw,36px);margin-top:3vh;opacity:.8}
+.countdown-message{font-size:3vw;font-size:clamp(20px,3vw,40px);margin-bottom:3vh;opacity:.8}
+.countdown-timer{font-size:16vw;font-size:clamp(72px,16vw,200px);font-weight:700;font-family:monospace;letter-spacing:-2px}
+.countdown-unit{font-size:2vw;font-size:clamp(14px,2vw,28px);opacity:.5;margin-left:1vw;display:inline-block;vertical-align:top}
+.countdown-end{font-size:2.5vw;font-size:clamp(18px,2.5vw,36px);margin-top:3vh;opacity:.8}
 
 /* ── Rotación de pantalla según instalación física (0/90/180/270) */
 body.rot-90 #player{ width:100vh;height:100vw; transform:rotate(90deg) translateY(-100%); }
@@ -1251,8 +1251,27 @@ function setupFxPagination(slide, perPageMs, onDone){
     if(!container) return;
     const filas=Math.max(1,n);
     const alto=Math.min(avail/filas, avail/MIN_FILAS_VISUALES);
+    const ancho=container.clientWidth;
     container.style.setProperty("--fx-row-h", alto+"px");
-    container.style.setProperty("--fx-box-w", container.clientWidth+"px");
+    container.style.setProperty("--fx-box-w", ancho+"px");
+    // Los tamaños del tablero salen de aqui y no de un min() en el CSS.
+    //
+    // El CSS decia min(calc(--fx-row-h*k1), calc(--fx-box-w*k2)): el alto manda
+    // en horizontal y el ancho en vertical, y hacen falta LOS DOS -sin el tope
+    // de ancho, en vertical el nombre del pais se montaba sobre la cotizacion-.
+    // Pero min() es Chrome 79 y la caja de la tienda carga Chrome 62, donde la
+    // declaracion se descarta entera y la letra cae a 16px. No hay respaldo
+    // estatico posible: cualquier termino fijo se equivoca en la mitad de las
+    // pantallas. Como aqui ya estan medidos los dos, se calcula y se publica el
+    // resultado: mismo pixel en un navegador moderno, y en el CSS solo quedan
+    // var() y calc(), de 2016.
+    const tope=(k1,k2)=>Math.min(alto*k1, ancho*k2)+"px";
+    container.style.setProperty("--fx-s-flag",     tope(.42,.075));
+    container.style.setProperty("--fx-w-flag",     tope(.55,.10));
+    container.style.setProperty("--fx-s-pais",     tope(.26,.055));
+    container.style.setProperty("--fx-s-moneda",   tope(.13,.028));
+    container.style.setProperty("--fx-s-tasa",     tope(.42,.115));
+    container.style.setProperty("--fx-s-etiqueta", tope(.10,.022));
     // Si no llenan, agrupar en el centro; si llenan, repartir todo el alto.
     container.style.justifyContent = (filas<MIN_FILAS_VISUALES) ? "center" : "stretch";
     container.style.setProperty("--fx-flex", filas<MIN_FILAS_VISUALES ? "0 0 auto" : "1 1 0");

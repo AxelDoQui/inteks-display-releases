@@ -85,6 +85,48 @@ test("toda declaracion con clamp()/min()/max() lleva su respaldo delante", () =>
     fallos.join("\n  "));
 });
 
+/**
+ * La trampa de las custom properties.
+ *
+ * `--fx-title-size:clamp(...)` NO falla al declararse: una custom property
+ * admite cualquier secuencia de tokens aunque el navegador no la entienda. El
+ * fallo llega donde se USA: al sustituir, `font-size:clamp(...)` es invalida y
+ * la propiedad se queda con lo heredado o con su valor inicial.
+ *
+ * Y eso no es un detalle cosmetico: `.mod-fx-logo{height:var(--fx-title-size)}`
+ * se quedaria con `height:auto`, que es exactamente el fallo ya documentado del
+ * logo saliendo a 99px donde su CSS pedia 20, comiendose el 26% del ancho y
+ * dejando el titulo en «TIPOS DE…».
+ *
+ * Quien revise esto mirando solo el :root no encontrara nada roto.
+ */
+test("usar una variable con sintaxis moderna dentro tambien lleva respaldo", () => {
+  const todas = reglas();
+  const sospechosas = new Set();
+  for (const r of todas) {
+    for (const d of r.decls) {
+      if (d.prop.startsWith("--") && FUNCIONES_MODERNAS.test(d.valor)) {
+        sospechosas.add(d.prop);
+      }
+    }
+  }
+  const fallos = [];
+  for (const r of todas) {
+    r.decls.forEach((d, i) => {
+      if (d.prop.startsWith("--")) return;
+      const usa = [...sospechosas].some(v => d.valor.includes("var(" + v));
+      if (!usa) return;
+      if (!tieneRespaldoAntes(r.decls, i)) {
+        fallos.push(`${r.selector} { ${d.prop}: ${d.valor} }`);
+      }
+    });
+  }
+  assert.deepStrictEqual(fallos, [],
+    "Estas variables llevan clamp()/min()/max() dentro: " + [...sospechosas].join(", ") +
+    "\nEn Chrome 62 la sustitucion es invalida y la propiedad se queda sin valor.\n" +
+    "Pon delante la misma propiedad con el termino de en medio:\n  " + fallos.join("\n  "));
+});
+
 test("no se usa inset: en ninguna regla", () => {
   const fallos = [];
   for (const r of reglas()) {
