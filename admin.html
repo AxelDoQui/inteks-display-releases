@@ -47,6 +47,21 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .page{display:none}.page.active{display:block}
 .card{background:var(--s1);border:1px solid var(--b);border-radius:var(--rl);padding:18px;margin-bottom:14px}
 .card-title{font-size:10px;font-family:'Space Mono',monospace;letter-spacing:2px;color:var(--muted);margin-bottom:14px;text-transform:uppercase}
+/* Fichas plegables de la ayuda. Se usa <details>, nativo desde Chrome 12, en
+   vez de un acordeon a mano: el panel no tenia ningun plegable y no merece
+   funciones nuevas en un archivo de 226 KB para algo que ya hace el navegador.
+   Van CERRADAS al abrir la pagina porque esto se consulta desde el movil, de
+   pie y delante de la pantalla que falla: seis fichas abiertas de golpe serian
+   un muro de scroll. */
+.aparato{border:1px solid var(--b);border-radius:var(--r);margin-bottom:8px;background:var(--s2)}
+.aparato>summary{cursor:pointer;padding:11px 14px;font-weight:600;color:var(--text);font-size:13px;list-style:none}
+.aparato>summary::-webkit-details-marker{display:none}
+.aparato>summary::before{content:"B8  ";color:var(--accent)}
+.aparato[open]>summary::before{content:"BE  "}
+.aparato[open]>summary{border-bottom:1px solid var(--b)}
+.aparato>p,.aparato>ul{margin:10px 14px;font-size:13px;line-height:1.8}
+.aparato>ul{padding-left:18px}
+.aparato code{background:var(--s1);padding:2px 6px;border-radius:4px;font-family:monospace}
 .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
 .stat-card{background:var(--s1);border:1px solid var(--b);border-radius:var(--r);padding:14px}
 .stat-val{font-family:'Space Mono',monospace;font-size:22px;font-weight:700;color:var(--accent)}
@@ -252,6 +267,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 }
 
 @media (max-width:560px){
+  /* 44 px de alto para el dedo, como el resto de objetivos del panel en movil. */
+  .aparato>summary{padding:14px;min-height:44px;box-sizing:border-box}
   .form-row{grid-template-columns:minmax(0,1fr)}
 
   /* A 375px un modal "centrado" son margenes desperdiciados. */
