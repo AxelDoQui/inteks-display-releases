@@ -8,6 +8,28 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.34 — 2026-09-01
+
+### Nuevo
+
+- **La ayuda del panel explica con qué reproducir.** Una ficha por tipo de
+  aparato —tablet o móvil, televisor con su propio navegador, caja Android TV,
+  Amazon Fire TV Stick y mini PC— con cómo dejarlo montado y las pegas de cada
+  uno. Del Fire TV Stick se dice claramente que **todavía no está probado**, para
+  que nadie monte una tienda dándolo por hecho.
+- **Y una lista de «si algo se ve mal»** con los fallos que ya han pasado en
+  tienda y qué hacer en cada caso: bordes recortados, contenido que no llena la
+  pantalla, el enlace que no carga en una caja Android, la pantalla que no
+  responde al tacto, el «Buscando…» tras un corte de luz y el cortafuegos.
+
+### Corregido
+
+- **La ayuda de conectar pantallas explicaba un flujo que ya no existe.** Pedía
+  ejecutar Python a mano y usar el puerto 8080, cuando hoy las pantallas se
+  emparejan escribiendo un PIN. Quien la siguiera no conectaba nada.
+
+---
+
 ## 1.0.33 — 2026-09-01
 
 ### Corregido

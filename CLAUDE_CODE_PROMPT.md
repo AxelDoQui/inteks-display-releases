@@ -1,6 +1,6 @@
 # InTeks Display — Contexto para Claude Code
 
-> Actualizado: 1 de septiembre de 2026 (v1.0.33). Este documento describe el estado **real** del
+> Actualizado: 1 de septiembre de 2026 (v1.0.34). Este documento describe el estado **real** del
 > código. Si algo aquí no cuadra con lo que ves en los archivos, gana el código:
 > avísalo y se corrige el documento.
 
@@ -56,6 +56,16 @@ línea 403). Quien necesite saber el puerto real no puede fiarse de
 Pantallas · Librería · Paquetes · Divisas · Clima · Noticias/ticker ·
 Texto/precios · URLs web · Comparativa · Cuenta atrás · QR · Ficha de producto ·
 Ajustes · Ayuda
+
+**Ayuda es el texto largo sobre aparatos, y `MANUAL.md` el resumen** (desde la
+1.0.34). Se decidió así porque no hay paso de compilación con el que generar uno
+del otro, y dos textos escritos a mano se separan — ya pasó con las divisas y
+con `CURRENCY_DB`. `tests/ayuda-aparatos.test.js` vigila tres cosas: que no
+vuelvan las instrucciones caducadas (`python server.py`, el puerto `8080`), que
+estén las seis fichas de aparato y las seis de diagnóstico, y que **el Fire TV
+Stick siga marcado como no probado** — cuando alguien lo pruebe de verdad, se
+quita el aviso y ese test en el mismo commit. Las fichas son `<details>`
+nativos: cero JavaScript.
 
 **Paquetes** agrupa varios contenidos para asignarlos juntos a una pantalla
 (p. ej. "Promo Enero"). No aparece en ningún roadmap; se añadió sobre la marcha.
@@ -401,7 +411,7 @@ de 390: hay que meterlo en un **iframe** del tamaño exacto.
 python server.py                  REM usa el puerto de config.json
 python server.py --port 8080      REM override
 
-npm test                          REM 260 tests de logica (Node stdlib)
+npm test                          REM 266 tests de logica (Node stdlib)
 python tests\test_<nombre>.py     REM 19 suites que arrancan el servidor
 cd android ^&^& gradlew.bat test  REM 40 tests de la app, sin aparato
 ```

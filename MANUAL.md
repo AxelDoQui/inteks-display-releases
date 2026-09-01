@@ -57,72 +57,20 @@ identidad viaja en la URL y ningún borrado la alcanza.
 
 ## Con qué reproducir: el televisor o una cajita
 
-Cualquier televisor con navegador vale para empezar, y para una pantalla que se
-apaga por la noche suele ir bien. Pero **el navegador de fábrica de un Smart TV
+Cualquier pantalla con navegador vale para empezar. Lo que cambia entre unas y
+otras es cuánto aguantan encendidas: **el navegador de fábrica de un televisor
 no está pensado para tener una página abierta doce horas seguidas**, y cuando
-falla no avisa: cierra la página y deja el escaparate en negro.
+falla no avisa —cierra la página y deja el escaparate en negro—. Pasó con un LG
+en una tienda y se resolvió cambiando el aparato, no la página.
 
-Pasó de verdad, en una tienda, con un LG: el navegador se cerraba solo cada dos
-minutos. No era el protector de pantalla, ni el ahorro de energía, ni el
-HDMI-CEC, ni InTeks Display — se probó con la versión corregida y siguió igual.
-Se resolvió **cambiando el aparato, no la página**.
+Para un escaparate que está encendido todo el día, lo recomendado es una **caja
+Android barata** enchufada al HDMI, con la app de InTeks o con Fully Kiosk.
 
-**La recomendación, si la pantalla tiene que estar encendida todo el día:** una
-caja Android barata (o un Fire TV Stick, o un mini PC) enchufada al HDMI del
-televisor, con la app **Fully Kiosk Browser** (~7 €, pago único). El televisor
-pasa a ser solo la pantalla. Es lo que está funcionando hoy en la tienda del
-caso de arriba.
-
-### Cómo se deja montada
-
-1. Enlaza la caja como una pantalla normal (ver arriba) y, en su tarjeta del
-   panel, pulsa **copiar enlace directo**.
-2. Instala Fully Kiosk en la caja y pega ese enlace en **Start URL**. Va con el
-   nombre de la pantalla dentro, así que la identidad viaja en la dirección y
-   no se pierde aunque la caja se reinicie o se borre su memoria.
-3. Activa, en los ajustes de Fully Kiosk:
-   - **Keep Screen On** — la pantalla no se apaga sola.
-   - **Start on Boot** — al volver la luz, arranca sin que nadie toque nada.
-   - **Kiosk Mode** — nadie sale de la aplicación con el mando por error.
-   - Y **desactiva el salvapantallas** de la propia app (*Screensaver*), que
-     viene puesto y taparía el contenido.
-
-Los nombres son los de la app en inglés y pueden cambiar un poco de una versión
-a otra.
-
-### La app propia de InTeks (desde la 1.0.26)
-
-Hay una alternativa a Fully Kiosk hecha a medida, que se instala en la caja
-como un archivo `.apk`. Hace lo mismo y dos cosas más: **encuentra el ordenador
-sola** —no hay que escribir ninguna dirección con el mando— y **si el ordenador
-cambia de dirección en la red, la pantalla lo vuelve a buscar** en vez de
-quedarse muerta.
-
-Al encender la caja arranca sola, enciende el televisor y se pone a reproducir.
-Si alguien se sale con el mando, vuelve en unos segundos.
-
-> **Para poder tocar la caja** —cambiar el wifi, entrar en sus ajustes— pulsa
-> **cinco veces seguidas la tecla «atrás»**. El reproductor se aparta cinco
-> minutos y luego vuelve solo. Una pulsación suelta no hace nada: es a propósito,
-> para que nadie se salga sin querer.
-
-**Si se va la luz**, la caja vuelve antes que el ordenador —ella tarda unos dos
-minutos y el ordenador más—. Mientras tanto pone «Buscando InTeks Display en la
-red…» y **se engancha sola** en cuanto el ordenador termina de arrancar, aunque
-tarde. No hay que ir con el mando ni escribir nada.
-
-> Si alguna vez hiciera falta escribir la dirección a mano —por ejemplo si te
-> llevas la caja a otra red—, pulsa **OK** en el mando mientras está esa pantalla
-> de «Buscando…».
-
-De momento se instala desde un ordenador. Pídela cuando quieras probarla.
-
-**No hace falta configurar nada más.** El reproductor ya se ocupa solo del
-resto: se reconecta cuando vuelve la red, guarda las imágenes y los vídeos en
-el propio aparato para sobrevivir a un arranque con el servidor apagado, y se
-refresca cada cuatro horas por seguridad.
-
----
+> **La guía completa está en el panel**, en **Ayuda → Con qué reproducir**: una
+> ficha por tipo de aparato —tablet, televisor, caja Android, Fire TV Stick,
+> mini PC— con cómo dejarlo montado y las pegas de cada uno. Está ahí y no aquí
+> para que haya un solo texto que mantener, y para tenerlo a mano cuando estás
+> delante de la pantalla que falla.
 
 ## Contenido
 

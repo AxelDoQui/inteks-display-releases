@@ -1,6 +1,6 @@
 {
   "name": "inteks-display",
-  "version": "1.0.33",
+  "version": "1.0.34",
   "description": "Sistema de carteleria digital profesional",
   "scripts": {
     "test": "node --test tests/*.test.js"
