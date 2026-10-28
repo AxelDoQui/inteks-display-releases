@@ -49,3 +49,6 @@ android/local.properties
 
 # Panel de escritorio: salida de escritorio\compilar.ps1 (el .exe y las DLL de WebView2)
 escritorio/bin/
+
+# Lo que se lleva a una tienda: copia de dist\installer y del .apk (tools\preparar-entrega.ps1)
+Entregables/
