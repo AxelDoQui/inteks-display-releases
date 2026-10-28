@@ -361,6 +361,17 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     </div>
   </div>
 
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-val" id="st-total">0</div><div class="stat-key">pantallas</div></div>
+    <div class="stat-card"><div class="stat-val" id="st-online">0</div><div class="stat-key">en línea</div></div>
+    <div class="stat-card"><div class="stat-val" id="st-wall">0</div><div class="stat-key">videowall</div></div>
+    <div class="stat-card"><div class="stat-val" id="st-items">0</div><div class="stat-key">archivos</div></div>
+  </div>
+  <div class="screens-grid" id="screens-grid"><div class="empty-state">Abre player.html en una tablet para que aparezca aquí</div></div>
+  <!-- Conectar pantallas: plegado, porque solo hace falta al añadir una. Se abre solo
+       cuando hay una pantalla esperando código. -->
+  <details id="conectar-det" style="margin-top:6px">
+    <summary style="cursor:pointer;font-size:13px;color:var(--a2);padding:10px 0;font-weight:500"><i class="fa-solid fa-plus"></i> Conectar una pantalla nueva <span id="pair-count-sum" class="pill" style="margin-left:6px;display:none"></span></summary>
   <!-- Pantallas esperando a que se les ponga nombre.
        El codigo lo genera y lo muestra la PANTALLA; aqui solo se le pone
        nombre. Antes era al reves y habia que teclear el PIN con el mando. -->
@@ -391,13 +402,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
       <strong style="color:var(--a2)">Cómo usar:</strong> Abre esta URL en Chrome/Safari en tu tablet. Añade <code style="background:var(--s3);padding:1px 4px;border-radius:2px">&screen=nombre</code> para darle un nombre único a cada pantalla.
     </div>
   </div>
-  <div class="stats-row">
-    <div class="stat-card"><div class="stat-val" id="st-total">0</div><div class="stat-key">pantallas</div></div>
-    <div class="stat-card"><div class="stat-val" id="st-online">0</div><div class="stat-key">en línea</div></div>
-    <div class="stat-card"><div class="stat-val" id="st-wall">0</div><div class="stat-key">videowall</div></div>
-    <div class="stat-card"><div class="stat-val" id="st-items">0</div><div class="stat-key">archivos</div></div>
-  </div>
-  <div class="screens-grid" id="screens-grid"><div class="empty-state">Abre player.html en una tablet para que aparezca aquí</div></div>
+  </details>
 </div>
 
 <!-- ── LIBRERÍA -->
@@ -1527,8 +1532,8 @@ function renderScreens(){
       <div class="sc-body">
         ${partnerInfo}
         <div class="sc-now-box" data-sid="${sid}">${textoAhora(reg)}</div>
-        <div class="sc-url" id="url-${sid}">—</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">${contarPlaylist(pl)} elemento(s)${
+        <div class="sc-url" id="url-${sid}" style="display:none">—</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">${pl.length?contarPlaylist(pl)+' elemento(s)':'Sin contenido todavía'}${
           (pl.length && vigentesHoy(pl)===0)
             ? ' · <span style="color:#f0a050">todo caducado, se sigue mostrando</span>' : ''}</div>
         <div class="sc-actions">
@@ -3587,6 +3592,8 @@ async function loadPairPending(){
 
   const badge=document.getElementById("pair-count");
   if(badge) badge.textContent=pend.length?pend.length:"";
+  const badge2=document.getElementById("pair-count-sum");
+  if(badge2){ badge2.textContent=pend.length?pend.length+" esperando":""; badge2.style.display=pend.length?"":"none"; }
 
   if(!pend.length){
     cont.innerHTML='<div style="font-size:12px;color:var(--muted);padding:10px 0">'+
@@ -3598,6 +3605,8 @@ async function loadPairPending(){
   const firma=pend.map(p=>p.code+":"+(p.known_as||"")).join(",");
   if(cont.dataset.firma===firma) return;
   cont.dataset.firma=firma;
+  const det=document.getElementById("conectar-det");
+  if(det) det.open=true;                    // hay una pantalla esperando: que se vea
 
   // Pantallas que ya existen, para poder reenlazar en vez de crear otra.
   const existentes=[...new Set([...Object.keys(regScreens||{}),

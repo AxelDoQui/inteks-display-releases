@@ -8,6 +8,18 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.46 — 2026-10-28
+
+### Mejorado
+
+- **Página de Pantallas más clara.** Las pantallas y sus contadores salen arriba;
+  «Conectar una pantalla nueva» queda plegado (se abre solo si hay una pantalla
+  esperando código). Antes ocupaba el primer pantallazo entero, sobre todo en el móvil.
+- En cada tarjeta ya no se muestra la dirección cortada (el botón de copiar enlace
+  sigue funcionando) y una pantalla sin nada pone «Sin contenido todavía».
+
+---
+
 ## 1.0.45 — 2026-10-28
 
 ### Nuevo
