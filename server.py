@@ -7,7 +7,7 @@ Player:   http://TU_IP/player.html?screen=NOMBRE
 Enlazar:  http://signage.local/pair     (nombre mDNS, configurable en config.json)
 """
 import json, os, base64, mimetypes, threading, time, socket, sys, random, struct
-import hmac, hashlib, secrets, shutil, io, zipfile, contextlib, subprocess
+import hmac, hashlib, secrets, shutil, io, zipfile, contextlib, subprocess, re
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, unquote
 import urllib.request
@@ -22,7 +22,7 @@ import urllib.request
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.38"
+APP_VERSION = "1.0.39"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -489,7 +489,8 @@ def notify_deleted(screen_id):
 # ── Aviso de version nueva ─────────────────────────────────────────────────
 # Esto NO instala nada solo. En una pantalla de escaparate, actualizarse sin
 # permiso es la peor idea posible: el momento lo eliges tú, no el programa.
-# Solo avisa en el panel.
+# Avisa en el panel; instalar es una acción aparte (el botón «Actualizar ahora»,
+# más abajo), que solo ocurre cuando alguien con sesión la pide.
 #
 # Viene apagado: `update_url` vacía en config.json. Mientras no se rellene, el
 # servidor no habla con nadie de fuera.
@@ -535,11 +536,97 @@ def comprobar_actualizacion(url):
             "update_available": comparar_versiones(APP_VERSION, ultima) < 0,
             "url": remoto.get("url", ""),
             "notes": remoto.get("notes", ""),
+            # Solo para el botón «Actualizar»: de dónde bajar el instalador y su huella.
+            "installer_url": str(remoto.get("installer_url", "") or ""),
+            "sha256": str(remoto.get("sha256", "") or "").strip().lower(),
         })
     except Exception as e:
         base["error"] = f"No se pudo consultar: {e}"
     _update_cache.update({"cuando": ahora, "datos": base})
     return base
+
+# ── Instalar la versión nueva (botón «Actualizar» del panel) ───────────────
+# El aviso de arriba sigue sin instalar nada solo: esto solo ocurre cuando
+# alguien con sesión pulsa el botón. La dirección del instalador sale del
+# version.json que consulta el SERVIDOR; el navegador no puede mandar la suya.
+#
+# Qué protege y qué no: el SHA-256 evita instalar un archivo corrupto o cortado.
+# NO protege de quien controle la cuenta donde se publica (podría cambiar el
+# instalador y la huella a la vez): esa cuenta es la raíz de confianza, y hay
+# que protegerla con verificación en dos pasos. La defensa de verdad sería
+# firmar el instalador.
+UPDATE_MAX_BYTES = 300 * 1024 * 1024
+UPDATE_DIR = os.path.join(DATA_DIR, "actualizacion")
+_update_lock = threading.Lock()
+
+def _url_instalador_valida(u):
+    p = urlparse(str(u or ""))
+    if p.scheme == "https" and p.hostname:
+        return True
+    # http solo hacia esta misma máquina (pruebas): nunca por la red.
+    return p.scheme == "http" and p.hostname in ("127.0.0.1", "localhost")
+
+def preparar_instalador(datos):
+    """Baja el instalador anunciado y comprueba su huella. Devuelve la ruta.
+    Lanza ValueError con un mensaje legible si algo no cuadra (y borra lo bajado)."""
+    ver = str(datos.get("latest", ""))
+    if not re.fullmatch(r"\d+(\.\d+){1,3}", ver):
+        raise ValueError("La versión publicada no tiene un formato válido")
+    url = datos.get("installer_url", "")
+    if not _url_instalador_valida(url):
+        raise ValueError("La versión publicada no trae una dirección de descarga segura (https)")
+    esperado = datos.get("sha256", "")
+    if not re.fullmatch(r"[0-9a-f]{64}", esperado):
+        raise ValueError("La versión publicada no trae la huella SHA-256 del instalador")
+    os.makedirs(UPDATE_DIR, exist_ok=True)
+    for f in os.listdir(UPDATE_DIR):                       # restos de intentos anteriores
+        try: os.remove(os.path.join(UPDATE_DIR, f))
+        except OSError: pass
+    ruta = os.path.join(UPDATE_DIR, f"InTeks_Display_Setup_{ver}.exe")
+    h = hashlib.sha256()
+    total = 0
+    try:
+        peticion = urllib.request.Request(url, headers={"User-Agent": f"InTeks-Display/{APP_VERSION}"})
+        with urllib.request.urlopen(peticion, timeout=30) as r, open(ruta, "wb") as f:
+            if not _url_instalador_valida(r.geturl()):      # una redirección tampoco puede bajar a http
+                raise ValueError("La descarga se redirigió a una dirección no segura")
+            while True:
+                trozo = r.read(65536)
+                if not trozo: break
+                total += len(trozo)
+                if total > UPDATE_MAX_BYTES:
+                    raise ValueError("El instalador es más grande de lo esperado")
+                h.update(trozo); f.write(trozo)
+        if h.hexdigest() != esperado:
+            raise ValueError("El instalador descargado no coincide con su huella SHA-256: no se instala")
+        with open(ruta, "rb") as f:
+            if f.read(2) != b"MZ":
+                raise ValueError("Lo descargado no es un programa de Windows")
+    except Exception as e:
+        try: os.remove(ruta)
+        except OSError: pass
+        if isinstance(e, ValueError): raise
+        raise ValueError(f"No se pudo descargar el instalador: {e}")
+    return ruta
+
+def lanzar_instalador(ruta):
+    """Ejecuta el instalador en silencio, separado de este proceso: él mismo
+    parará este servidor para sustituir los archivos y lo volverá a arrancar."""
+    args = [ruta, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS",
+            f"/LOG={os.path.join(UPDATE_DIR, 'instalacion.log')}"]
+    if os.environ.get("SIGNALOS_UPDATE_DRYRUN"):             # pruebas: no ejecuta nada
+        with open(os.path.join(UPDATE_DIR, "lanzaria.txt"), "w") as f:
+            f.write(" ".join(args))
+        return
+    if os.name != "nt":
+        raise ValueError("La actualización desde el panel solo existe en Windows")
+    DETACHED, NUEVO_GRUPO, FUERA_DEL_JOB = 0x00000008, 0x00000200, 0x01000000
+    try:
+        subprocess.Popen(args, creationflags=DETACHED | NUEVO_GRUPO | FUERA_DEL_JOB, close_fds=True)
+    except OSError:
+        # El job de Windows no permite salirse: sin esa marca.
+        subprocess.Popen(args, creationflags=DETACHED | NUEVO_GRUPO, close_fds=True)
+    log(f"  [actualizar] instalador lanzado: {ruta}")
 
 # ── Copia de seguridad ─────────────────────────────────────────────────────
 # Toda la configuración de una tienda vivía solo en el disco de ese PC. Si el
@@ -2440,6 +2527,33 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception:
                     os._exit(0)
             threading.Thread(target=_restart, daemon=True).start()
+            return
+
+        # ── Instalar la versión nueva (solo admin: la puerta de control ya lo exige)
+        if path == "/api/update-install":
+            url_v = str(load_config().get("update_url", "") or "").strip()
+            if not url_v:
+                jresp(400, {"ok": False, "error": "No hay dirección de actualizaciones configurada"}); return
+            if not _update_lock.acquire(blocking=False):
+                jresp(409, {"ok": False, "error": "Ya hay una actualización en marcha"}); return
+            try:
+                _update_cache["datos"] = None                  # siempre lo último publicado
+                datos = comprobar_actualizacion(url_v)
+                if datos.get("error"):
+                    jresp(502, {"ok": False, "error": datos["error"]}); return
+                if not datos.get("update_available"):
+                    jresp(409, {"ok": False, "error": "Ya tienes la última versión"}); return
+                try:
+                    ruta = preparar_instalador(datos)
+                except ValueError as e:
+                    log(f"  [actualizar] rechazada: {e}")
+                    jresp(502, {"ok": False, "error": str(e)}); return
+                ok({"version": datos["latest"]})               # primero se responde...
+                lanzar_instalador(ruta)                        # ...y luego el instalador para el servidor
+            except Exception as e:
+                log(f"  [actualizar] error: {e}")
+            finally:
+                _update_lock.release()
             return
 
         # ── Pedir un PIN nuevo (solo admin: la puerta de control ya lo exige)

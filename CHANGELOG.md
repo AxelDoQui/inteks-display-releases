@@ -8,6 +8,22 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.39 — 2026-10-28
+
+### Nuevo
+
+- **Botón «Actualizar ahora» en el panel.** Cuando hay una versión nueva
+  publicada, el panel la anuncia y, al pulsar el botón, el servidor baja el
+  instalador, comprueba su huella SHA-256 y lo ejecuta en silencio. Las
+  pantallas siguen con su contenido mientras el servidor se reinicia. Nada se
+  instala sin que alguien con sesión lo pida. Las versiones se publican con
+  `tools\publicar-version.ps1` en GitHub Releases, y cada tienda apunta su
+  `update_url` a `.../releases/latest/download/version.json`.
+- **La pantalla del mini PC vuelve sola tras actualizar.** Una tarea programada
+  la abre al iniciar sesión y cada 5 minutos si no está abierta.
+
+---
+
 ## 1.0.38 — 2026-10-28
 
 ### Mejorado

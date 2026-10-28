@@ -3428,11 +3428,45 @@ async function comprobarActualizacion(forzar){
       const enlace=d.url
         ? ' <a href="'+d.url+'" target="_blank" rel="noopener" style="color:var(--accent)">descargar</a>'
         : "";
-      el.innerHTML='<span style="color:var(--accent);font-weight:600">hay versión '+d.latest+' disponible</span>'+enlace;
+      // El botón solo sale si la versión publicada trae instalador y huella.
+      const boton=(d.installer_url&&d.sha256)
+        ? ' <button class="btn" id="btn-actualizar" onclick="instalarActualizacion(\''+d.latest+'\')">Actualizar ahora</button>'
+        : "";
+      el.innerHTML='<span style="color:var(--accent);font-weight:600">hay versión '+d.latest+' disponible</span>'+enlace+boton;
     }else{
       el.innerHTML='<span style="color:var(--muted)">al día</span>';
     }
   }catch(e){ el.innerHTML=""; }
+}
+
+// Instala la versión nueva. El servidor baja el instalador (de la dirección que
+// él mismo consulta, no de una que mande esta página), comprueba su huella y lo
+// lanza; el instalador para el servidor y lo vuelve a arrancar. Mientras tanto
+// las pantallas siguen con lo que ya tienen en caché.
+async function instalarActualizacion(version){
+  if(!confirm("Se instalará la versión "+version+".\n\n"+
+              "El servidor se reiniciará durante un minuto aproximadamente. Las pantallas "+
+              "seguirán mostrando su contenido y se reconectarán solas.\n\n¿Actualizar ahora?")) return;
+  const el=document.getElementById("set-update");
+  el.innerHTML='<span style="color:var(--muted)">descargando e instalando… no cierres esta ventana</span>';
+  try{
+    const r=await fetch("/api/update-install",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){
+      el.innerHTML='<span style="color:var(--danger,#e5484d)">'+(d.error||"No se pudo actualizar")+'</span>';
+      return;
+    }
+  }catch(e){ el.innerHTML='<span style="color:var(--danger,#e5484d)">No se pudo contactar con el servidor</span>'; return; }
+  // Esperar a que vuelva con la versión nueva (hasta 4 minutos).
+  const fin=Date.now()+240000;
+  while(Date.now()<fin){
+    await new Promise(ok=>setTimeout(ok,3000));
+    try{
+      const i=await (await fetch("/api/info",{cache:"no-store"})).json();
+      if(i.version===version){ location.reload(); return; }
+    }catch(e){ /* el servidor está reiniciándose */ }
+  }
+  el.innerHTML='<span style="color:var(--muted)">La actualización tarda más de lo normal. Recarga la página en un momento.</span>';
 }
 
 // ── Copia de seguridad ─────────────────────────────────────────────────────

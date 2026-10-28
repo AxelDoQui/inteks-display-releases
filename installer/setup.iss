@@ -7,12 +7,12 @@
 
 [Setup]
 AppName=InTeks Display
-AppVersion=1.0.38
+AppVersion=1.0.39
 AppPublisher=InTeks Solutions
 DefaultDirName={autopf}\InTeks Display
 DefaultGroupName=InTeks Display
 OutputDir=..\dist\installer
-OutputBaseFilename=InTeks_Display_Setup_v1.0.38
+OutputBaseFilename=InTeks_Display_Setup_v1.0.39
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -115,6 +115,7 @@ Source: "..\vendor\*"; DestDir: "{app}\vendor"; Flags: ignoreversion recursesubd
 Source: "..\inteks-extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "instalar-extension.html"; DestDir: "{app}"; Flags: ignoreversion
 Source: "registrar-tarea.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "registrar-pantalla.ps1"; DestDir: "{app}"; Flags: ignoreversion
 ; Este NO se instala: se extrae a la carpeta temporal y se ejecuta antes de
 ; copiar nada. Ver [Code] / PrepareToInstall.
 Source: "parar-servidor.ps1"; Flags: dontcopy
@@ -158,6 +159,13 @@ Filename: "powershell.exe"; \
   StatusMsg: "Configurando el arranque automatico..."; \
   Flags: runhidden waituntilterminated; Tasks: startupicon
 
+; Mantiene abierta la ventana de la pantalla: al iniciar sesión y cada 5 min, para
+; que vuelva sola tras una actualización (el instalador la cierra al sustituirla).
+Filename: "powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\registrar-pantalla.ps1"" -AppDir ""{app}"" -Usuario ""{username}"""; \
+  StatusMsg: "Configurando la pantalla del televisor..."; \
+  Flags: runhidden waituntilterminated; Tasks: pantalla
+
 ; Un televisor que se suspende o apaga la pantalla deja la tienda en negro.
 Filename: "powercfg.exe"; Parameters: "/change standby-timeout-ac 0"; Flags: runhidden waituntilterminated; Tasks: pantalla
 Filename: "powercfg.exe"; Parameters: "/change monitor-timeout-ac 0"; Flags: runhidden waituntilterminated; Tasks: pantalla
@@ -171,6 +179,9 @@ Filename: "{app}\InTeksDisplay.exe"; Description: "Abrir el panel de administrac
 Filename: "powershell.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\registrar-tarea.ps1"" -Quitar"; \
   Flags: runhidden waituntilterminated; RunOnceId: "QuitarTareaInTeks Display"
+Filename: "powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\registrar-pantalla.ps1"" -Quitar"; \
+  Flags: runhidden waituntilterminated; RunOnceId: "QuitarTareaPantalla"
 
 [Code]
 { Parar el servidor ANTES de copiar un solo archivo.
