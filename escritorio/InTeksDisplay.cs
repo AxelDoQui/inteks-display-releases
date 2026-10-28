@@ -26,18 +26,22 @@ static class Programa
     static extern void SetCurrentProcessExplicitAppUserModelID(
         [MarshalAs(UnmanagedType.LPWStr)] string id);
 
+    // Sin argumentos: el panel de administración. Con --pantalla: este equipo ES
+    // una pantalla (el mini PC pegado al televisor) y reproduce a pantalla
+    // completa, sin marco, sin cursor y sin atajos del navegador.
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
+        bool pantalla = Array.IndexOf(args, "--pantalla") >= 0;
         // Antes de crear ninguna ventana: es lo que separa este icono del de Chrome.
-        SetCurrentProcessExplicitAppUserModelID("InTeks.Display.Panel");
+        SetCurrentProcessExplicitAppUserModelID(pantalla ? "InTeks.Display.Pantalla" : "InTeks.Display.Panel");
         bool primera;
-        using (var m = new Mutex(true, "InTeksDisplayPanel", out primera))
+        using (var m = new Mutex(true, pantalla ? "InTeksDisplayPantalla" : "InTeksDisplayPanel", out primera))
         {
-            if (!primera) return;      // ya hay un panel abierto
+            if (!primera) return;      // ya hay una abierta
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Ventana());
+            Application.Run(new Ventana(pantalla));
         }
     }
 }
@@ -47,10 +51,12 @@ class Ventana : Form
     readonly WebView2 web = new WebView2();
     readonly Label aviso = new Label();
     readonly Button reintentar = new Button();
+    readonly bool pantalla;
     int puerto;
 
-    public Ventana()
+    public Ventana(bool pantalla)
     {
+        this.pantalla = pantalla;
         Text = "InTeks Display";
         try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
         StartPosition = FormStartPosition.CenterScreen;
@@ -58,6 +64,14 @@ class Ventana : Form
         Size = new Size(Math.Min(1366, area.Width - 40), Math.Min(850, area.Height - 40));
         MinimumSize = new Size(900, 600);
         BackColor = Color.FromArgb(15, 17, 23);
+        if (pantalla)
+        {
+            // Pantalla completa de verdad: sin marco ni barra de tareas encima.
+            FormBorderStyle = FormBorderStyle.None;
+            WindowState = FormWindowState.Maximized;
+            BackColor = Color.Black;
+            Cursor.Hide();
+        }
 
         aviso.Dock = DockStyle.Fill;
         aviso.TextAlign = ContentAlignment.MiddleCenter;
@@ -150,7 +164,10 @@ class Ventana : Form
                     Process.Start(psi);
                 }
                 catch { }
-                for (int i = 0; i < 30 && p == 0; i++) { Thread.Sleep(1000); p = Buscar(); }
+                // Una pantalla no se rinde: tras un corte de luz el servidor
+                // tarda más que el reproductor en estar listo, y nadie va a
+                // pulsar «Reintentar» en un televisor.
+                for (int i = 0; (pantalla || i < 30) && p == 0; i++) { Thread.Sleep(1000); p = Buscar(); }
             }
             try { BeginInvoke(new Action(delegate { Listo(p); })); } catch { }
         }) { IsBackground = true }.Start();
@@ -172,8 +189,26 @@ class Ventana : Form
             string datos = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "InTeks Display", "webview");
-            var entorno = await CoreWebView2Environment.CreateAsync(null, datos);
+            // La pantalla guarda su identidad (el nombre con el que se emparejó)
+            // en su propio almacén, separado del del panel.
+            if (pantalla) datos += "-pantalla";
+            // Sin esto los vídeos con sonido no arrancan solos.
+            var opciones = new CoreWebView2EnvironmentOptions("--autoplay-policy=no-user-gesture-required");
+            var entorno = await CoreWebView2Environment.CreateAsync(null, datos, opciones);
             await web.EnsureCoreWebView2Async(entorno);
+            if (pantalla)
+            {
+                var aj = web.CoreWebView2.Settings;
+                aj.AreBrowserAcceleratorKeysEnabled = false;
+                aj.AreDefaultContextMenusEnabled = false;
+                aj.AreDevToolsEnabled = false;
+                aj.IsStatusBarEnabled = false;
+                aj.IsZoomControlEnabled = false;
+                // El cursor desaparece también sobre el contenido.
+                await web.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+                    "document.addEventListener('DOMContentLoaded',function(){var s=document.createElement('style');"
+                    + "s.textContent='*{cursor:none!important}';document.head.appendChild(s);});");
+            }
             web.CoreWebView2.NewWindowRequested += delegate (object s, CoreWebView2NewWindowRequestedEventArgs e)
             {
                 e.Handled = true;          // nada de ventanas sueltas: al navegador
@@ -189,7 +224,9 @@ class Ventana : Form
                 }
             };
             web.CoreWebView2.DocumentTitleChanged += delegate { Text = "InTeks Display"; };
-            web.Source = new Uri("http://localhost:" + puerto + "/admin.html");
+            // La raíz es el router de pantallas: si ya está emparejada abre su
+            // player; si no, pide el PIN en /pair (una sola vez).
+            web.Source = new Uri("http://localhost:" + puerto + (pantalla ? "/" : "/admin.html"));
             web.Visible = true;
             aviso.Visible = false;
         }

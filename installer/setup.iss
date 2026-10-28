@@ -7,12 +7,12 @@
 
 [Setup]
 AppName=InTeks Display
-AppVersion=1.0.35
+AppVersion=1.0.36
 AppPublisher=InTeks Solutions
 DefaultDirName={autopf}\InTeks Display
 DefaultGroupName=InTeks Display
 OutputDir=..\dist\installer
-OutputBaseFilename=InTeks_Display_Setup_v1.0.35
+OutputBaseFilename=InTeks_Display_Setup_v1.0.36
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -31,6 +31,9 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 ; Sin "Flags: checked": ese flag no existe en Inno Setup y aborta la compilación.
 ; Las tareas ya salen marcadas por defecto; el flag que sí existe es "unchecked".
 Name: "desktopicon"; Description: "Crear acceso directo en escritorio"; GroupDescription: "Accesos directos:"
+; Para el mini PC pegado al televisor: el mismo equipo es servidor y pantalla.
+; Sin marcar por defecto, porque en el ordenador del dueño tapa el escritorio.
+Name: "pantalla"; Description: "Este equipo reproduce en su propia pantalla (mini PC del televisor): abrir el reproductor a pantalla completa al iniciar sesión y no dejar que se suspenda"; GroupDescription: "Mini PC del televisor:"; Flags: unchecked
 Name: "startupicon"; Description: "Iniciar InTeks Display automáticamente al encender el equipo (recomendado)"; GroupDescription: "Arranque:"
 
 [InstallDelete]
@@ -131,6 +134,10 @@ Name: "{group}\InTeks Display"; Filename: "{app}\InTeksDisplay.exe"; WorkingDir:
 Name: "{group}\Instalar extension de divisas"; Filename: "{app}\instalar-extension.html"; WorkingDir: "{app}"; IconFilename: "{app}\assets\icon.ico"
 Name: "{group}\Desinstalar"; Filename: "{uninstallexe}"
 Name: "{commondesktop}\InTeks Display"; Filename: "{app}\InTeksDisplay.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+; Al iniciar sesión, la pantalla completa. La app espera sola a que el servidor
+; esté listo (lo despierta con la tarea programada), así que no hace falta retraso.
+Name: "{commonstartup}\InTeks Display Pantalla"; Filename: "{app}\InTeksDisplay.exe"; Parameters: "--pantalla"; WorkingDir: "{app}"; Tasks: pantalla
+Name: "{group}\InTeks Display Pantalla"; Filename: "{app}\InTeksDisplay.exe"; Parameters: "--pantalla"; WorkingDir: "{app}"; Tasks: pantalla
 
 [Run]
 ; Abrir el puerto en el cortafuegos. SIN "Tasks:", a propósito: esto se hace
@@ -151,7 +158,12 @@ Filename: "powershell.exe"; \
   StatusMsg: "Configurando el arranque automatico..."; \
   Flags: runhidden waituntilterminated; Tasks: startupicon
 
-Filename: "{app}\abrir-panel.bat"; Description: "Abrir el panel de administracion"; Flags: nowait postinstall skipifsilent
+; Un televisor que se suspende o apaga la pantalla deja la tienda en negro.
+Filename: "powercfg.exe"; Parameters: "/change standby-timeout-ac 0"; Flags: runhidden waituntilterminated; Tasks: pantalla
+Filename: "powercfg.exe"; Parameters: "/change monitor-timeout-ac 0"; Flags: runhidden waituntilterminated; Tasks: pantalla
+Filename: "powercfg.exe"; Parameters: "/change hibernate-timeout-ac 0"; Flags: runhidden waituntilterminated; Tasks: pantalla
+
+Filename: "{app}\InTeksDisplay.exe"; Description: "Abrir el panel de administracion"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 ; Quitar la tarea al desinstalar, o quedaría intentando arrancar un programa

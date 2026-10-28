@@ -8,6 +8,20 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.36 — 2026-10-28
+
+### Nuevo
+
+- **Mini PC del televisor: el mismo equipo es servidor y pantalla.** El
+  instalador tiene una casilla nueva, «Este equipo reproduce en su propia
+  pantalla». Al marcarla, al iniciar sesión se abre el reproductor a pantalla
+  completa (sin marco, sin cursor y sin atajos del navegador) y se desactiva la
+  suspensión y el apagado de pantalla. Espera solo a que el servidor esté listo,
+  también tras un corte de luz. Funciona con `InTeksDisplay.exe --pantalla`.
+  Python ya iba dentro del instalador: no hay que instalar nada más.
+
+---
+
 ## 1.0.35 — 2026-10-28
 
 ### Nuevo
