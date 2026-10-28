@@ -28,7 +28,8 @@ if ($vApk -ne $version) { throw "El apk es de la version $vApk y el instalador d
 
 New-Item -ItemType Directory -Force $destino | Out-Null
 # Solo queda la version actual: dos entregas mezcladas es justo lo que se evita.
-Get-ChildItem $destino -File | Where-Object { $_.Name -like "InTeks_Display_*" } | Remove-Item -Force
+# version.json también: es de la entrega anterior y lo regenera publicar-version.ps1.
+Get-ChildItem $destino -File | Where-Object { $_.Name -like "InTeks_Display_*" -or $_.Name -eq "version.json" } | Remove-Item -Force
 
 Copy-Item $instalador (Join-Path $destino "InTeks_Display_Setup_v$version.exe")
 Copy-Item $apk        (Join-Path $destino "InTeks_Display_TV_v$version.apk")
