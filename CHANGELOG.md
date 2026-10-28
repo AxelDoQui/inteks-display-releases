@@ -8,6 +8,17 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.40 — 2026-10-28
+
+### Mejorado
+
+- **Las actualizaciones vienen configuradas de fábrica.** El panel consulta las
+  versiones publicadas en GitHub sin tocar ningún ajuste (también en las tiendas
+  que ya estaban instaladas). Solo se consulta cuando se abre el panel. Para
+  apagarlo en una tienda: `"update_url": "off"` en `config.json`.
+
+---
+
 ## 1.0.39 — 2026-10-28
 
 ### Nuevo

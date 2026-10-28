@@ -22,7 +22,7 @@ import urllib.request
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.39"
+APP_VERSION = "1.0.40"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -492,9 +492,22 @@ def notify_deleted(screen_id):
 # Avisa en el panel; instalar es una acción aparte (el botón «Actualizar ahora»,
 # más abajo), que solo ocurre cuando alguien con sesión la pide.
 #
-# Viene apagado: `update_url` vacía en config.json. Mientras no se rellene, el
-# servidor no habla con nadie de fuera.
+# Consulta la dirección de `url_actualizaciones()` solo cuando el panel lo pide
+# (no hay ninguna consulta en segundo plano). "update_url": "off" la apaga.
 _update_cache = {"cuando": 0, "datos": None}
+
+# Dónde se publica la última versión (GitHub Releases, repositorio solo de
+# descargas). Es el valor de fábrica: las instalaciones ya hechas tienen
+# `update_url` vacía en su config.json y así también reciben el aviso sin tocar
+# nada. Para apagar la consulta de una tienda: "update_url": "off".
+UPDATE_URL_DEFECTO = ("https://github.com/AxelDoQui/inteks-display-releases"
+                      "/releases/latest/download/version.json")
+
+def url_actualizaciones():
+    v = str(load_config().get("update_url", "") or "").strip()
+    if v.lower() == "off":
+        return ""
+    return v or UPDATE_URL_DEFECTO
 UPDATE_TTL = 3600                  # no molestar al servidor de versiones cada rato
 
 def comparar_versiones(a, b):
@@ -1745,7 +1758,7 @@ class Handler(BaseHTTPRequestHandler):
         # ── API: ¿hay una version mas nueva publicada?
         if path == "/api/update-check":
             if not self.require_auth(): return
-            url = str(load_config().get("update_url", "") or "").strip()
+            url = url_actualizaciones()
             if not url:
                 datos = {"enabled": False, "current": APP_VERSION,
                          "update_available": False}
@@ -2531,7 +2544,7 @@ class Handler(BaseHTTPRequestHandler):
 
         # ── Instalar la versión nueva (solo admin: la puerta de control ya lo exige)
         if path == "/api/update-install":
-            url_v = str(load_config().get("update_url", "") or "").strip()
+            url_v = url_actualizaciones()
             if not url_v:
                 jresp(400, {"ok": False, "error": "No hay dirección de actualizaciones configurada"}); return
             if not _update_lock.acquire(blocking=False):

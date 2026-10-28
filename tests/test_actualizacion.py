@@ -51,7 +51,7 @@ def main():
     json.dump({"api_token": TOKEN, "secret": "s" * 64},
               open(os.path.join(datos, "admin.json"), "w"))
     cfgpath = os.path.join(datos, "config.json")
-    json.dump({"port": PORT, "update_url": ""}, open(cfgpath, "w"))
+    json.dump({"port": PORT, "update_url": "off"}, open(cfgpath, "w"))
 
     socketserver.TCPServer.allow_reuse_address = True
     falso = socketserver.TCPServer(("127.0.0.1", FAKE_PORT), Falso)

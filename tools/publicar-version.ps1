@@ -19,7 +19,8 @@
 param(
     [Parameter(Mandatory = $true)][string]$Repo,
     [string]$Notas = "",
-    [switch]$SoloManifiesto
+    [switch]$SoloManifiesto,
+    [switch]$SinPreguntar
 )
 $ErrorActionPreference = "Stop"
 $raiz = Split-Path -Parent $PSScriptRoot
@@ -56,7 +57,7 @@ if ($SoloManifiesto) { exit 0 }
 Write-Host ""
 Write-Host "Se va a PUBLICAR en https://github.com/$Repo la release v$version con:"
 Write-Host "  $nombreExe, $(Split-Path -Leaf $apk) y version.json"
-if ((Read-Host "¿Publicar? (s/n)") -ne "s") { Write-Host "Cancelado."; exit 1 }
+if (-not $SinPreguntar -and (Read-Host "¿Publicar? (s/n)") -ne "s") { Write-Host "Cancelado."; exit 1 }
 
 gh release create "v$version" $exe $apk $json --repo $Repo --title "InTeks Display $version" --notes $Notas
 if ($LASTEXITCODE -ne 0) { throw "gh no pudo crear la release" }
