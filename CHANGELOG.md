@@ -8,6 +8,17 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.45 — 2026-10-28
+
+### Nuevo
+
+- **«▶ Ahora: …» en cada pantalla.** En la tarjeta de cada pantalla del panel se
+  ve qué contenido está mostrando en ese momento. Se actualiza solo cada pocos
+  segundos y desaparece si la pantalla está apagada. El dato vive solo en memoria:
+  no escribe nada en el disco.
+
+---
+
 ## 1.0.44 — 2026-10-28
 
 ### Mejorado

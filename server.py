@@ -22,7 +22,7 @@ import urllib.request
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.44"
+APP_VERSION = "1.0.45"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -656,7 +656,10 @@ MAX_BODY_BYTES = 512 * 1024 * 1024      # el cuerpo POST se carga entero en RAM
 # POST que se aceptan sin sesión (el resto exige cookie o api_token antes de
 # leer el cuerpo). Sus cuerpos son JSON de unas pocas líneas.
 POST_PUBLICOS = {"/api/login", "/api/set-password", "/api/logout",
-                 "/api/pair-request", "/api/pair-status", "/api/pair"}
+                 "/api/pair-request", "/api/pair-status", "/api/pair",
+                 "/api/screen-now"}
+# Lo que cada pantalla está mostrando ahora (solo memoria, se pierde al reiniciar).
+ahora_pantalla = {}
 MAX_BODY_PUBLICO = 64 * 1024
 
 # Intentos de login fallidos por dirección: 5 y se bloquea un minuto. Por
@@ -1885,7 +1888,11 @@ class Handler(BaseHTTPRequestHandler):
         # ── API: obtener pantallas registradas  (solo admin / extensión con token)
         if path == "/api/screens":
             if not self.require_auth(): return
-            body = json.dumps(load_json(SCREENS_FILE)).encode()
+            pantallas = load_json(SCREENS_FILE)
+            for sid, p in pantallas.items():
+                if isinstance(p, dict) and sid in ahora_pantalla:
+                    p["now"] = ahora_pantalla[sid]
+            body = json.dumps(pantallas).encode()
             self.send_response(200); self.send_header("Content-Type","application/json")
             self.cors(); self.end_headers(); self.wfile.write(body); return
 
@@ -2232,6 +2239,29 @@ class Handler(BaseHTTPRequestHandler):
                 if nombre is None and d.get("token", "") not in pending_screens:
                     jresp(200, {"ok": True, "expired": True}); return
                 jresp(200, {"ok": True, "claimed": bool(nombre), "screen": nombre or ""}); return
+            except Exception as e: err(e)
+            return
+
+        # ── La pantalla avisa de qué diapositiva está mostrando ahora. Público como
+        #    el resto de lo que hacen las pantallas, y solo en MEMORIA: escribir
+        #    screens.json en cada cambio de diapositiva gastaría el disco por un
+        #    dato que no vale la pena conservar. Solo vale para pantallas ya
+        #    registradas, para que nadie llene la memoria con nombres inventados.
+        if path == "/api/screen-now":
+            try:
+                d = json.loads(body or "{}")
+                if not isinstance(d, dict):
+                    jresp(400, {"ok": False, "error": "Cuerpo no válido"}); return
+                sid = str(d.get("screen", "") or "")
+                if sid not in load_json(SCREENS_FILE):
+                    jresp(404, {"ok": False, "error": "Pantalla desconocida"}); return
+                ahora_pantalla[sid] = {
+                    "id": str(d.get("id", "") or "")[:200],
+                    "name": str(d.get("name", "") or "")[:80],
+                    "type": str(d.get("type", "") or "")[:20],
+                    "at": time.time(),
+                }
+                jresp(200, {"ok": True}); return
             except Exception as e: err(e)
             return
 

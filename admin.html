@@ -1473,6 +1473,16 @@ async function duplicarPantalla(sid){
 }
 
 // ── Screens
+// «▶ Ahora: …» de una pantalla. Solo si está en línea y el aviso es reciente
+// (el reproductor avisa en cada cambio de diapositiva): un dato viejo
+// engañaría más que no decir nada.
+function textoAhora(reg){
+  const n=reg&&reg.now;
+  if(!n||!reg.connected||!n.name||(Date.now()/1000-(n.at||0))>300) return "";
+  const t=String(n.name).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  return `<div class="sc-now" style="font-size:11px;color:var(--a2);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${t}"><i class="fa-solid fa-play"></i> Ahora: ${t}</div>`;
+}
+
 function renderScreens(){
   const grid=document.getElementById("screens-grid");
   // 'admin' no es una pantalla: es este panel, que escucha los avisos por SSE.
@@ -1516,6 +1526,7 @@ function renderScreens(){
       </div>
       <div class="sc-body">
         ${partnerInfo}
+        <div class="sc-now-box" data-sid="${sid}">${textoAhora(reg)}</div>
         <div class="sc-url" id="url-${sid}">—</div>
         <div style="font-size:11px;color:var(--muted);margin-bottom:8px">${contarPlaylist(pl)} elemento(s)${
           (pl.length && vigentesHoy(pl)===0)
@@ -4108,7 +4119,11 @@ loadPairInfo();
 loadPairPending();
 connectSSE();
 loadAll();
-setInterval(loadScreens,8000);
+setInterval(async()=>{
+  await loadScreens();
+  // Solo se cambia la línea «Ahora:», sin rehacer las tarjetas (miniaturas, botones).
+  document.querySelectorAll(".sc-now-box").forEach(b=>{b.innerHTML=textoAhora(regScreens[b.dataset.sid]);});
+},8000);
 setInterval(loadPairPending,3000);
 </script>
 </body>
