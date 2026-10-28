@@ -8,6 +8,19 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.43 — 2026-10-28
+
+### Corregido
+
+- **El panel mostraba una versión vieja de sí mismo tras actualizar.** El
+  navegador guardaba la página del panel en una caché y la servía primero, así
+  que el botón «Actualizar ahora» (y cualquier novedad del panel) no aparecía
+  hasta recargar varias veces. Ahora el panel y el login se piden siempre al
+  servidor; la caché solo se usa para el reproductor, que sí tiene que funcionar
+  sin red. La caché anterior se limpia sola.
+
+---
+
 ## 1.0.42 — 2026-10-28
 
 ### Corregido

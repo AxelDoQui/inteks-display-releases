@@ -1,7 +1,14 @@
 // Service Worker de InTeks Display — caché offline para el player.
 // SOLO funciona en contexto seguro (localhost o HTTPS). En http://IP no se registra.
 // Diseño SEGURO: nunca intercepta /api/ (datos/SSE) ni vídeos (HTTP Range) para no romperlos.
-const CACHE = 'signalos-v1';
+// v2: cambiar el nombre borra la caché anterior al activarse, y con ella el
+// admin.html viejo que se había quedado guardado (el panel no mostraba lo nuevo).
+const CACHE = 'signalos-v2';
+
+// El panel de administración y su login SE PIDEN SIEMPRE AL SERVIDOR. Solo el
+// player necesita funcionar sin red; el panel sin servidor no sirve para nada, y
+// servirlo de la caché hacía que tras actualizar se siguiera viendo la versión vieja.
+const SIN_CACHE = new Set(['/admin', '/admin.html', '/login.html', '/login']);
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(
@@ -12,6 +19,7 @@ self.addEventListener('activate', (e) => e.waitUntil(
 function cacheable(url, req) {
   if (req.method !== 'GET') return false;
   if (url.pathname.startsWith('/api/')) return false;                 // datos y SSE: pasar siempre
+  if (SIN_CACHE.has(url.pathname)) return false;                      // panel: siempre fresco
   if (/\.(mp4|webm|mov|m4v|ogg|ogv)$/i.test(url.pathname)) return false; // vídeo: lo maneja el navegador (Range)
   return true;
 }
