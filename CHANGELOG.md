@@ -8,6 +8,16 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.47 — 2026-10-28
+
+### Mejorado
+
+- **Tarjetas de pantalla más limpias.** Los botones de uso diario (Playlist, Horario,
+  Girar) siguen a la vista; Duplicar, Copiar enlace, Soltar TV y Eliminar están bajo
+  «Más», ahora con su nombre escrito en vez de iconos sueltos.
+
+---
+
 ## 1.0.46 — 2026-10-28
 
 ### Mejorado

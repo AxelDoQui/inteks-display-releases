@@ -86,6 +86,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .sc-body{padding:12px 16px}
 .sc-url{font-size:10px;font-family:'Space Mono',monospace;color:var(--muted);background:var(--s2);padding:5px 9px;border-radius:5px;margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sc-actions{display:flex;gap:5px;flex-wrap:wrap}
+.sc-mas{display:none;gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--b)}
+.sc-mas.abierto{display:flex}
 /* Playlist modal */
 .modal-bd{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;align-items:center;justify-content:center}
 .modal-bd.show{display:flex}
@@ -1541,10 +1543,13 @@ function renderScreens(){
           <button class="btn btn-a2 btn-sm" onclick="openScheduleModal('${sid}')"><i class="fa-regular fa-clock"></i> Horario</button>
           ${rotBtn}
           ${isWall?`<button class="btn btn-sm btn-danger" onclick="unlinkWall('${sid}')"><i class="fa-solid fa-link-slash"></i> Wall</button>`:''}
-          <button class="btn btn-ghost btn-sm" onclick="duplicarPantalla('${sid}')" title="Crear otra pantalla igual que esta"><i class="fa-solid fa-clone"></i></button>
-          <button class="btn btn-ghost btn-sm" onclick="copiarEnlace('${sid}')" title="Copiar el enlace directo de esta pantalla"><i class="fa-solid fa-copy"></i></button>
-          <button class="btn btn-a4 btn-sm" onclick="desenlazar('${sid}')" title="Soltar el televisor sin borrar la pantalla"><i class="fa-solid fa-link-slash"></i></button>
-          <button class="btn btn-danger btn-sm" onclick="deleteScreen('${sid}')" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+          <button class="btn btn-ghost btn-sm" onclick="this.closest('.sc-body').querySelector('.sc-mas').classList.toggle('abierto')" title="Más acciones"><i class="fa-solid fa-ellipsis"></i> Más</button>
+        </div>
+        <div class="sc-mas">
+          <button class="btn btn-ghost btn-sm" onclick="duplicarPantalla('${sid}')" title="Crear otra pantalla igual que esta"><i class="fa-solid fa-clone"></i> Duplicar</button>
+          <button class="btn btn-ghost btn-sm" onclick="copiarEnlace('${sid}')" title="Copiar el enlace directo de esta pantalla"><i class="fa-solid fa-copy"></i> Copiar enlace</button>
+          <button class="btn btn-a4 btn-sm" onclick="desenlazar('${sid}')" title="Soltar el televisor sin borrar la pantalla"><i class="fa-solid fa-link-slash"></i> Soltar TV</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteScreen('${sid}')" title="Eliminar la pantalla"><i class="fa-solid fa-trash"></i> Eliminar</button>
         </div>
       </div>`;
     grid.appendChild(card);
