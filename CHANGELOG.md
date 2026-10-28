@@ -8,6 +8,19 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.41 — 2026-10-28
+
+### Nuevo
+
+- **Copia diaria también fuera del ordenador.** En Ajustes → Copia de seguridad
+  se puede poner una carpeta externa (Google Drive, un pendrive, otro disco). La
+  copia automática de cada día se copia también allí, en una subcarpeta con el
+  nombre de la instalación, se comprueba y se conservan las últimas 14. Si la
+  carpeta no está (pendrive sin enchufar) no se inventa: se espera y se copia
+  cuando vuelva.
+
+---
+
 ## 1.0.40 — 2026-10-28
 
 ### Mejorado

@@ -107,6 +107,43 @@ def main():
             fallos += comprobar("con copia_auto=false no se crea", not os.path.exists(hoy_zip))
         finally:
             parar(proc)
+
+        print("4. copia externa")
+        externa = tempfile.mkdtemp(prefix="signalos_ext_")
+        try:
+            sitio = os.path.join(externa, "InTeks Display")      # nombre de instalacion por defecto
+            os.makedirs(sitio)
+            for d in range(1, 21):
+                open(os.path.join(sitio, f"{PREFIJO}2020-01-{d:02d}.zip"), "wb").write(b"viejo")
+            ext_zip = os.path.join(sitio, f"{PREFIJO}{hoy}.zip")
+            proc = arrancar(work, {"copia_externa": externa})
+            try:
+                fallos += comprobar("aparece la copia en la carpeta externa", esperar(ext_zip))
+                if os.path.exists(ext_zip):
+                    with zipfile.ZipFile(ext_zip) as z:
+                        fallos += comprobar("el zip externo es valido", z.testzip() is None and "content.json" in z.namelist())
+                time.sleep(0.5)
+                n = len([f for f in os.listdir(sitio) if f.startswith(PREFIJO)])
+                fallos += comprobar("la poda externa respeta el limite", n == 14, str(n))
+                fallos += comprobar("no quedan .tmp fuera", not any(f.endswith(".tmp") for f in os.listdir(sitio)))
+            finally:
+                parar(proc)
+            # Carpeta que no existe (USB sin enchufar): no falla ni la inventa
+            fantasma = os.path.join(externa, "no-existe", "usb")
+            proc = arrancar(work, {"copia_externa": fantasma})
+            try:
+                time.sleep(2.5)
+                fallos += comprobar("carpeta inexistente: no se crea", not os.path.exists(os.path.join(externa, "no-existe")))
+                try:
+                    urllib.request.urlopen(BASE + "/api/auth-status", timeout=2)
+                    vivo = True
+                except Exception:
+                    vivo = False
+                fallos += comprobar("y el servidor sigue vivo", vivo)
+            finally:
+                parar(proc)
+        finally:
+            shutil.rmtree(externa, ignore_errors=True)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     print("OK test_copia_automatica" if not fallos else f"{fallos} FALLOS")

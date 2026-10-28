@@ -911,6 +911,19 @@ JPY  Yen        162.5"></textarea>
       <button class="btn btn-accent" onclick="descargarCopia(true)"><i class="fa-solid fa-download"></i> Descargar copia completa</button>
       <button class="btn btn-ghost" onclick="descargarCopia(false)"><i class="fa-solid fa-file-arrow-down"></i> Solo configuración</button>
     </div>
+    <div style="border-top:1px solid var(--b);padding-top:14px;margin-bottom:14px">
+      <label class="flabel">Copia diaria automática</label>
+      <p style="font-size:11px;color:var(--muted);margin:4px 0 10px;line-height:1.6">
+        Cada día se guarda sola una copia (sin vídeos), y se conservan las últimas 14.
+        Si pones una <strong style="color:var(--text)">carpeta externa</strong> (la de Google Drive,
+        un pendrive u otro disco), se copia también allí: así no se pierde si este ordenador falla.
+        La carpeta tiene que existir; si el pendrive no está enchufado, se espera y se copia al volver.
+      </p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input class="finput" id="set-copia-ext" placeholder="Ej.: G:\Mi unidad\Copias InTeks" style="flex:1;min-width:220px">
+        <button class="btn btn-accent" onclick="guardarCopiaExterna()"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
+      </div>
+    </div>
     <div style="border-top:1px solid var(--b);padding-top:14px">
       <label class="flabel">Restaurar desde un archivo</label>
       <p style="font-size:11px;color:#f0a050;margin:4px 0 10px">
@@ -3874,6 +3887,7 @@ async function loadSettings(){
       document.getElementById("set-tg-token").value=cfg.telegram_token||"";
       document.getElementById("set-tg-chat").value=cfg.telegram_chat_id||"";
       document.getElementById("set-tg-min").value=cfg.alert_offline_min||15;
+      document.getElementById("set-copia-ext").value=cfg.copia_externa||"";
       document.getElementById("set-tg-desde").value=cfg.alert_tasas_desde||"09:00";
       document.getElementById("set-tg-hasta").value=cfg.alert_tasas_hasta||"22:00";
       document.getElementById("set-tg-cada").value=
@@ -3944,6 +3958,16 @@ async function guardarAvisos(){
       headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)});
     toast(r.ok?"Avisos guardados ✓":"No se pudieron guardar",!r.ok);
   }catch(e){ toast("Error al guardar los avisos",true); }
+}
+
+// Solo manda su clave: /api/config fusiona y no borra las demás.
+async function guardarCopiaExterna(){
+  const ruta=document.getElementById("set-copia-ext").value.trim().replace(/^"|"$/g,"");
+  try{
+    const r=await fetch("/api/config",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify({copia_externa:ruta})});
+    toast(r.ok?(ruta?"Carpeta externa guardada ✓":"Copia externa desactivada"):"No se pudo guardar",!r.ok);
+  }catch(e){ toast("Error al guardar",true); }
 }
 
 async function probarAvisos(){

@@ -22,7 +22,7 @@ import urllib.request
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.40"
+APP_VERSION = "1.0.41"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -758,6 +758,55 @@ def copia_automatica_si_toca():
     log(f"  [copias] copia automática: {destino}")
     return destino
 
+def copia_externa_si_toca():
+    """Copia la de hoy a la carpeta externa (Drive, un USB, otro disco) si está
+    configurada en `copia_externa`. Se reintenta cada minuto mientras falte: un
+    USB desenchufado no cuenta como «hecho». Nunca lanza."""
+    try:
+        cfg = load_config()
+        destino_base = str(cfg.get("copia_externa", "") or "").strip()
+        if not destino_base:
+            return None
+        hoy = time.strftime("%Y-%m-%d")
+        nombre_zip = f"{COPIAS_PREFIJO}{hoy}.zip"
+        origen = os.path.join(COPIAS_DIR, nombre_zip)
+        if not os.path.exists(origen):
+            return None                                   # aún no hay copia de hoy
+        # La carpeta tiene que existir ya: si es un USB que no está, no se
+        # inventa una carpeta con ese nombre en el disco del sistema.
+        if not os.path.isdir(destino_base):
+            return None
+        real_base = os.path.realpath(destino_base)
+        if real_base == os.path.realpath(DATA_DIR) or real_base.startswith(os.path.realpath(DATA_DIR) + os.sep):
+            return None                                   # no tiene sentido «fuera» dentro de los datos
+        # Una subcarpeta por instalación: varias tiendas pueden usar el mismo Drive.
+        sitio = re.sub(r'[^\w\- ]', "", _nombre_instalacion()).strip() or "InTeks Display"
+        carpeta = os.path.join(destino_base, sitio)
+        destino = os.path.join(carpeta, nombre_zip)
+        if os.path.exists(destino):
+            return None
+        os.makedirs(carpeta, exist_ok=True)
+        tmp = destino + ".tmp"
+        shutil.copyfile(origen, tmp)
+        with zipfile.ZipFile(tmp) as z:                   # se comprueba lo copiado, no lo de origen
+            if z.testzip() is not None or BACKUP_FICHA not in z.namelist():
+                raise RuntimeError("la copia externa no es válida")
+        os.replace(tmp, destino)
+        try:
+            guardar = max(1, int(cfg.get("copia_auto_dias", COPIAS_GUARDAR_DEFECTO)))
+        except (TypeError, ValueError):
+            guardar = COPIAS_GUARDAR_DEFECTO
+        viejas = sorted(f for f in os.listdir(carpeta)
+                        if f.startswith(COPIAS_PREFIJO) and f.endswith(".zip"))
+        for f in viejas[:-guardar]:
+            try: os.remove(os.path.join(carpeta, f))
+            except OSError: pass
+        log(f"  [copias] copia externa: {destino}")
+        return destino
+    except Exception as e:
+        log(f"  [copias] no se pudo hacer la copia externa: {e}")
+        return None
+
 def _destino_seguro(nombre):
     """Ruta absoluta dentro de DATA_DIR, o None si el zip intenta salirse.
 
@@ -1143,7 +1192,8 @@ def _vigilante():
     while True:
         # Primero la copia (si hoy no hay): al arrancar el equipo se hace ya.
         try: copia_automatica_si_toca()
-        except Exception: pass            # ya quedó en el log y en Telegram
+        except Exception: pass            # ya quedó en el log
+        copia_externa_si_toca()
         time.sleep(60)
         revisar_avisos()
 
