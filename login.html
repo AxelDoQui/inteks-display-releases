@@ -108,7 +108,7 @@ document.getElementById("form").addEventListener("submit", async (e) => {
 
   if(SETUP){
     const pwd2 = document.getElementById("password2").value;
-    if(pwd.length < 6){ showStatus("La contraseña debe tener al menos 6 caracteres", "error"); return; }
+    if(pwd.length < 8){ showStatus("La contraseña debe tener al menos 8 caracteres", "error"); return; }
     if(pwd !== pwd2){ showStatus("Las contraseñas no coinciden", "error"); return; }
   }
 

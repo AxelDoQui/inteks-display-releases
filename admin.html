@@ -3857,7 +3857,7 @@ async function changePassword(){
   const p1=document.getElementById("set-newpass").value;
   const p2=document.getElementById("set-newpass2").value;
   if(!p1){ toast("Escribe la nueva contraseña",true); return; }
-  if(p1.length<6){ toast("Mínimo 6 caracteres",true); return; }
+  if(p1.length<8){ toast("Mínimo 8 caracteres",true); return; }
   if(p1!==p2){ toast("Las contraseñas no coinciden",true); return; }
   try{
     const r=await fetch("/api/set-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:p1})});

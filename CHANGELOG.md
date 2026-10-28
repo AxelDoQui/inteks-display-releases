@@ -8,6 +8,23 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.37 — 2026-10-28
+
+### Nuevo
+
+- **Copia de seguridad automática diaria.** Una al día (playlists, pantallas y
+  ajustes, sin vídeos) en la carpeta `copias` junto a los datos. Se comprueba
+  que el zip abre antes de darla por buena y se guardan las últimas 14. Se
+  puede apagar con `copia_auto: false` en `config.json`.
+
+### Mejorado
+
+- **La contraseña del panel es más difícil de adivinar.** El hash usa 600.000
+  iteraciones (antes 100.000). Las contraseñas actuales siguen valiendo y se
+  actualizan solas la primera vez que entran. Las nuevas piden 8 caracteres.
+
+---
+
 ## 1.0.36 — 2026-10-28
 
 ### Nuevo

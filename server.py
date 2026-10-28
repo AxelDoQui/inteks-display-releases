@@ -22,7 +22,7 @@ import urllib.request
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.36"
+APP_VERSION = "1.0.37"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -357,14 +357,23 @@ def _load_admin():
 def admin_has_password():
     return bool(_load_admin().get("pwd_hash"))
 
-def _hash_password(password, salt):
-    return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), bytes.fromhex(salt), 100000).hex()
+# Iteraciones de PBKDF2. Las contraseñas guardadas antes de existir el campo
+# "iter" en admin.json se hicieron con 100.000: se siguen aceptando, y se
+# vuelven a guardar con las nuevas la primera vez que entran bien.
+PBKDF2_ITER_ANTIGUAS = 100000
+PBKDF2_ITER = 600000
+PASSWORD_MIN = 8
+
+def _hash_password(password, salt, iteraciones=PBKDF2_ITER):
+    return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), bytes.fromhex(salt), iteraciones).hex()
 
 def set_admin_password(password):
     """Crea/actualiza la contraseña del admin y garantiza secret + api_token."""
     a = _load_admin()
-    salt = a.get("salt") or secrets.token_hex(16)
+    # Sal nueva en cada cambio: la misma contraseña no repite el mismo hash.
+    salt = secrets.token_hex(16)
     a["salt"] = salt
+    a["iter"] = PBKDF2_ITER
     a["pwd_hash"] = _hash_password(password, salt)
     if not a.get("secret"):    a["secret"] = secrets.token_hex(32)
     if not a.get("api_token"): a["api_token"] = secrets.token_hex(24)
@@ -374,7 +383,19 @@ def set_admin_password(password):
 def verify_admin_password(password):
     a = _load_admin()
     if not a.get("pwd_hash") or not a.get("salt"): return False
-    return hmac.compare_digest(_hash_password(password, a["salt"]), a["pwd_hash"])
+    iteraciones = int(a.get("iter") or PBKDF2_ITER_ANTIGUAS)
+    if not hmac.compare_digest(_hash_password(password, a["salt"], iteraciones), a["pwd_hash"]):
+        return False
+    if iteraciones < PBKDF2_ITER:
+        # Migración: ya tenemos la contraseña en claro y sabemos que es buena.
+        # Si guardar falla, no pasa nada: seguirá valiendo con las antiguas.
+        try:
+            a["iter"] = PBKDF2_ITER
+            a["pwd_hash"] = _hash_password(password, a["salt"])
+            save_json(ADMIN_FILE, a)
+        except Exception as e:
+            log(f"  [auth] no se pudo actualizar el hash: {e}")
+    return True
 
 def _session_secret():
     a = _load_admin()
@@ -591,6 +612,51 @@ def crear_backup(incluir_media=True):
                     rel = os.path.relpath(completa, UPLOAD_DIR).replace("\\", "/")
                     z.write(completa, f"uploads/{rel}")
     return buf.getvalue()
+
+# ── Copia de seguridad automática ──────────────────────────────────────────
+# La del panel es a mano, y lo que se hace a mano un día no se hace. Una al día,
+# sin multimedia (playlists, pantallas y ajustes: lo que cuesta rehacer; los
+# vídeos están en el equipo que los subió), en una carpeta junto a los datos.
+# Va a disco aparte de uploads/ y no entra en las copias del panel.
+COPIAS_DIR = os.path.join(DATA_DIR, "copias")
+COPIAS_PREFIJO = "InTeks-Display-auto-"
+COPIAS_GUARDAR_DEFECTO = 14
+
+def copia_automatica_si_toca():
+    """Hace la copia de hoy si no existe y poda las viejas. Devuelve la ruta
+    creada, o None si no tocaba. Lanza si la copia falla (la llama el vigilante)."""
+    cfg = load_config()
+    if cfg.get("copia_auto", True) is False:
+        return None
+    hoy = time.strftime("%Y-%m-%d")
+    destino = os.path.join(COPIAS_DIR, f"{COPIAS_PREFIJO}{hoy}.zip")
+    if os.path.exists(destino):
+        return None
+    try:
+        os.makedirs(COPIAS_DIR, exist_ok=True)
+        tmp = destino + ".tmp"
+        with open(tmp, "wb") as f:
+            f.write(crear_backup(False))
+        # Una copia que no abre no es una copia: se comprueba antes de darla por buena.
+        with zipfile.ZipFile(tmp) as z:
+            if z.testzip() is not None or BACKUP_FICHA not in z.namelist():
+                raise RuntimeError("la copia recién hecha no es válida")
+        os.replace(tmp, destino)
+    except Exception as e:
+        log(f"  [copias] no se pudo hacer la copia automática: {e}")
+        raise
+    # Poda solo DESPUÉS de tener la de hoy, y solo lo que lleva nuestro prefijo.
+    try:
+        guardar = max(1, int(cfg.get("copia_auto_dias", COPIAS_GUARDAR_DEFECTO)))
+    except (TypeError, ValueError):
+        guardar = COPIAS_GUARDAR_DEFECTO
+    viejas = sorted(f for f in os.listdir(COPIAS_DIR)
+                    if f.startswith(COPIAS_PREFIJO) and f.endswith(".zip"))
+    for f in viejas[:-guardar]:
+        try: os.remove(os.path.join(COPIAS_DIR, f))
+        except OSError: pass
+    log(f"  [copias] copia automática: {destino}")
+    return destino
 
 def _destino_seguro(nombre):
     """Ruta absoluta dentro de DATA_DIR, o None si el zip intenta salirse.
@@ -975,6 +1041,9 @@ def revisar_avisos():
 def _vigilante():
     """Hilo de fondo. Una pasada por minuto."""
     while True:
+        # Primero la copia (si hoy no hay): al arrancar el equipo se hace ya.
+        try: copia_automatica_si_toca()
+        except Exception: pass            # ya quedó en el log y en Telegram
         time.sleep(60)
         revisar_avisos()
 
@@ -1941,8 +2010,8 @@ class Handler(BaseHTTPRequestHandler):
                 new = (d.get("password", "") or "").strip()
                 if admin_has_password() and not self.is_authed():
                     jresp(401, {"ok": False, "error": "no autorizado"}); return
-                if len(new) < 6:
-                    jresp(400, {"ok": False, "error": "La contraseña debe tener al menos 6 caracteres"}); return
+                if len(new) < PASSWORD_MIN:
+                    jresp(400, {"ok": False, "error": f"La contraseña debe tener al menos {PASSWORD_MIN} caracteres"}); return
                 a = set_admin_password(new)
                 self.send_response(200); self.send_header("Content-Type","application/json")
                 self._set_session_cookie(make_session_token()); self.cors(); self.end_headers()
