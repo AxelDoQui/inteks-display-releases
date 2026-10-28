@@ -8,6 +8,19 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.42 — 2026-10-28
+
+### Corregido
+
+- **Un archivo de datos dañado ya no se convierte en «vacío».** Tras un corte de
+  luz, `content.json` o `screens.json` podían quedar a medias, y el servidor
+  los leía como vacíos: el siguiente guardado borraba todas las pantallas y
+  playlists sin avisar. Ahora cada guardado se escribe a disco de verdad y deja
+  una copia `.bak` de la versión anterior; si un archivo está dañado, se aparta
+  con otro nombre (nunca se borra) y se recupera de esa copia.
+
+---
+
 ## 1.0.41 — 2026-10-28
 
 ### Nuevo

@@ -22,7 +22,7 @@ import urllib.request
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.41"
+APP_VERSION = "1.0.42"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -1371,18 +1371,53 @@ def notify_unlink(screen_id):
             except: pass
     return entregados
 
+def _leer_json_crudo(ruta):
+    with open(ruta, encoding="utf-8") as f:
+        return json.load(f)
+
 def load_json(path):
+    """Lee un JSON. Un archivo que NO existe es «vacío» ({}); uno que existe y
+    está dañado NO: devolver {} sin más haría que el siguiente guardado
+    escribiera encima y borrara todo (un corte de luz puede dejar un archivo a
+    medias o a cero bytes). Se recupera de la copia .bak, y lo dañado se aparta
+    con otro nombre, nunca se borra."""
     with file_lock:
         try:
-            with open(path, encoding="utf-8") as f: return json.load(f)
-        except: return {}
+            return _leer_json_crudo(path)
+        except FileNotFoundError:
+            return {}
+        except Exception as e:
+            log(f"  [datos] {os.path.basename(path)} está dañado: {e}")
+        aparte = f"{path}.corrupto-{time.strftime('%Y%m%d-%H%M%S')}"
+        try:
+            os.replace(path, aparte)
+            log(f"  [datos] el dañado se aparta como {os.path.basename(aparte)}")
+        except OSError:
+            pass
+        try:
+            datos = _leer_json_crudo(path + ".bak")
+            shutil.copyfile(path + ".bak", path)
+            log(f"  [datos] recuperado de {os.path.basename(path)}.bak")
+            return datos
+        except Exception:
+            log(f"  [datos] sin copia .bak utilizable de {os.path.basename(path)}")
+            return {}
 
 def save_json(path, data):
     # Escritura atómica + lock: evita corrupción si dos peticiones escriben a la vez
     with file_lock:
         tmp = path + ".tmp"
         try:
-            with open(tmp, "w", encoding="utf-8") as f: json.dump(data, f, indent=2)
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+                f.flush(); os.fsync(f.fileno())      # a disco de verdad antes de sustituir
+            # La versión buena anterior se guarda como .bak (solo si lo que hay
+            # ahora se lee: no se pisa una copia buena con una dañada).
+            try:
+                _leer_json_crudo(path)
+                shutil.copyfile(path, path + ".bak")
+            except Exception:
+                pass
             os.replace(tmp, path)
         except Exception:
             try:
