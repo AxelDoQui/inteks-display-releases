@@ -46,3 +46,6 @@ android/build/
 android/.gradle/
 android/app/build/
 android/local.properties
+
+# Panel de escritorio: salida de escritorio\compilar.ps1 (el .exe y las DLL de WebView2)
+escritorio/bin/

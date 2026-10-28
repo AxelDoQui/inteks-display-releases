@@ -8,6 +8,33 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.35 — 2026-10-28
+
+### Nuevo
+
+- **El panel de administración es ahora una app de escritorio.** Una ventana
+  propia, con su icono y su identidad en la barra de tareas: al anclarla se ancla
+  «InTeks Display» y no Chrome. Los accesos directos del menú de inicio y del
+  escritorio abren esta ventana; `abrir-panel.bat` queda como respaldo. Usa
+  WebView2, que ya viene con Windows 10 y 11.
+
+### Corregido
+
+- **Un envío enorme sin sesión ya no tumba el servidor.** Antes se leía el
+  cuerpo entero (hasta 512 MB) antes de mirar quién llamaba. Ahora la sesión se
+  comprueba primero y las rutas públicas tienen un tope de 64 KB.
+- **Una cabecera `Content-Length` negativa o no numérica** ya no deja un hilo
+  colgado ni lanza una excepción: responde 400.
+- **El login limita los intentos.** Tras 5 fallos desde una misma dirección se
+  bloquea un minuto.
+- **El PIN de emparejamiento y el código de pantalla** se generan con `secrets`
+  en vez de `random`.
+- **Una subida podía pisar a otra** si antes se había borrado algún archivo, y
+  el nombre del archivo no se limpiaba. Ahora se usa el primer número libre y
+  solo el nombre, sin carpetas.
+
+---
+
 ## 1.0.34 — 2026-09-01
 
 ### Nuevo

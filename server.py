@@ -22,7 +22,7 @@ import urllib.request
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.34"
+APP_VERSION = "1.0.35"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -224,7 +224,7 @@ def pending_new(known_as=""):
         _purge_pending()
         usados = {v["code"] for v in pending_screens.values()}
         for _ in range(200):
-            code = f"{random.randint(0, 9999):04d}"
+            code = f"{secrets.randbelow(10000):04d}"
             if code not in usados: break
         token = secrets.token_hex(16)
         pending_screens[token] = {"code": code, "created": time.time(),
@@ -294,7 +294,7 @@ def _load_pin_state():
 
 def generate_pin():
     """Genera un nuevo PIN de 6 dígitos válido por 10 minutos y lo persiste"""
-    pin_state["pin"] = str(random.randint(100000, 999999))
+    pin_state["pin"] = str(100000 + secrets.randbelow(900000))
     pin_state["expires_at"] = time.time() + 600  # 10 minutos
     pin_state["failed_attempts"] = 0
     pin_state["blocked_until"] = 0
@@ -532,6 +532,41 @@ def comprobar_actualizacion(url):
 BACKUP_JSONS = ("content.json", "screens.json", "config.json")
 BACKUP_FICHA = "inteks-backup.json"
 MAX_BODY_BYTES = 512 * 1024 * 1024      # el cuerpo POST se carga entero en RAM
+# POST que se aceptan sin sesión (el resto exige cookie o api_token antes de
+# leer el cuerpo). Sus cuerpos son JSON de unas pocas líneas.
+POST_PUBLICOS = {"/api/login", "/api/set-password", "/api/logout",
+                 "/api/pair-request", "/api/pair-status", "/api/pair"}
+MAX_BODY_PUBLICO = 64 * 1024
+
+# Intentos de login fallidos por dirección: 5 y se bloquea un minuto. Por
+# dirección y no global, para que un intruso no deje fuera al dueño.
+LOGIN_MAX_FALLOS = 5
+LOGIN_BLOQUEO_S = 60
+_login_fallos = {}          # ip -> {"n": fallos, "hasta": instante de desbloqueo}
+_login_lock = threading.Lock()
+
+def login_bloqueado(ip):
+    """Segundos que faltan para poder reintentar, o 0 si puede intentarlo."""
+    with _login_lock:
+        e = _login_fallos.get(ip)
+        if not e: return 0
+        resto = e["hasta"] - time.time()
+        if resto > 0: return int(resto) + 1
+        if e["hasta"]: del _login_fallos[ip]       # el bloqueo ya pasó
+        return 0
+
+def login_fallo(ip):
+    with _login_lock:
+        if len(_login_fallos) > 1000:               # que no crezca sin fin
+            _login_fallos.clear()
+        e = _login_fallos.setdefault(ip, {"n": 0, "hasta": 0})
+        e["n"] += 1
+        if e["n"] >= LOGIN_MAX_FALLOS:
+            e["hasta"] = time.time() + LOGIN_BLOQUEO_S
+            e["n"] = 0
+
+def login_acierto(ip):
+    with _login_lock: _login_fallos.pop(ip, None)
 
 def crear_backup(incluir_media=True):
     """Devuelve los bytes de un zip con la configuración (y opcionalmente los
@@ -1825,10 +1860,32 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         path = ruta_decodificada(parsed.path)
-        length = int(self.headers.get("Content-Length",0))
+        # Content-Length mentiroso: uno negativo hace que rfile.read espere
+        # hasta que el cliente cierre, y uno no numérico lanzaba excepción.
+        try:
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            if length < 0: raise ValueError
+        except ValueError:
+            self.send_response(400); self.send_header("Content-Type","application/json")
+            self.send_header("Connection","close")
+            self.cors(); self.end_headers()
+            self.wfile.write(json.dumps({"ok": False, "error": "Content-Length no válido"}).encode())
+            return
+        # Quién llama se comprueba ANTES de leer el cuerpo: si no, cualquiera de
+        # la red mandaba 512 MB sin sesión y se cargaban en RAM. Las rutas
+        # públicas sí se leen, pero con un techo pequeño.
+        if path not in POST_PUBLICOS and not self.require_auth():
+            return
         # Techo de seguridad: el cuerpo se carga ENTERO en memoria, así que un
         # envío gigante (una restauración con vídeos, una subida equivocada)
         # tumbaría el servidor de la tienda. Se rechaza antes de leerlo.
+        if path in POST_PUBLICOS and length > MAX_BODY_PUBLICO:
+            self.send_response(413)
+            self.send_header("Content-Type","application/json")
+            self.send_header("Connection","close")
+            self.cors(); self.end_headers()
+            self.wfile.write(json.dumps({"ok": False, "error": "Envío demasiado grande"}).encode())
+            return
         if length > MAX_BODY_BYTES:
             self.send_response(413)
             self.send_header("Content-Type","application/json")
@@ -1857,11 +1914,21 @@ class Handler(BaseHTTPRequestHandler):
                 d = json.loads(body or "{}")
                 if not admin_has_password():
                     jresp(409, {"ok": False, "error": "no_password", "setup_required": True}); return
+                ip = self.client_address[0]
+                espera = login_bloqueado(ip)
+                if espera:
+                    self.send_response(429); self.send_header("Content-Type","application/json")
+                    self.send_header("Retry-After", str(espera)); self.cors(); self.end_headers()
+                    self.wfile.write(json.dumps({"ok": False, "error":
+                        f"Demasiados intentos. Prueba de nuevo en {espera} segundos."}).encode())
+                    return
                 if verify_admin_password(d.get("password", "")):
+                    login_acierto(ip)
                     self.send_response(200); self.send_header("Content-Type","application/json")
                     self._set_session_cookie(make_session_token()); self.cors(); self.end_headers()
                     self.wfile.write(json.dumps({"ok": True}).encode())
                 else:
+                    login_fallo(ip)
                     jresp(401, {"ok": False, "error": "Contraseña incorrecta"})
             except Exception as e: err(e)
             return
@@ -1999,8 +2066,13 @@ class Handler(BaseHTTPRequestHandler):
                 raw_data = d["data"]
                 if "," in raw_data: raw_data = raw_data.split(",",1)[1]
                 raw = base64.b64decode(raw_data)
-                name = d["name"]
+                # Solo el nombre, sin carpetas: "../../x" no sale de uploads/.
+                name = os.path.basename(str(d["name"]).replace("\\", "/")).strip() or "archivo"
+                # Primer número libre, no "cuántos hay": si se borró alguno, el
+                # recuento repetía un número y una subida pisaba a otra.
                 idx = len(os.listdir(UPLOAD_DIR))
+                while os.path.exists(os.path.join(UPLOAD_DIR, f"{idx:04d}_{name}")):
+                    idx += 1
                 filename = f"{idx:04d}_{name}"
                 with open(os.path.join(UPLOAD_DIR, filename),"wb") as f: f.write(raw)
                 item = {"id": filename, "name": name, "type": d["type"],

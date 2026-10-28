@@ -7,12 +7,12 @@
 
 [Setup]
 AppName=InTeks Display
-AppVersion=1.0.34
+AppVersion=1.0.35
 AppPublisher=InTeks Solutions
 DefaultDirName={autopf}\InTeks Display
 DefaultGroupName=InTeks Display
 OutputDir=..\dist\installer
-OutputBaseFilename=InTeks_Display_Setup_v1.0.34
+OutputBaseFilename=InTeks_Display_Setup_v1.0.35
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -94,6 +94,11 @@ Source: "..\pair.html"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\sw.js"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\config.json"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
 Source: "..\abrir-panel.bat"; DestDir: "{app}"; Flags: ignoreversion
+; El panel como app de escritorio (ventana WebView2 propia, con su icono y su
+; identidad en la barra de tareas). Sale de escritorio\compilar.ps1; sin
+; compilarlo antes, esta linea aborta la compilacion a proposito. El .bat se
+; queda como respaldo.
+Source: "..\escritorio\bin\*"; DestDir: "{app}"; Flags: ignoreversion
 ; Recuperar el acceso al panel si se olvida la contrasena. Va como herramienta
 ; local y no como endpoint: por la red seria una puerta trasera.
 Source: "..\restablecer-contrasena.py"; DestDir: "{app}"; Flags: ignoreversion
@@ -122,10 +127,10 @@ Source: "parar-servidor.ps1"; Flags: dontcopy
 [Icons]
 ; IconFilename en todos: sin el, un acceso directo a un .bat sale con el icono
 ; generico de archivo por lotes y el programa parece un script suelto.
-Name: "{group}\InTeks Display"; Filename: "{app}\abrir-panel.bat"; WorkingDir: "{app}"; IconFilename: "{app}\assets\icon.ico"
+Name: "{group}\InTeks Display"; Filename: "{app}\InTeksDisplay.exe"; WorkingDir: "{app}"
 Name: "{group}\Instalar extension de divisas"; Filename: "{app}\instalar-extension.html"; WorkingDir: "{app}"; IconFilename: "{app}\assets\icon.ico"
 Name: "{group}\Desinstalar"; Filename: "{uninstallexe}"
-Name: "{commondesktop}\InTeks Display"; Filename: "{app}\abrir-panel.bat"; WorkingDir: "{app}"; IconFilename: "{app}\assets\icon.ico"; Tasks: desktopicon
+Name: "{commondesktop}\InTeks Display"; Filename: "{app}\InTeksDisplay.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
 ; Abrir el puerto en el cortafuegos. SIN "Tasks:", a propósito: esto se hace
