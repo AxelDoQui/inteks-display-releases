@@ -159,12 +159,26 @@ def prueba_5_subidas():
     return fallos
 
 
+def prueba_6_pin_no_cambia_con_get():
+    fallos = 0
+    def leer(url):
+        req = urllib.request.Request(BASE + url, headers={"X-SignalOS-Token": TOKEN})
+        return json.loads(urllib.request.urlopen(req, timeout=5).read())["pin"]
+    p0 = leer("/api/pin")
+    fallos += comprobar("GET con ?regenerate ya no cambia el PIN", leer("/api/pin?regenerate=1") == p0)
+    cod, r = post_json("/api/pin/regenerate", {})
+    fallos += comprobar("POST /api/pin/regenerate da uno nuevo", cod == 200 and r.get("pin") != p0, str(cod))
+    cod, _ = post_json("/api/pin/regenerate", {}, token=None)
+    fallos += comprobar("sin sesion -> 401", cod == 401, str(cod))
+    return fallos
+
+
 if __name__ == "__main__":
     proc, WORK = arrancar()
     fallos = 0
     try:
         for p in (prueba_1_content_length_raro, prueba_2_no_lee_cuerpo_sin_sesion,
-                  prueba_5_subidas, prueba_3_login_limitado):
+                  prueba_5_subidas, prueba_6_pin_no_cambia_con_get, prueba_3_login_limitado):
             print(p.__name__)
             fallos += p()
         print("prueba_4_aleatoriedad_segura")

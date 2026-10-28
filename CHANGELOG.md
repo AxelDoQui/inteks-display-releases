@@ -8,6 +8,18 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.38 — 2026-10-28
+
+### Mejorado
+
+- **La pantalla del mini PC se arregla sola.** Si el motor de la ventana se cae,
+  o la app falla, se vuelve a abrir en unos segundos. Si la página no carga (el
+  servidor aún arranca), reintenta cada 5 segundos en vez de dejar un error.
+- **Pedir un PIN nuevo ya no se hace con un enlace.** Leer el PIN no lo cambia;
+  regenerarlo es una petición aparte (`POST /api/pin/regenerate`) y exige sesión.
+
+---
+
 ## 1.0.37 — 2026-10-28
 
 ### Nuevo

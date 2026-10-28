@@ -22,7 +22,7 @@ import urllib.request
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.37"
+APP_VERSION = "1.0.38"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -1604,8 +1604,8 @@ class Handler(BaseHTTPRequestHandler):
         # ── API: obtener PIN activo para enlace  (solo admin: revela el PIN)
         if path == "/api/pin":
             if not self.require_auth(): return
-            if "regenerate" in qs:
-                generate_pin()
+            # Leer el PIN no lo cambia: regenerarlo es un POST (/api/pin/regenerate),
+            # porque un GET lo puede disparar cualquier enlace o imagen de una web.
             pin = get_active_pin()
             expires_in = max(0, int(pin_state["expires_at"] - time.time()))
             info = {"pin": pin, "expires_in": expires_in, "blocked": time.time() < pin_state["blocked_until"]}
@@ -2441,6 +2441,11 @@ class Handler(BaseHTTPRequestHandler):
                     os._exit(0)
             threading.Thread(target=_restart, daemon=True).start()
             return
+
+        # ── Pedir un PIN nuevo (solo admin: la puerta de control ya lo exige)
+        if path == "/api/pin/regenerate":
+            generate_pin()
+            ok({"pin": pin_state["pin"], "expires_in": 600}); return
 
         # ── Emparejar pantalla con PIN
         if path == "/api/pair":

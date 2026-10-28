@@ -26,6 +26,22 @@ static class Programa
     static extern void SetCurrentProcessExplicitAppUserModelID(
         [MarshalAs(UnmanagedType.LPWStr)] string id);
 
+    // Relanza la pantalla y cierra esta instancia. Hay que esperar unos segundos:
+    // mientras esta siga viva tiene el mutex, y la nueva se iría por «ya hay una».
+    public static void Reiniciar()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("cmd.exe",
+                "/c timeout /t 4 /nobreak >nul & start \"\" \"" + Application.ExecutablePath + "\" --pantalla");
+            psi.CreateNoWindow = true;
+            psi.UseShellExecute = false;
+            Process.Start(psi);
+        }
+        catch { }
+        Environment.Exit(1);
+    }
+
     // Sin argumentos: el panel de administración. Con --pantalla: este equipo ES
     // una pantalla (el mini PC pegado al televisor) y reproduce a pantalla
     // completa, sin marco, sin cursor y sin atajos del navegador.
@@ -33,6 +49,14 @@ static class Programa
     static void Main(string[] args)
     {
         bool pantalla = Array.IndexOf(args, "--pantalla") >= 0;
+        if (pantalla)
+        {
+            // Cualquier error sin controlar: volver a arrancar en vez de quedarse
+            // con un cuadro de error encima del escaparate.
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            Application.ThreadException += delegate { Reiniciar(); };
+            AppDomain.CurrentDomain.UnhandledException += delegate { Reiniciar(); };
+        }
         // Antes de crear ninguna ventana: es lo que separa este icono del de Chrome.
         SetCurrentProcessExplicitAppUserModelID(pantalla ? "InTeks.Display.Pantalla" : "InTeks.Display.Panel");
         bool primera;
@@ -224,6 +248,26 @@ class Ventana : Form
                 }
             };
             web.CoreWebView2.DocumentTitleChanged += delegate { Text = "InTeks Display"; };
+            if (pantalla)
+            {
+                // Un televisor sin nadie delante tiene que arreglarse solo.
+                web.CoreWebView2.ProcessFailed += delegate (object s, CoreWebView2ProcessFailedEventArgs e)
+                {
+                    if (e.ProcessFailedKind == CoreWebView2ProcessFailedKind.BrowserProcessExited)
+                        Programa.Reiniciar();                 // se cayó todo el motor
+                    else
+                        BeginInvoke(new Action(delegate { web.Reload(); }));   // un proceso de página
+                };
+                // Si la página no carga (el servidor aún arranca, o se reinició),
+                // se vuelve a pedir en 5 s en vez de dejar el error en pantalla.
+                web.NavigationCompleted += delegate (object s, CoreWebView2NavigationCompletedEventArgs e)
+                {
+                    if (e.IsSuccess) return;
+                    var t = new System.Windows.Forms.Timer { Interval = 5000 };
+                    t.Tick += delegate { t.Stop(); t.Dispose(); web.Reload(); };
+                    t.Start();
+                };
+            }
             // La raíz es el router de pantallas: si ya está emparejada abre su
             // player; si no, pide el PIN en /pair (una sola vez).
             web.Source = new Uri("http://localhost:" + puerto + (pantalla ? "/" : "/admin.html"));
