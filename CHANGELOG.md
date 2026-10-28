@@ -8,6 +8,19 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.44 — 2026-10-28
+
+### Mejorado
+
+- **El servidor ya no se traga la señal de cierre.** Varios `except:` desnudos
+  atrapaban también `Ctrl+C` y el apagado del programa; ahora solo atrapan
+  errores de verdad. No cambia nada de lo que se ve.
+- **El manual cuenta lo nuevo:** el mini PC servidor y pantalla en uno, la copia
+  diaria con carpeta externa, qué hacer con un archivo dañado y cómo se actualiza
+  con el botón.
+
+---
+
 ## 1.0.43 — 2026-10-28
 
 ### Corregido

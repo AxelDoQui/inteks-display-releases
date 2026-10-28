@@ -72,6 +72,29 @@ Android barata** enchufada al HDMI, con la app de InTeks o con Fully Kiosk.
 > para que haya un solo texto que mantener, y para tenerlo a mano cuando estás
 > delante de la pantalla que falla.
 
+---
+
+## Mini PC pegado al televisor (servidor y pantalla en uno)
+
+Un mini PC con Windows enchufado al televisor sirve de servidor **y** de pantalla.
+
+1. Instala con el instalador de InTeks Display y marca **«Este equipo reproduce en
+   su propia pantalla»** (sale desmarcada). Python ya va dentro: no hay que
+   instalar nada más.
+2. Abre **InTeks Display** y empareja la pantalla una vez: la ventana a pantalla
+   completa pide el PIN que muestra el panel.
+3. Desde entonces, al iniciar sesión se abre sola a pantalla completa, sin cursor, y
+   si se cierra o falla **vuelve en unos 5 minutos** (también tras actualizar).
+   El instalador desactiva la suspensión y el apagado de pantalla.
+
+Lo que no puede hacer el instalador, lo haces tú una vez: el **inicio de sesión
+automático de Windows** (`Win+R` → `netplwiz`) y, en la BIOS, **«Restore on AC
+Power Loss = Power On»** para que arranque solo tras un corte de luz.
+
+Para entrar al panel con la pantalla ocupada, ábrelo desde otro ordenador o el
+móvil (`http://IP-DEL-MINI-PC/admin.html`). `Alt+F4` cierra la pantalla, pero
+volverá a abrirse sola.
+
 ## Contenido
 
 ### Librería y playlists
@@ -274,6 +297,24 @@ Telegram.
 de sesión y el PIN. Es a propósito: un archivo que va por correo o en un
 pendrive no puede llevar dentro la llave de casa.
 
+### Copia diaria automática
+
+Cada día el servidor guarda solo una copia (sin vídeos) en la carpeta `copias`,
+junto a los datos, y conserva las últimas 14. Esa carpeta está en el mismo disco
+que todo lo demás: **si el ordenador falla, se pierde con él**. Por eso, en el
+mismo apartado, pon una **carpeta externa** (la de Google Drive, un pendrive u
+otro disco): la copia de cada día se copia también allí, en una subcarpeta con el
+nombre de la instalación. La carpeta tiene que existir; si el pendrive no está
+enchufado, se espera y se copia cuando vuelva.
+
+### Si un archivo de datos se daña
+
+Un corte de luz puede dejar `content.json` o `screens.json` a medias. Cada
+guardado deja una copia `.bak` de la versión anterior; si un archivo está dañado,
+el servidor lo **aparta** como `…corrupto-fecha` (nunca lo borra) y recupera la
+copia. Si ves un archivo `.corrupto-…` junto a los datos, es esto: no lo borres
+hasta comprobar que está todo.
+
 ### Montar otra tienda a partir de una copia
 
 1. Instala en el equipo nuevo y **crea la contraseña**.
@@ -286,6 +327,21 @@ pendrive no puede llevar dentro la llave de casa.
 6. Reconfigura la extensión de Chrome con el token del equipo nuevo.
 7. **Actualiza las tasas.** La copia trae las de la otra tienda con su fecha
    original, y el tablero las marcará como viejas desde el primer minuto.
+
+---
+
+## Actualizar el programa
+
+Cuando hay una versión nueva, en **Ajustes → Estado actual** el panel dice «hay
+versión X disponible» con el botón **Actualizar ahora**. Al pulsarlo, el servidor
+baja el instalador, comprueba que no esté corrupto (huella SHA-256) y lo instala
+en silencio; tarda aproximadamente un minuto y las pantallas siguen mostrando su
+contenido. Nada se instala solo: lo decides tú. Elige un momento tranquilo y estate
+delante la primera vez. Si falla, el registro queda en
+`actualizacion\instalacion.log`, dentro de la carpeta de datos.
+
+Si el botón no aparece, recarga el panel con `Ctrl+Shift+R`. Para apagar la
+consulta en una tienda, pon `"update_url": "off"` en su `config.json`.
 
 ---
 

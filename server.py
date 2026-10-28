@@ -22,7 +22,7 @@ import urllib.request
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.42"
+APP_VERSION = "1.0.44"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -279,7 +279,7 @@ def load_config():
     try:
         with open(CONFIG_FILE) as f:
             return json.load(f)
-    except:
+    except Exception:
         return default_config
 
 def _save_pin_state():
@@ -436,7 +436,7 @@ def find_free_port(preferred_port, fallback_port):
             s.bind(("0.0.0.0", port))
             s.close()
             return port
-        except:
+        except Exception:
             continue
     return None
 
@@ -468,7 +468,7 @@ def notify_screen(screen_id):
             try:
                 wfile.write(f"data: update:{screen_id}\n\n".encode())
                 wfile.flush()
-            except: dead.append(wfile)
+            except Exception: dead.append(wfile)
         if dead:
             sse_clients[screen_id] = [c for c in sse_clients.get(screen_id,[]) if c not in dead]
 
@@ -484,7 +484,7 @@ def notify_deleted(screen_id):
             try:
                 wfile.write(f"data: deleted:{screen_id}\n\n".encode())
                 wfile.flush()
-            except: pass
+            except Exception: pass
 
 # ── Aviso de version nueva ─────────────────────────────────────────────────
 # Esto NO instala nada solo. En una pantalla de escaparate, actualizarse sin
@@ -1368,7 +1368,7 @@ def notify_unlink(screen_id):
                 wfile.write(f"data: unlink:{screen_id}\n\n".encode())
                 wfile.flush()
                 entregados += 1
-            except: pass
+            except Exception: pass
     return entregados
 
 def _leer_json_crudo(ruta):
@@ -1625,7 +1625,7 @@ def get_ip():
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80)); ip = s.getsockname()[0]; s.close(); return ip
-    except: return "127.0.0.1"
+    except Exception: return "127.0.0.1"
 
 # ─────────────────────────────────────────────────────────────
 #  URLs amigables
@@ -1830,7 +1830,7 @@ class Handler(BaseHTTPRequestHandler):
                 body = json.dumps(cfg).encode()
                 self.send_response(200); self.send_header("Content-Type","application/json")
                 self.cors(); self.end_headers(); self.wfile.write(body); return
-            except:
+            except Exception:
                 self.send_response(500); self.end_headers(); return
 
         # ── API: obtener contenido  (solo admin)
@@ -1936,7 +1936,7 @@ class Handler(BaseHTTPRequestHandler):
             if sid != "admin" and sid not in screens and sid not in content_screens:
                 try:
                     self.wfile.write(f"data: deleted:{sid}\n\n".encode()); self.wfile.flush()
-                except: pass
+                except Exception: pass
                 return
             # Desenlace pendiente: se pidio soltar el aparato mientras estaba
             # apagado, asi que el aviso no llego a nadie y quedo apuntado. Es la
@@ -1946,7 +1946,7 @@ class Handler(BaseHTTPRequestHandler):
             if sid != "admin" and screens.get(sid, {}).get("unlink_pending"):
                 try:
                     self.wfile.write(f"data: unlink:{sid}\n\n".encode()); self.wfile.flush()
-                except: pass
+                except Exception: pass
                 screens[sid].pop("unlink_pending", None)
                 screens[sid]["connected"] = False
                 save_json(SCREENS_FILE, screens)
@@ -1980,7 +1980,7 @@ class Handler(BaseHTTPRequestHandler):
                     if sid in screens:
                         screens[sid]["last_seen"] = time.time()
                         save_json(SCREENS_FILE, screens)
-            except:
+            except Exception:
                 with sse_lock:
                     if sid in sse_clients and self.wfile in sse_clients[sid]:
                         sse_clients[sid].remove(self.wfile)
