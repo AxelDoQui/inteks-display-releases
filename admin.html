@@ -205,6 +205,17 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .screen-option:hover,.screen-option.sel{border-color:var(--a2);color:var(--a2)}
 /* Upload progress */
 .uprog{display:none;padding:8px 0}.uprog.show{display:block}
+.sub-lista{display:none;flex-direction:column;gap:6px}
+.sub-lista.show{display:flex}
+.sub-fila{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,2fr) 120px;gap:10px;align-items:center;font-size:12px}
+.sub-nom{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub-barra{height:6px;background:var(--s3);border-radius:3px;overflow:hidden}
+.sub-relleno{height:100%;width:0;background:var(--accent);transition:width .15s}
+.sub-est{color:var(--muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub-ok .sub-est{color:var(--ok,#3ecf8e)}
+.sub-mal .sub-est{color:#ef6a6a}
+.sub-mal .sub-relleno{background:#ef6a6a}
+@media (max-width:600px){.sub-fila{grid-template-columns:1fr;gap:4px}.sub-est{text-align:left}}
 .pbar-outer{background:var(--s2);border-radius:4px;height:4px;overflow:hidden;margin-top:5px}
 .pbar-fill{height:100%;background:var(--accent);border-radius:4px;transition:width .3s}
 .plabel{font-size:11px;color:var(--muted);font-family:'Space Mono',monospace}
@@ -415,11 +426,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     <input type="file" id="fi" multiple accept="image/*,video/*" onchange="handleUpload(this.files)">
     <div style="font-size:26px;margin-bottom:8px;opacity:.4"><i class="fa-solid fa-cloud-arrow-up"></i></div>
     <div style="font-size:14px;font-weight:500;margin-bottom:4px">Arrastra archivos o haz clic</div>
-    <div style="font-size:12px;color:var(--muted)">JPG · PNG · GIF · WEBP · MP4 · WEBM · MOV</div>
+    <div style="font-size:12px;color:var(--muted)">JPG · PNG · GIF · WEBP · MP4 · WEBM · MOV — se sube de uno en uno, con progreso</div>
   </div>
   <div class="uprog" id="uprog">
-    <div class="plabel" id="uprog-lbl">Subiendo...</div>
-    <div class="pbar-outer"><div class="pbar-fill" id="uprog-fill" style="width:0%"></div></div>
+    <div id="uprog-lista" class="sub-lista"></div>
+    <button class="btn btn-ghost btn-sm" id="uprog-cancel" style="display:none;margin-top:6px"><i class="fa-solid fa-xmark"></i> Cancelar subida</button>
   </div>
   <div class="section-hdr" style="margin-top:16px">
     <span class="section-lbl">ARCHIVOS</span>
@@ -440,6 +451,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
       <button class="btn btn-a2 btn-sm" type="button" id="pkg-upload-btn" onclick="document.getElementById('pkg-fi').click()"><i class="fa-solid fa-cloud-arrow-up"></i> Subir nuevo al paquete</button>
       <input type="file" id="pkg-fi" multiple accept="image/*,video/*" style="display:none" onchange="handlePkgUpload(this.files)">
     </div>
+    <div id="pkg-uprog-lista" class="sub-lista" style="margin-bottom:8px"></div>
+    <button class="btn btn-ghost btn-sm" id="pkg-uprog-cancel" style="display:none;margin-bottom:8px"><i class="fa-solid fa-xmark"></i> Cancelar subida</button>
     <div id="pkg-picker" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;max-height:300px;overflow-y:auto;margin-bottom:12px"></div>
     <div id="pkg-selected-wrap" style="display:none;margin-bottom:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:7px">
@@ -902,6 +915,18 @@ JPY  Yen        162.5"></textarea>
       <button class="btn btn-accent" onclick="saveSettings()"><i class="fa-solid fa-floppy-disk"></i> Guardar cambios</button>
       <button class="btn btn-a2 btn-sm" onclick="restartServer()"><i class="fa-solid fa-rotate-right"></i> Reiniciar servidor</button>
       <button class="btn btn-ghost btn-sm" onclick="comprobarActualizacion(true)"><i class="fa-solid fa-cloud-arrow-down"></i> Comprobar actualizaciones</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Subida de archivos</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+      Tamaño máximo de cada imagen o vídeo que se sube a la Librería. Los vídeos largos
+      pesan mucho; si no caben, se avisa con el motivo.
+    </p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input class="finput" id="set-upload-max" type="number" min="10" max="20480" style="width:120px"> <span style="font-size:12px;color:var(--muted)">MB por archivo</span>
+      <button class="btn btn-accent" onclick="guardarUploadMax()"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
     </div>
   </div>
 
@@ -1775,54 +1800,105 @@ function saveSchedule(){
 }
 
 // ── Library
-async function handleUpload(files){
-  const arr=Array.from(files);
-  const pw=document.getElementById("uprog");pw.classList.add("show");
-  const fill=document.getElementById("uprog-fill");
-  const lbl=document.getElementById("uprog-lbl");
-  for(let i=0;i<arr.length;i++){
-    const f=arr[i];lbl.textContent=`Subiendo ${i+1}/${arr.length}: ${f.name}`;
-    fill.style.width=`${Math.round(i/arr.length*100)}%`;
-    const b64=await toB64(f);
-    const isV=f.type.startsWith("video/");
-    await fetch("/api/upload",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({name:f.name,type:isV?"video":"image",data:b64,size:f.size})});
-  }
-  fill.style.width="100%";lbl.textContent="¡Listo!";
-  setTimeout(()=>pw.classList.remove("show"),1500);
-  document.getElementById("fi").value="";
-  await loadAll();toast(`${arr.length} archivo(s) subido(s) ✓`);
+// ── Subida de archivos
+// Se envía el archivo en bruto con XMLHttpRequest (da el progreso real) y de
+// uno en uno, para no saturar el mini PC. Solo se dice «subido» de lo que el
+// servidor confirmó.
+function resumenSubida(res){
+  const ok=res.filter(r=>r.ok).length;
+  const cancel=res.filter(r=>r.cancelado).length;
+  const mal=res.filter(r=>!r.ok&&!r.cancelado);
+  let texto=ok+(ok===1?" subido":" subidos");
+  if(mal.length) texto+=", "+mal.length+(mal.length===1?" falló":" fallaron")+": "+
+    mal.map(r=>r.nombre+" ("+(r.error||"error")+")").join("; ");
+  if(cancel) texto+=(ok||mal.length?", ":"")+"cancelado"+(cancel>1?"s":"");
+  return {subidos:ok,fallidos:mal.length,texto,hayError:mal.length>0};
 }
-function toB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);});}
+function subirUno(f,nuevoXHR,alProgreso,ctl){
+  return new Promise(resolve=>{
+    const x=nuevoXHR();
+    x.open("POST","/api/upload-raw?name="+encodeURIComponent(f.name));
+    x.setRequestHeader("Content-Type","application/octet-stream");
+    x.upload.onprogress=e=>{ if(e.lengthComputable&&e.total) alProgreso(e.loaded/e.total); };
+    x.onload=()=>{
+      let d={}; try{ d=JSON.parse(x.responseText); }catch(e){}
+      if(x.status===200&&d.ok) resolve({ok:true,nombre:f.name,item:d.item});
+      else resolve({ok:false,nombre:f.name,error:d.error||("Error "+x.status)});
+    };
+    x.onerror=()=>resolve({ok:false,nombre:f.name,error:"Se perdió la conexión con el servidor"});
+    x.onabort=()=>resolve({ok:false,nombre:f.name,error:"Cancelado",cancelado:true});
+    if(ctl) ctl.abort=()=>x.abort();
+    x.send(f);
+  });
+}
+async function subirArchivos(files,nuevoXHR,g){
+  const res=[];
+  for(let i=0;i<files.length;i++){
+    if(g.cancelado()) break;
+    g.alEmpezar(i,files.length,files[i]);
+    const r=await subirUno(files[i],nuevoXHR,fr=>g.alProgreso(i,fr),g.ctl||{});
+    g.alTerminar(i,r);
+    res.push(r);
+  }
+  return res;
+}
+// ── fin de la subida
+
+// Una fila por archivo dentro de `cont`, con barra, porcentaje y estado.
+function filaSubida(cont,nombre){
+  const fila=document.createElement("div");fila.className="sub-fila";
+  fila.innerHTML=`<div class="sub-nom"></div><div class="sub-barra"><div class="sub-relleno"></div></div><div class="sub-est">En cola</div>`;
+  fila.querySelector(".sub-nom").textContent=nombre;
+  cont.appendChild(fila);
+  const rel=fila.querySelector(".sub-relleno"),est=fila.querySelector(".sub-est");
+  return {
+    progreso(fr){ rel.style.width=Math.round(fr*100)+"%"; est.textContent=Math.round(fr*100)+"%"; },
+    fin(r){
+      fila.classList.add(r.ok?"sub-ok":(r.cancelado?"sub-can":"sub-mal"));
+      rel.style.width=r.ok?"100%":rel.style.width;
+      est.textContent=r.ok?"✓ Subido":(r.error||"Error");
+    }
+  };
+}
+// Sube lo elegido y devuelve los items que el servidor confirmó. `cont` es el
+// contenedor de filas y `btnCancelar` el botón que aborta la subida en curso.
+async function subirConPanel(files,cont,btnCancelar){
+  const arr=Array.from(files); if(!arr.length) return [];
+  cont.innerHTML="";cont.classList.add("show");
+  const filas=arr.map(f=>filaSubida(cont,f.name));
+  const ctl={};let cancelado=false;
+  if(btnCancelar){btnCancelar.style.display="";btnCancelar.onclick=()=>{cancelado=true;if(ctl.abort)ctl.abort();};}
+  const res=await subirArchivos(arr,()=>new XMLHttpRequest(),{
+    ctl,cancelado:()=>cancelado,
+    alEmpezar(){}, alProgreso:(i,fr)=>filas[i].progreso(fr), alTerminar:(i,r)=>filas[i].fin(r)});
+  if(btnCancelar) btnCancelar.style.display="none";
+  const s=resumenSubida(res);
+  toast(s.texto,s.hayError);
+  return res.filter(r=>r.ok).map(r=>r.item);
+}
+async function handleUpload(files){
+  document.getElementById("uprog").classList.add("show");
+  await subirConPanel(files,document.getElementById("uprog-lista"),document.getElementById("uprog-cancel"));
+  document.getElementById("fi").value="";
+  await loadAll();
+}
 // Sube contenido directamente desde la página de Paquetes y lo añade al paquete en edición.
 // El archivo queda también en la Librería (reutilizable), pero sin el paso manual de ir allí.
 async function handlePkgUpload(files){
   const arr=Array.from(files); if(!arr.length)return;
   const btn=document.getElementById("pkg-upload-btn");
-  const orig=btn.innerHTML; btn.disabled=true;
-  const added=[];
-  for(let i=0;i<arr.length;i++){
-    const f=arr[i];
-    btn.innerHTML=`<i class="fa-solid fa-spinner fa-spin"></i> Subiendo ${i+1}/${arr.length}…`;
-    try{
-      const b64=await toB64(f);
-      const isV=f.type.startsWith("video/");
-      const r=await fetch("/api/upload",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({name:f.name,type:isV?"video":"image",data:b64,size:f.size})});
-      const d=await r.json();
-      if(d.ok && d.item) added.push(d.item);
-    }catch(e){}
-  }
+  btn.disabled=true;
+  const added=await subirConPanel(arr,document.getElementById("pkg-uprog-lista"),document.getElementById("pkg-uprog-cancel"));
   await loadAll();                       // refresca la librería con lo nuevo
   added.forEach(item=>{                  // auto-añadir al paquete en construcción
     if(!pkgSelection.some(x=>x.id===item.id))
       pkgSelection.push({id:item.id,duration:pkgDefaultDur(item)});
   });
   renderPkgPicker(); renderPkgSelected();
-  btn.disabled=false; btn.innerHTML=orig;
+  btn.disabled=false;
   document.getElementById("pkg-fi").value="";
-  toast(added.length?`${added.length} archivo(s) añadido(s) al paquete ✓`:"No se pudo subir",!added.length);
 }
+function toB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);});}
 async function deleteItem(id,e){
   if(e)e.stopPropagation();
   await fetch("/api/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
@@ -3913,6 +3989,7 @@ async function loadSettings(){
       document.getElementById("set-tg-chat").value=cfg.telegram_chat_id||"";
       document.getElementById("set-tg-min").value=cfg.alert_offline_min||15;
       document.getElementById("set-copia-ext").value=cfg.copia_externa||"";
+      document.getElementById("set-upload-max").value=cfg.upload_max_mb||2048;
       document.getElementById("set-tg-desde").value=cfg.alert_tasas_desde||"09:00";
       document.getElementById("set-tg-hasta").value=cfg.alert_tasas_hasta||"22:00";
       document.getElementById("set-tg-cada").value=
@@ -3983,6 +4060,16 @@ async function guardarAvisos(){
       headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)});
     toast(r.ok?"Avisos guardados ✓":"No se pudieron guardar",!r.ok);
   }catch(e){ toast("Error al guardar los avisos",true); }
+}
+
+async function guardarUploadMax(){
+  const mb=parseInt(document.getElementById("set-upload-max").value,10);
+  if(!(mb>=10&&mb<=20480)){ toast("Pon un número entre 10 y 20480",true); return; }
+  try{
+    const r=await fetch("/api/config",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify({upload_max_mb:mb})});
+    toast(r.ok?"Máximo guardado ✓":"No se pudo guardar",!r.ok);
+  }catch(e){ toast("Error al guardar",true); }
 }
 
 // Solo manda su clave: /api/config fusiona y no borra las demás.
