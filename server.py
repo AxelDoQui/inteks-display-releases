@@ -143,6 +143,12 @@ pin_state = {
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# Restos de subidas que se cortaron con el servidor apagado.
+for _n in os.listdir(UPLOAD_DIR):
+    if _n.endswith(".part"):
+        try: os.remove(os.path.join(UPLOAD_DIR, _n))
+        except OSError: pass
+
 # El instalador deja una config.json junto al programa. La primera vez sirve de
 # plantilla para la de datos, así se respetan el puerto y el nombre elegidos.
 _plantilla = os.path.join(APP_DIR, "config.json")
@@ -1463,6 +1469,100 @@ def contenido_en_edicion():
         content["rev"] = int(content.get("rev", 0)) + 1
         save_json(CONTENT_FILE, content)
 
+# ── Subida de archivos en bruto ─────────────────────────────────────────────
+# El archivo llega como cuerpo de la petición y se escribe a disco por trozos:
+# la memoria usada no depende de su tamaño (con base64 un vídeo de 300 MB
+# ocupaba ~400 MB en el navegador y otro tanto aquí).
+SUBIDA_TROZO = 1024 * 1024
+SUBIDA_MARGEN_DISCO = 500 * 1024 * 1024
+SUBIDA_MAX_MB_DEFECTO = 2048
+_subida_lock = threading.Lock()
+
+class SubidaRechazada(Exception):
+    def __init__(self, codigo, mensaje):
+        super().__init__(mensaje)
+        self.codigo = codigo
+        self.mensaje = mensaje
+
+def detectar_tipo(cab):
+    """'image' / 'video' / None, mirando los primeros bytes (no la extensión
+    ni lo que diga el navegador)."""
+    if cab[:3] == b"\xff\xd8\xff": return "image"                      # JPEG
+    if cab[:8] == b"\x89PNG\r\n\x1a\n": return "image"
+    if cab[:6] in (b"GIF87a", b"GIF89a"): return "image"
+    if cab[:4] == b"RIFF" and cab[8:12] == b"WEBP": return "image"
+    if cab[4:8] == b"ftyp":
+        # HEIC/AVIF también empiezan por ftyp y son imágenes que la TV no abre.
+        if cab[8:12] in (b"heic", b"heix", b"mif1", b"msf1", b"avif"): return None
+        return "video"                                                  # MP4 / MOV
+    if cab[:4] == b"\x1a\x45\xdf\xa3": return "video"                  # WEBM
+    return None
+
+def _espacio_legible(n):
+    return f"{n // (1024**3)} GB" if n >= 1024**3 else f"{n // (1024**2)} MB"
+
+def guardar_subida_raw(lector, length, name):
+    """Lee `length` bytes de `lector` (por trozos) y los guarda como archivo de
+    la Librería. Lanza SubidaRechazada con el motivo si no se puede."""
+    try:
+        maximo_mb = int(load_config().get("upload_max_mb", SUBIDA_MAX_MB_DEFECTO) or SUBIDA_MAX_MB_DEFECTO)
+    except (TypeError, ValueError):
+        maximo_mb = SUBIDA_MAX_MB_DEFECTO
+    if length <= 0:
+        raise SubidaRechazada(400, "El archivo está vacío")
+    if length > maximo_mb * 1024 * 1024:
+        raise SubidaRechazada(413, f"Pasa del máximo de {maximo_mb} MB por archivo")
+    libre = shutil.disk_usage(UPLOAD_DIR).free
+    if libre < length + SUBIDA_MARGEN_DISCO:
+        raise SubidaRechazada(507, f"No cabe: quedan {_espacio_legible(libre)} libres en el disco")
+    nombre = os.path.basename(str(name).replace("\\", "/")).strip() or "archivo"
+    primero = lector.read(min(SUBIDA_TROZO, length))
+    tipo = detectar_tipo(primero)
+    if not tipo:
+        raise SubidaRechazada(415, "No es una imagen ni un vídeo que se pueda mostrar "
+                                   "(vale JPG, PNG, GIF, WEBP, MP4, MOV o WEBM)")
+    # Primer número libre y el .part reservado a la vez: dos subidas simultáneas
+    # no pueden elegir el mismo nombre.
+    with _subida_lock:
+        idx = len(os.listdir(UPLOAD_DIR))
+        while (os.path.exists(os.path.join(UPLOAD_DIR, f"{idx:04d}_{nombre}"))
+               or os.path.exists(os.path.join(UPLOAD_DIR, f"{idx:04d}_{nombre}.part"))):
+            idx += 1
+        filename = f"{idx:04d}_{nombre}"
+        destino = os.path.join(UPLOAD_DIR, filename)
+        parcial = destino + ".part"
+        open(parcial, "xb").close()
+    recibido = len(primero)
+    try:
+        with open(parcial, "wb") as f:
+            f.write(primero)
+            while recibido < length:
+                trozo = lector.read(min(SUBIDA_TROZO, length - recibido))
+                if not trozo:
+                    raise SubidaRechazada(400, "La subida se cortó antes de terminar")
+                f.write(trozo)
+                recibido += len(trozo)
+        os.replace(parcial, destino)
+    except BaseException:
+        try: os.remove(parcial)
+        except OSError: pass
+        raise
+    item = {"id": filename, "name": nombre, "type": tipo,
+            "src": f"/uploads/{filename}", "size": recibido}
+    with contenido_en_edicion() as content:
+        content.setdefault("items", []).append(item)
+    return item
+
+class _Lector:
+    """Cuenta lo leído para saber, si se rechaza, cuánto cuerpo queda sin leer."""
+    def __init__(self, rfile):
+        self.rfile = rfile
+        self.leido = 0
+    def read(self, n):
+        d = self.rfile.read(n)
+        self.leido += len(d)
+        return d
+
 def _migrar_rev():
     """Añade 'rev' al content.json que viene de una versión anterior.
 
@@ -2118,6 +2218,32 @@ class Handler(BaseHTTPRequestHandler):
             self.cors(); self.end_headers(); self.wfile.write(data)
         else: self.send_response(404); self.end_headers(); self.wfile.write(b"404")
 
+    def _subida_raw(self, parsed, length):
+        """POST /api/upload-raw?name=... El cuerpo es el archivo. La sesión ya se
+        comprobó en do_POST."""
+        nombre = (parse_qs(parsed.query).get("name", [""])[0])
+        lector = _Lector(self.rfile)
+        try:
+            item = guardar_subida_raw(lector, length, nombre)
+            codigo, cuerpo = 200, {"ok": True, "item": item}
+        except SubidaRechazada as e:
+            codigo, cuerpo = e.codigo, {"ok": False, "error": e.mensaje}
+            sin_leer = length - lector.leido
+            if 0 < sin_leer <= 8 * 1024 * 1024:
+                while sin_leer > 0:                 # pequeño: se vacía y la respuesta llega limpia
+                    d = self.rfile.read(min(SUBIDA_TROZO, sin_leer))
+                    if not d: break
+                    sin_leer -= len(d)
+            elif sin_leer > 0:
+                self.close_connection = True        # grande: no se lee, se corta
+        except Exception as e:
+            codigo, cuerpo = 500, {"ok": False, "error": f"Error del servidor: {e}"}
+            self.close_connection = True
+        self.send_response(codigo); self.send_header("Content-Type", "application/json")
+        if self.close_connection: self.send_header("Connection", "close")
+        self.cors(); self.end_headers()
+        self.wfile.write(json.dumps(cuerpo).encode())
+
     def do_POST(self):
         parsed = urlparse(self.path)
         path = ruta_decodificada(parsed.path)
@@ -2146,6 +2272,11 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Connection","close")
             self.cors(); self.end_headers()
             self.wfile.write(json.dumps({"ok": False, "error": "Envío demasiado grande"}).encode())
+            return
+        # La subida en bruto se lee por trozos, no se carga en RAM: no le
+        # aplica MAX_BODY_BYTES (manda upload_max_mb).
+        if path == "/api/upload-raw":
+            self._subida_raw(parsed, length)
             return
         if length > MAX_BODY_BYTES:
             self.send_response(413)
