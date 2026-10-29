@@ -132,11 +132,53 @@ test("subirArchivos: un fallo no detiene los demás y se avisa de cada uno", asy
   assert.deepStrictEqual(eventos, ["E0/3", "T0ok", "E1/3", "T1mal", "E2/3", "T2ok"]);
 });
 
-test("subirArchivos: si se cancela, no empieza los siguientes", async () => {
+test("subirArchivos: si se cancela, los siguientes quedan cancelados", async () => {
   const { subirArchivos } = cargar();
   let cancelar = false;
   const res = await subirArchivos(
     [{ name: "a.png" }, { name: "b.png" }, { name: "c.png" }], fabricaXHR({}),
     { alEmpezar() {}, alProgreso() {}, alTerminar: () => { cancelar = true; }, cancelado: () => cancelar });
-  assert.strictEqual(res.length, 1);
+  assert.strictEqual(res.length, 3);
+  assert.strictEqual(res[0].ok, true);
+  assert.strictEqual(res[1].cancelado, true);
+  assert.strictEqual(res[2].cancelado, true);
+});
+
+// XHR que cuenta los send y se queda esperando (para abortar a mitad).
+function xhrContador(cuenta) {
+  return () => ({ upload: {}, open() {}, setRequestHeader() {},
+    send() { cuenta.n++; }, abort() { this.onabort(); } });
+}
+
+test("subirArchivos: abort a mitad cancela el actual y no envía los demás", async () => {
+  const { subirArchivos } = cargar();
+  const cuenta = { n: 0 }; const ctl = {}; let cancelar = false;
+  const p = subirArchivos([{ name: "a.mp4" }, { name: "b.png" }, { name: "c.png" }], xhrContador(cuenta),
+    { ctl, alEmpezar() {}, alProgreso() {}, alTerminar() {}, cancelado: () => cancelar });
+  await new Promise(r => setImmediate(r));
+  cancelar = true; ctl.abort();
+  const res = await p;
+  assert.strictEqual(cuenta.n, 1);
+  assert.strictEqual(res.length, 3);
+  assert.ok(res.every(r => r.cancelado));
+});
+
+test("excedeMaximo compara contra MB", () => {
+  const { excedeMaximo } = cargar();
+  assert.strictEqual(excedeMaximo({ size: 11 * 1024 * 1024 }, 10), true);
+  assert.strictEqual(excedeMaximo({ size: 10 * 1024 * 1024 }, 10), false);
+  assert.strictEqual(excedeMaximo({ size: 1e12 }, undefined), false);
+});
+
+test("subirArchivos: no envía el que pasa del máximo y sigue con el resto", async () => {
+  const { subirArchivos } = cargar();
+  const cuenta = { n: 0 };
+  const base = fabricaXHR({});
+  const xhr = () => { const x = base(); const s = x.send.bind(x); x.send = f => { cuenta.n++; s(f); }; return x; };
+  const res = await subirArchivos(
+    [{ name: "a.png", size: 10 }, { name: "grande.mp4", size: 5 * 1024 * 1024 }, { name: "c.png", size: 10 }], xhr,
+    { maxMb: 1, alEmpezar() {}, alProgreso() {}, alTerminar() {}, cancelado: () => false });
+  assert.strictEqual(cuenta.n, 2);
+  assert.deepStrictEqual(Array.from(res, r => r.ok), [true, false, true]);
+  assert.match(res[1].error, /Pasa del máximo de 1 MB por archivo/);
 });

@@ -213,6 +213,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .sub-relleno{height:100%;width:0;background:var(--accent);transition:width .15s}
 .sub-est{color:var(--muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sub-ok .sub-est{color:var(--ok,#3ecf8e)}
+.sub-can .sub-est{color:var(--muted);opacity:.7}
 .sub-mal .sub-est{color:#ef6a6a}
 .sub-mal .sub-relleno{background:#ef6a6a}
 @media (max-width:600px){.sub-fila{grid-template-columns:1fr;gap:4px}.sub-est{text-align:left}}
@@ -1831,12 +1832,22 @@ function subirUno(f,nuevoXHR,alProgreso,ctl){
     x.send(f);
   });
 }
+function excedeMaximo(f,maxMb){ return !!maxMb&&f.size>maxMb*1024*1024; }
 async function subirArchivos(files,nuevoXHR,g){
   const res=[];
   for(let i=0;i<files.length;i++){
-    if(g.cancelado()) break;
+    if(g.cancelado()){
+      for(let j=i;j<files.length;j++){
+        const c={ok:false,nombre:files[j].name,error:"Cancelado",cancelado:true};
+        g.alTerminar(j,c); res.push(c);
+      }
+      break;
+    }
     g.alEmpezar(i,files.length,files[i]);
-    const r=await subirUno(files[i],nuevoXHR,fr=>g.alProgreso(i,fr),g.ctl||{});
+    let r;
+    if(excedeMaximo(files[i],g.maxMb))
+      r={ok:false,nombre:files[i].name,error:"Pasa del máximo de "+g.maxMb+" MB por archivo"};
+    else r=await subirUno(files[i],nuevoXHR,fr=>g.alProgreso(i,fr),g.ctl||{});
     g.alTerminar(i,r);
     res.push(r);
   }
@@ -1862,25 +1873,35 @@ function filaSubida(cont,nombre){
 }
 // Sube lo elegido y devuelve los items que el servidor confirmó. `cont` es el
 // contenedor de filas y `btnCancelar` el botón que aborta la subida en curso.
+let subiendo=false;
 async function subirConPanel(files,cont,btnCancelar){
   const arr=Array.from(files); if(!arr.length) return [];
-  cont.innerHTML="";cont.classList.add("show");
-  const filas=arr.map(f=>filaSubida(cont,f.name));
-  const ctl={};let cancelado=false;
-  if(btnCancelar){btnCancelar.style.display="";btnCancelar.onclick=()=>{cancelado=true;if(ctl.abort)ctl.abort();};}
-  const res=await subirArchivos(arr,()=>new XMLHttpRequest(),{
-    ctl,cancelado:()=>cancelado,
-    alEmpezar(){}, alProgreso:(i,fr)=>filas[i].progreso(fr), alTerminar:(i,r)=>filas[i].fin(r)});
-  if(btnCancelar) btnCancelar.style.display="none";
-  const s=resumenSubida(res);
-  toast(s.texto,s.hayError);
-  return res.filter(r=>r.ok).map(r=>r.item);
+  if(subiendo){ toast("Ya hay una subida en marcha, espera a que termine",true); return []; }
+  subiendo=true;
+  try{
+    cont.innerHTML="";cont.classList.add("show");
+    const filas=arr.map(f=>filaSubida(cont,f.name));
+    const ctl={};let cancelado=false;
+    if(btnCancelar){btnCancelar.style.display="";btnCancelar.onclick=()=>{cancelado=true;if(ctl.abort)ctl.abort();};}
+    let maxMb;
+    try{ const c=await (await fetch("/api/config")).json(); maxMb=c.upload_max_mb||2048; }catch(e){}
+    const res=await subirArchivos(arr,()=>new XMLHttpRequest(),{
+      ctl,maxMb,cancelado:()=>cancelado,
+      alEmpezar(){}, alProgreso:(i,fr)=>filas[i].progreso(fr), alTerminar:(i,r)=>filas[i].fin(r)});
+    const s=resumenSubida(res);
+    toast(s.texto,s.hayError);
+    return res.filter(r=>r.ok).map(r=>r.item);
+  } finally {
+    if(btnCancelar){btnCancelar.style.display="none";btnCancelar.onclick=null;}
+    subiendo=false;
+  }
 }
 async function handleUpload(files){
   document.getElementById("uprog").classList.add("show");
-  await subirConPanel(files,document.getElementById("uprog-lista"),document.getElementById("uprog-cancel"));
-  document.getElementById("fi").value="";
-  await loadAll();
+  try{
+    await subirConPanel(files,document.getElementById("uprog-lista"),document.getElementById("uprog-cancel"));
+    await loadAll();
+  } finally { document.getElementById("fi").value=""; }
 }
 // Sube contenido directamente desde la página de Paquetes y lo añade al paquete en edición.
 // El archivo queda también en la Librería (reutilizable), pero sin el paso manual de ir allí.
@@ -1888,15 +1909,18 @@ async function handlePkgUpload(files){
   const arr=Array.from(files); if(!arr.length)return;
   const btn=document.getElementById("pkg-upload-btn");
   btn.disabled=true;
-  const added=await subirConPanel(arr,document.getElementById("pkg-uprog-lista"),document.getElementById("pkg-uprog-cancel"));
-  await loadAll();                       // refresca la librería con lo nuevo
-  added.forEach(item=>{                  // auto-añadir al paquete en construcción
-    if(!pkgSelection.some(x=>x.id===item.id))
-      pkgSelection.push({id:item.id,duration:pkgDefaultDur(item)});
-  });
-  renderPkgPicker(); renderPkgSelected();
-  btn.disabled=false;
-  document.getElementById("pkg-fi").value="";
+  try{
+    const added=await subirConPanel(arr,document.getElementById("pkg-uprog-lista"),document.getElementById("pkg-uprog-cancel"));
+    await loadAll();                       // refresca la librería con lo nuevo
+    added.forEach(item=>{                  // auto-añadir al paquete en construcción
+      if(!pkgSelection.some(x=>x.id===item.id))
+        pkgSelection.push({id:item.id,duration:pkgDefaultDur(item)});
+    });
+    renderPkgPicker(); renderPkgSelected();
+  } finally {
+    btn.disabled=false;
+    document.getElementById("pkg-fi").value="";
+  }
 }
 function toB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);});}
 async function deleteItem(id,e){
