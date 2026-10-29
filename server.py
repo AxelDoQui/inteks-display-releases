@@ -1498,6 +1498,19 @@ def detectar_tipo(cab):
     if cab[:4] == b"\x1a\x45\xdf\xa3": return "video"                  # WEBM
     return None
 
+def nombre_seguro(name):
+    """Nombre de archivo válido también en Windows: sin separadores, sin
+    caracteres reservados (<>:"/\\|?*) ni de control, sin puntos/espacios al
+    final y de 120 caracteres como mucho (conservando la extensión)."""
+    nombre = os.path.basename(str(name).replace("\\", "/"))
+    nombre = "".join("_" if (c in '<>:"/\\|?*' or ord(c) < 32) else c for c in nombre)
+    nombre = nombre.strip().rstrip(". ")
+    if len(nombre) > 120:
+        raiz, ext = os.path.splitext(nombre)
+        ext = ext[:20]
+        nombre = (raiz[:120 - len(ext)] + ext).rstrip(". ")
+    return nombre or "archivo"
+
 def _espacio_legible(n):
     return f"{n // (1024**3)} GB" if n >= 1024**3 else f"{n // (1024**2)} MB"
 
@@ -1515,7 +1528,7 @@ def guardar_subida_raw(lector, length, name):
     libre = shutil.disk_usage(UPLOAD_DIR).free
     if libre < length + SUBIDA_MARGEN_DISCO:
         raise SubidaRechazada(507, f"No cabe: quedan {_espacio_legible(libre)} libres en el disco")
-    nombre = os.path.basename(str(name).replace("\\", "/")).strip() or "archivo"
+    nombre = nombre_seguro(name)
     primero = lector.read(min(SUBIDA_TROZO, length))
     tipo = detectar_tipo(primero)
     if not tipo:
@@ -1549,8 +1562,14 @@ def guardar_subida_raw(lector, length, name):
         raise
     item = {"id": filename, "name": nombre, "type": tipo,
             "src": f"/uploads/{filename}", "size": recibido}
-    with contenido_en_edicion() as content:
-        content.setdefault("items", []).append(item)
+    try:
+        with contenido_en_edicion() as content:
+            content.setdefault("items", []).append(item)
+    except BaseException:
+        # Sin entrada en la Librería el archivo quedaría huérfano en uploads/.
+        try: os.remove(destino)
+        except OSError: pass
+        raise
     return item
 
 class _Lector:

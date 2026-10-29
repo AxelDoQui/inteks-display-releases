@@ -100,6 +100,22 @@ def main():
                             os.path.getsize(os.path.join(up, item.get("id", "x"))) == len(PNG))
         _, contenido = peticion("GET", "/api/content")
         fallos += comprobar("queda en la Librería", any(i["id"] == item.get("id") for i in contenido.get("items", [])))
+        fallos += comprobar("un nombre normal no se toca", item.get("name") == "logo.png", str(item.get("name")))
+
+        # Nombres que Windows no admite: se limpian en vez de dar 500.
+        prohibidos = set('<>:"/\\|?*') | {chr(i) for i in range(32)}
+        antes = set(os.listdir(up))
+        for etiqueta, nombre_malo in (("a:b*c?.png", "a:b*c?.png"), ("300 letras", "x" * 300 + ".png")):
+            cod, r = subir(nombre_malo, PNG)
+            it = r.get("item", {})
+            n = it.get("name", "")
+            fallos += comprobar(f"nombre {etiqueta} -> 200", cod == 200, f"{cod} {r}")
+            fallos += comprobar(f"nombre {etiqueta}: archivo en disco",
+                                os.path.isfile(os.path.join(up, it.get("id", "x"))))
+            fallos += comprobar(f"nombre {etiqueta}: sin caracteres prohibidos, <=120 y .png",
+                                n and not (set(n) & prohibidos) and len(n) <= 120 and n.endswith(".png"), n)
+        nuevos = set(os.listdir(up)) - antes
+        fallos += comprobar("solo aparecen los 2 archivos esperados (sin restos)", len(nuevos) == 2, str(nuevos))
 
         cod, r = subir("clip.mp4", MP4)
         fallos += comprobar("MP4 -> video", cod == 200 and r["item"]["type"] == "video", f"{cod} {r}")
