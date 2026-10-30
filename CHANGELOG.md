@@ -17,6 +17,11 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
   eliges las pantallas, la duración por imagen y se añaden al final de su lista.
   Si una pantalla ya lo tenía, se salta. El panel dice cuántos sitios se añadieron.
 
+- **Carpetas y etiquetas en la Librería.** Cada archivo puede estar en una carpeta y llevar
+  varias etiquetas. Se ponen desde su ficha o, en bloque, con «Poner en carpeta…» y
+  «Añadir etiqueta…» sobre los archivos marcados. La barra de la Librería filtra por
+  carpeta («Sin carpeta» incluido) y por etiquetas, y el buscador también las encuentra.
+
 ## 1.0.49 — 2026-10-30
 
 ### Mejorado

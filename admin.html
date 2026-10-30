@@ -177,6 +177,15 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 #mp-dlg label{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
 #mp-dlg .mp-dur{width:80px;background:var(--s2);border:1px solid var(--b);color:inherit;border-radius:var(--r);padding:5px 8px;font-size:12px}
 #mp-dlg .mp-pie{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+#lib-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+#lib-tags:empty{display:none}
+.chip{display:inline-flex;align-items:center;gap:4px;background:var(--s2);border:1px solid var(--b);color:inherit;border-radius:12px;padding:2px 10px;font-size:11px;cursor:pointer}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip .chip-x{background:none;border:none;color:inherit;cursor:pointer;padding:0 0 0 2px;font-size:11px}
+.lib-carp{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fi-org{margin:0 0 12px}
+.fi-org select,.fi-org input,#mp-dlg select,#mp-dlg .org-txt{background:var(--s2);border:1px solid var(--b);color:inherit;border-radius:var(--r);padding:6px 8px;font-size:12px;width:100%;box-sizing:border-box;margin-top:4px}
+.fi-chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .lib-del{position:absolute;top:3px;right:3px;background:rgba(0,0,0,.75);border:none;color:var(--danger);border-radius:3px;width:18px;height:18px;font-size:11px;cursor:pointer;display:none;align-items:center;justify-content:center}
 .lib-item:hover .lib-del{display:flex}
@@ -467,12 +476,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
       <option value="todos">Todos</option><option value="image">Imágenes</option>
       <option value="video">Vídeos</option><option value="otros">Otros</option>
     </select>
+    <select id="lib-carpeta" title="Carpeta" onchange="libFiltro.carpeta=this.value;renderLibrary()"></select>
     <select id="lib-orden" onchange="libFiltro.orden=this.value;renderLibrary()">
       <option value="nuevos">Más nuevos</option><option value="nombre">Nombre</option>
       <option value="tamano">Tamaño</option><option value="usados">Más usados</option>
     </select>
   </div>
+  <div id="lib-tags"></div>
   <div id="lib-selbar"><span class="sel-n" id="lib-seln"></span>
+    <button class="btn btn-ghost btn-sm" id="lib-sel-carpeta"><i class="fa-solid fa-folder"></i> Poner en carpeta…</button>
+    <button class="btn btn-ghost btn-sm" id="lib-sel-etiqueta"><i class="fa-solid fa-tag"></i> Añadir etiqueta…</button>
     <button class="btn btn-accent btn-sm" id="lib-sel-mandar"><i class="fa-solid fa-paper-plane"></i> Mandar a pantallas</button>
     <button class="btn btn-ghost btn-sm" id="lib-sel-quitar">Quitar selección</button></div>
   <div class="lib-grid" id="lib-grid"><div class="empty-state" style="grid-column:1/-1">Sin archivos</div></div>
@@ -2010,9 +2023,19 @@ function formatoTamano(b){
 }
 function filtrarOrdenar(items,info,opc){
   const o=opc||{}, texto=normalizarTexto(o.texto), tipo=o.tipo||"todos", orden=o.orden||"nuevos";
+  const carpeta=o.carpeta, etiquetas=Array.isArray(o.etiquetas)?o.etiquetas:[];
   const dato=id=>(info&&info[id])||{};
   let r=(items||[]).filter(it=>{
-    if(texto&&normalizarTexto(it.name).indexOf(texto)===-1) return false;
+    if(texto){
+      const pajar=[it.name,it.folder].concat(Array.isArray(it.tags)?it.tags:[]).map(normalizarTexto).join("\n");
+      if(pajar.indexOf(texto)===-1) return false;
+    }
+    if(carpeta==="__sin__"){ if(it.folder) return false; }
+    else if(carpeta&&carpeta!=="todas"){ if(normalizarTexto(it.folder)!==normalizarTexto(carpeta)) return false; }
+    if(etiquetas.length){
+      const suyas=(Array.isArray(it.tags)?it.tags:[]).map(normalizarTexto);
+      if(!etiquetas.every(t=>suyas.indexOf(normalizarTexto(t))!==-1)) return false;
+    }
     if(tipo==="image"||tipo==="video") return it.type===tipo;
     if(tipo==="otros") return it.type!=="image"&&it.type!=="video";
     return true;
@@ -2028,9 +2051,24 @@ function filtrarOrdenar(items,info,opc){
   });
   return r;
 }
+function listasDeOrganizacion(items){
+  const unicos=(valores)=>{
+    const vistos=new Map();
+    valores.forEach(v=>{
+      const t=String(v==null?"":v).trim(), k=normalizarTexto(t);
+      if(t&&!vistos.has(k)) vistos.set(k,t);
+    });
+    return Array.from(vistos.values()).sort((a,b)=>a.localeCompare(b,"es"));
+  };
+  const lista=items||[];
+  return {
+    carpetas:unicos(lista.map(i=>i.folder)),
+    etiquetas:unicos(lista.reduce((acc,i)=>acc.concat(Array.isArray(i.tags)?i.tags:[]),[]))
+  };
+}
 // ── fin de filtrar y ordenar
 let libInfo={};
-let libFiltro={texto:"",tipo:"todos",orden:"nuevos"};
+let libFiltro={texto:"",tipo:"todos",orden:"nuevos",carpeta:"todas",etiquetas:[]};
 async function loadLibInfo(){try{const r=await fetch("/api/library-info");if(r.ok)libInfo=await r.json();}catch(e){}}
 function fechaCorta(ts){return ts?new Date(ts*1000).toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric"}):"—";}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
@@ -2044,6 +2082,7 @@ function resumenUsos(uses){
 function renderLibrary(){
   const grid=document.getElementById("lib-grid");
   const total=(content.items||[]).length;
+  reconstruirFiltrosOrg();
   const lista=filtrarOrdenar(content.items||[],libInfo,libFiltro);
   const existentes=new Set((content.items||[]).map(i=>i.id));
   libSel.forEach(id=>{if(!existentes.has(id))libSel.delete(id);});
@@ -2061,7 +2100,7 @@ function renderLibrary(){
     const ext=(String(item.src||"").split("?")[0].split(".").pop()||"").toUpperCase();
     const tipoTxt=(String(item.src||"").startsWith("/uploads/")&&ext&&ext.length<=5)?ext:item.type;
     const tam=formatoTamano(inf.size);
-    el.innerHTML=`<div class="lib-thumb">${thumb}${item.type==="video"?'<span class="lib-dur" style="display:none"></span>':""}</div>${uses.length?`<span class="lib-uso">en uso · ${uses.length}</span>`:""}<div class="lib-info"><div class="lib-name">${esc(item.name)}</div></div><div class="lib-meta">${tam?tam+" · ":""}${esc(tipoTxt)}</div><input type="checkbox" class="lib-chk" title="Seleccionar"><button class="lib-del"><i class="fa-solid fa-xmark"></i></button>`;
+    el.innerHTML=`<div class="lib-thumb">${thumb}${item.type==="video"?'<span class="lib-dur" style="display:none"></span>':""}</div>${uses.length?`<span class="lib-uso">en uso · ${uses.length}</span>`:""}<div class="lib-info"><div class="lib-name">${esc(item.name)}</div>${item.folder?`<div class="lib-carp"><i class="fa-solid fa-folder"></i> ${esc(item.folder)}</div>`:""}</div><div class="lib-meta">${tam?tam+" · ":""}${esc(tipoTxt)}</div><input type="checkbox" class="lib-chk" title="Seleccionar"><button class="lib-del"><i class="fa-solid fa-xmark"></i></button>`;
     el.querySelector(".lib-del").onclick=e=>deleteItem(item.id,e);
     const chk=el.querySelector(".lib-chk");
     chk.checked=libSel.has(item.id);el.classList.toggle("sel",chk.checked);
@@ -2073,6 +2112,148 @@ function renderLibrary(){
     grid.appendChild(el);
   });
 }
+// ── Carpetas y etiquetas
+function reconstruirFiltrosOrg(){
+  const sel=document.getElementById("lib-carpeta"), caja=document.getElementById("lib-tags");
+  if(!sel||!caja) return;
+  const l=listasDeOrganizacion(content.items||[]);
+  const hay=(lista,v)=>lista.find(x=>normalizarTexto(x)===normalizarTexto(v));
+  if(libFiltro.carpeta!=="todas"&&libFiltro.carpeta!=="__sin__"){
+    libFiltro.carpeta=hay(l.carpetas,libFiltro.carpeta)||"todas";
+  }
+  libFiltro.etiquetas=libFiltro.etiquetas.map(t=>hay(l.etiquetas,t)).filter(Boolean);
+  sel.innerHTML="";
+  const op=(v,t)=>{const o=document.createElement("option");o.value=v;o.textContent=t;sel.appendChild(o);};
+  op("todas","Todas las carpetas"); op("__sin__","Sin carpeta");
+  l.carpetas.forEach(c=>op(c,c));
+  sel.value=libFiltro.carpeta;
+  caja.innerHTML="";
+  l.etiquetas.forEach(t=>{
+    const b=document.createElement("button");b.type="button";b.className="chip"+(libFiltro.etiquetas.indexOf(t)!==-1?" on":"");
+    b.textContent=t;
+    b.onclick=()=>{
+      const i=libFiltro.etiquetas.indexOf(t);
+      if(i===-1)libFiltro.etiquetas.push(t);else libFiltro.etiquetas.splice(i,1);
+      renderLibrary();
+    };
+    caja.appendChild(b);
+  });
+}
+async function organizar(cuerpo){
+  let r,j={};
+  try{
+    r=await fetch("/api/organize",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cuerpo)});
+    try{j=await r.json();}catch(e){}
+  }catch(e){toast("No se pudo conectar con el servidor",true);return false;}
+  if(!r.ok||!j.ok){toast(j.error||"No se pudo organizar",true);return false;}
+  await loadAll();
+  return true;
+}
+function cerrarOrg(){const d=document.getElementById("mp-dlg");if(d)d.remove();}
+// Diálogo pequeño con el estilo de #mp-dlg. onOk(): promesa que devuelve true si se cierra.
+function dialogoOrg(titulo,cuerpo,textoOk,onOk){
+  cerrarOrg();
+  const dlg=document.createElement("div");dlg.id="mp-dlg";
+  const box=document.createElement("div");box.className="mp-box";
+  const t=document.createElement("strong");t.style.fontSize="15px";t.textContent=titulo;
+  const pie=document.createElement("div");pie.className="mp-pie";
+  pie.innerHTML='<button class="btn btn-ghost btn-sm mp-cancel">Cancelar</button><button class="btn btn-accent btn-sm mp-enviar"></button>';
+  pie.querySelector(".mp-enviar").textContent=textoOk;
+  box.appendChild(t);box.appendChild(cuerpo);box.appendChild(pie);dlg.appendChild(box);
+  document.body.appendChild(dlg);
+  dlg.onclick=e=>{if(e.target===dlg)cerrarOrg();};
+  pie.querySelector(".mp-cancel").onclick=cerrarOrg;
+  const ok=pie.querySelector(".mp-enviar");
+  const lanzar=async()=>{ok.disabled=true;const hecho=await onOk();if(hecho)cerrarOrg();else ok.disabled=false;};
+  ok.onclick=lanzar;
+  return {dlg,lanzar};
+}
+function cuerpoCarpeta(actual){
+  const l=listasDeOrganizacion(content.items||[]);
+  const w=document.createElement("div");
+  w.innerHTML='<select class="org-sel"></select><input type="text" class="org-txt" maxlength="40" placeholder="Nombre de la carpeta" style="display:none">';
+  const sel=w.querySelector(".org-sel"), txt=w.querySelector(".org-txt");
+  const op=(v,t)=>{const o=document.createElement("option");o.value=v;o.textContent=t;sel.appendChild(o);};
+  op("__sin__","Sin carpeta");
+  l.carpetas.forEach(c=>op("c:"+c,c));
+  op("__nueva__","Nueva carpeta…");
+  sel.value=actual?"c:"+actual:"__sin__";
+  if(!sel.value) sel.value="__sin__";
+  sel.onchange=()=>{txt.style.display=sel.value==="__nueva__"?"":"none";if(sel.value==="__nueva__")txt.focus();};
+  // null = sin carpeta, texto = carpeta, undefined = falta el nombre
+  w.valor=()=>{
+    if(sel.value==="__sin__") return null;
+    if(sel.value==="__nueva__"){const n=txt.value.trim();return n?n:undefined;}
+    return sel.value.slice(2);
+  };
+  w.txt=txt;
+  return w;
+}
+function abrirDialogoCarpeta(ids){
+  ids=(ids||[]).filter(Boolean); if(!ids.length) return;
+  const cuerpo=cuerpoCarpeta("");
+  cuerpo.style.margin="10px 0";
+  const d=dialogoOrg("Poner "+ids.length+(ids.length===1?" archivo":" archivos")+" en una carpeta",cuerpo,"Aplicar",async()=>{
+    const v=cuerpo.valor();
+    if(v===undefined){toast("Escribe el nombre de la carpeta",true);return false;}
+    const ok=await organizar({ids,folder:v});
+    if(ok){libSel.clear();renderLibrary();toast(v===null?"Quitado de la carpeta":"Puesto en «"+v+"»");}
+    return ok;
+  });
+  cuerpo.txt.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();d.lanzar();}};
+}
+function abrirDialogoEtiqueta(ids){
+  ids=(ids||[]).filter(Boolean); if(!ids.length) return;
+  const l=listasDeOrganizacion(content.items||[]);
+  const w=document.createElement("div");w.style.margin="10px 0";
+  w.innerHTML='<input type="text" class="org-txt" maxlength="30" list="org-etiquetas" placeholder="Etiqueta"><datalist id="org-etiquetas"></datalist>';
+  const dl=w.querySelector("datalist");
+  l.etiquetas.forEach(t=>{const o=document.createElement("option");o.value=t;dl.appendChild(o);});
+  const txt=w.querySelector(".org-txt");
+  const d=dialogoOrg("Añadir etiqueta a "+ids.length+(ids.length===1?" archivo":" archivos"),w,"Añadir",async()=>{
+    const t=txt.value.trim();
+    if(!t){toast("Escribe la etiqueta",true);return false;}
+    const ok=await organizar({ids,addTags:[t]});
+    if(ok){libSel.clear();renderLibrary();toast("Etiqueta «"+t+"» añadida");}
+    return ok;
+  });
+  txt.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();d.lanzar();}};
+  txt.focus();
+}
+// «Carpeta» y «Etiquetas» de la ficha (los nombres entran por textContent/value, nunca por HTML)
+function pintarOrgFicha(f,it){
+  const caja=f.querySelector(".fi-org"); if(!caja) return;
+  caja.innerHTML='<div class="section-lbl" style="margin-bottom:2px">CARPETA</div><div class="fi-carp"></div>'
+    +'<div class="section-lbl" style="margin:10px 0 2px">ETIQUETAS</div><div class="fi-chips"></div>'
+    +'<input type="text" class="fi-tag-in" maxlength="30" placeholder="Nueva etiqueta y Enter">';
+  const cuerpo=cuerpoCarpeta(it.folder||"");
+  caja.querySelector(".fi-carp").appendChild(cuerpo);
+  const guardarCarpeta=async()=>{
+    const v=cuerpo.valor(); if(v===undefined) return;
+    if(await organizar({ids:[it.id],folder:v})){toast(v===null?"Sin carpeta":"Carpeta: "+v);abrirFicha(it.id);}
+  };
+  const sel=cuerpo.querySelector(".org-sel");
+  sel.addEventListener("change",()=>{if(sel.value!=="__nueva__")guardarCarpeta();});
+  cuerpo.txt.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();guardarCarpeta();}};
+  const chips=caja.querySelector(".fi-chips");
+  (Array.isArray(it.tags)?it.tags:[]).forEach(t=>{
+    const s=document.createElement("span");s.className="chip";s.style.cursor="default";
+    s.appendChild(document.createTextNode(t));
+    const x=document.createElement("button");x.type="button";x.className="chip-x";x.title="Quitar etiqueta";x.textContent="✕";
+    x.onclick=async()=>{if(await organizar({ids:[it.id],removeTags:[t]}))abrirFicha(it.id);};
+    s.appendChild(x);chips.appendChild(s);
+  });
+  const inp=caja.querySelector(".fi-tag-in");
+  inp.onkeydown=async e=>{
+    if(e.key!=="Enter") return;
+    e.preventDefault();
+    const t=inp.value.trim(); if(!t) return;
+    inp.disabled=true;
+    const ok=await organizar({ids:[it.id],addTags:[t]});
+    if(ok)abrirFicha(it.id);else inp.disabled=false;
+  };
+}
+// ── fin de carpetas y etiquetas
 let idAbierto=null;
 function cerrarFicha(){idAbierto=null;const f=document.getElementById("lib-ficha");f.style.display="none";f.innerHTML="";}
 function abrirFicha(id){
@@ -2092,11 +2273,13 @@ function abrirFicha(id){
     <dl><dt>Tipo</dt><dd>${esc(it.type)}</dd><dt>Tamaño</dt><dd>${formatoTamano(inf.size)||"—"}</dd>
       <dt>Resolución</dt><dd id="fi-res">—</dd><dt>Duración</dt><dd id="fi-dur">—</dd>
       <dt>Subido</dt><dd>${fechaCorta(inf.created)}</dd></dl>
+    <div class="fi-org"></div>
     <div class="section-lbl" style="margin-bottom:6px">DÓNDE SE USA</div>${lista}
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-accent btn-sm fi-mandar"><i class="fa-solid fa-paper-plane"></i> Mandar a pantallas</button>
       <button class="btn btn-ghost btn-sm fi-ren"><i class="fa-solid fa-pen"></i> Renombrar</button>
       <button class="btn btn-danger btn-sm fi-del"><i class="fa-solid fa-trash"></i> Borrar</button></div>`;
+  pintarOrgFicha(f,it);
   f.querySelector(".fi-mandar").onclick=()=>abrirMandar([id]);
   f.querySelector(".fi-ren").onclick=()=>renombrarItem(id);
   f.querySelector(".fi-del").onclick=()=>deleteItem(id);
@@ -2183,6 +2366,9 @@ document.addEventListener("DOMContentLoaded",()=>{
   const m=document.getElementById("lib-sel-mandar"),q=document.getElementById("lib-sel-quitar");
   if(m)m.onclick=()=>abrirMandar(Array.from(libSel));
   if(q)q.onclick=()=>{libSel.clear();renderLibrary();};
+  const c=document.getElementById("lib-sel-carpeta"),e=document.getElementById("lib-sel-etiqueta");
+  if(c)c.onclick=()=>abrirDialogoCarpeta(Array.from(libSel));
+  if(e)e.onclick=()=>abrirDialogoEtiqueta(Array.from(libSel));
 });
 // Icono Font Awesome por tipo de contenido (unifica los thumbnails)
 const TYPE_ICONS={image:'fa-image',video:'fa-film',text:'fa-tag',fx:'fa-money-bill-trend-up',weather:'fa-cloud-sun',ticker:'fa-newspaper',url:'fa-globe',qr:'fa-qrcode',product:'fa-box-open',comparison:'fa-scale-balanced',countdown:'fa-stopwatch'};
