@@ -154,6 +154,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .lib-thumb img,.lib-thumb video{width:100%;height:100%;object-fit:cover}
 .lib-info{padding:5px 7px}
 .lib-name{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lib-bar{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.lib-bar input,.lib-bar select{background:var(--s2);border:1px solid var(--b);color:inherit;border-radius:var(--r);padding:6px 8px;font-size:12px}
+.lib-bar input{flex:1;min-width:160px}
+.lib-meta{font-size:9px;color:var(--muted);padding:0 7px 5px}
+.lib-uso{position:absolute;top:3px;left:3px;background:var(--accent);color:#fff;border-radius:8px;padding:0 6px;font-size:9px;line-height:16px}
+.lib-dur{position:absolute;right:3px;bottom:26px;background:rgba(0,0,0,.75);color:#fff;border-radius:3px;padding:0 4px;font-size:9px}
+.lib-ficha{position:fixed;top:0;right:0;bottom:0;width:min(380px,100vw);background:var(--s1,var(--s2));border-left:1px solid var(--b);z-index:900;padding:16px;overflow:auto;box-shadow:-8px 0 24px rgba(0,0,0,.35)}
+.lib-ficha .prev{width:100%;aspect-ratio:16/9;background:#000;border-radius:var(--r);overflow:hidden;display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+.lib-ficha .prev img,.lib-ficha .prev video{width:100%;height:100%;object-fit:contain}
+.lib-ficha dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;margin:0 0 12px}
+.lib-ficha dt{color:var(--muted)}
+.lib-ficha ul{margin:0 0 12px;padding-left:18px;font-size:12px}
 .lib-del{position:absolute;top:3px;right:3px;background:rgba(0,0,0,.75);border:none;color:var(--danger);border-radius:3px;width:18px;height:18px;font-size:11px;cursor:pointer;display:none;align-items:center;justify-content:center}
 .lib-item:hover .lib-del{display:flex}
 /* Dropzone */
@@ -436,6 +448,17 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
   <div class="section-hdr" style="margin-top:16px">
     <span class="section-lbl">ARCHIVOS</span>
     <span class="count-pill" id="lib-count">0</span>
+  </div>
+  <div class="lib-bar">
+    <input type="search" id="lib-q" placeholder="Buscar por nombre…" oninput="libFiltro.texto=this.value;renderLibrary()">
+    <select id="lib-tipo" onchange="libFiltro.tipo=this.value;renderLibrary()">
+      <option value="todos">Todos</option><option value="image">Imágenes</option>
+      <option value="video">Vídeos</option><option value="otros">Otros</option>
+    </select>
+    <select id="lib-orden" onchange="libFiltro.orden=this.value;renderLibrary()">
+      <option value="nuevos">Más nuevos</option><option value="nombre">Nombre</option>
+      <option value="tamano">Tamaño</option><option value="usados">Más usados</option>
+    </select>
   </div>
   <div class="lib-grid" id="lib-grid"><div class="empty-state" style="grid-column:1/-1">Sin archivos</div></div>
 </div>
@@ -1411,7 +1434,7 @@ let selWeatherIcon="🌤";
 const WEATHER_ICONS=["☀️","🌤","⛅","🌥","☁️","🌦","🌧","⛈","🌩","🌨","❄️","🌫","🌬","🌊","🔥"];
 
 async function loadAll(){
-  await Promise.all([loadContent(),loadScreens()]);
+  await Promise.all([loadContent(),loadScreens(),loadLibInfo()]);
   renderScreens();renderLibrary();updateStats();renderFxSaved();renderUrlList();renderPackages();renderPkgPicker();
 }
 async function loadContent(){try{const r=await fetch("/api/content");content=await r.json();}catch(e){}}
@@ -1943,8 +1966,16 @@ async function handlePkgUpload(files){
 function toB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);});}
 async function deleteItem(id,e){
   if(e)e.stopPropagation();
-  await fetch("/api/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
-  await loadAll();toast("Eliminado");
+  const it=(content.items||[]).find(i=>i.id===id);
+  const uses=(libInfo[id]||{}).uses||[];
+  const nombre=it?it.name:id;
+  const msg=uses.length
+    ? `«${nombre}» está en ${resumenUsos(uses)}: ${uses.map(u=>u.name).join(", ")}.\n\nSi lo borras, se quita también de ahí. ¿Borrar igualmente?`
+    : `¿Borrar «${nombre}»?`;
+  if(!confirm(msg)) return;
+  const r=await fetch("/api/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
+  if(!r.ok){toast("No se pudo borrar",true);return;}
+  cerrarFicha();await loadAll();toast("Eliminado");
 }
 // ── Librería: filtrar y ordenar
 function normalizarTexto(s){
@@ -1979,21 +2010,76 @@ function filtrarOrdenar(items,info,opc){
   return r;
 }
 // ── fin de filtrar y ordenar
+let libInfo={};
+let libFiltro={texto:"",tipo:"todos",orden:"nuevos"};
+async function loadLibInfo(){try{const r=await fetch("/api/library-info");if(r.ok)libInfo=await r.json();}catch(e){}}
+function fechaCorta(ts){return ts?new Date(ts*1000).toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric"}):"—";}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function duracionTxt(s){if(!isFinite(s))return"";const m=Math.floor(s/60),x=Math.round(s%60);return m+":"+String(x).padStart(2,"0");}
+function resumenUsos(uses){
+  const p=uses.filter(u=>u.kind==="screen").length,k=uses.filter(u=>u.kind==="package").length,t=[];
+  if(p)t.push(p+" pantalla"+(p>1?"s":""));
+  if(k)t.push(k+" paquete"+(k>1?"s":""));
+  return t.join(" y ");
+}
 function renderLibrary(){
   const grid=document.getElementById("lib-grid");
-  const items=content.items||[];
-  document.getElementById("lib-count").textContent=items.length;
-  if(!items.length){grid.innerHTML='<div class="empty-state" style="grid-column:1/-1">Sin archivos</div>';return;}
+  const total=(content.items||[]).length;
+  const lista=filtrarOrdenar(content.items||[],libInfo,libFiltro);
+  document.getElementById("lib-count").textContent=lista.length===total?total:lista.length+" de "+total;
+  if(!lista.length){grid.innerHTML='<div class="empty-state" style="grid-column:1/-1">'+(total?"Nada coincide con el filtro":"Sin archivos")+'</div>';return;}
   grid.innerHTML="";
-  items.forEach(item=>{
+  lista.forEach(item=>{
     const el=document.createElement("div");el.className="lib-item";el.dataset.id=item.id;
+    const inf=libInfo[item.id]||{}, uses=inf.uses||[];
     let thumb=`<i class="fa-solid ${typeIcon(item.type)}" style="font-size:22px;color:var(--muted)"></i>`;
-    if(item.type==="image")thumb=`<img src="${item.src}" alt="">`;
-    else if(item.type==="video")thumb=`<video src="${item.src}" muted preload="metadata"></video>`;
-    else if(item.type==="text")thumb=`<div style="width:100%;height:100%;background:${item.bg||'#111'};display:flex;align-items:center;justify-content:center;font-size:9px;color:${item.color||'#fff'};text-align:center;padding:4px">${item.title}</div>`;
-    el.innerHTML=`<div class="lib-thumb">${thumb}</div><div class="lib-info"><div class="lib-name">${item.name}</div></div><button class="lib-del" onclick="deleteItem('${item.id}',event)"><i class="fa-solid fa-xmark"></i></button>`;
+    if(item.type==="image")thumb=`<img src="${esc(item.src)}" alt="">`;
+    else if(item.type==="video")thumb=`<video src="${esc(item.src)}" muted preload="metadata"></video>`;
+    else if(item.type==="text")thumb=`<div style="width:100%;height:100%;background:${esc(item.bg||'#111')};display:flex;align-items:center;justify-content:center;font-size:9px;color:${esc(item.color||'#fff')};text-align:center;padding:4px">${esc(item.title)}</div>`;
+    const ext=(String(item.src||"").split("?")[0].split(".").pop()||"").toUpperCase();
+    const tipoTxt=(item.src&&ext&&ext.length<=5)?ext:item.type;
+    const tam=formatoTamano(inf.size);
+    el.innerHTML=`<div class="lib-thumb">${thumb}</div>${uses.length?`<span class="lib-uso">en uso · ${uses.length}</span>`:""}${item.type==="video"?'<span class="lib-dur" style="display:none"></span>':""}<div class="lib-info"><div class="lib-name">${esc(item.name)}</div></div><div class="lib-meta">${tam?tam+" · ":""}${esc(tipoTxt)}</div><button class="lib-del" onclick="deleteItem('${esc(item.id)}',event)"><i class="fa-solid fa-xmark"></i></button>`;
+    el.onclick=()=>abrirFicha(item.id);
+    const v=el.querySelector("video"),d=el.querySelector(".lib-dur");
+    if(v&&d)v.onloadedmetadata=()=>{const t=duracionTxt(v.duration);if(t){d.textContent=t;d.style.display="";}};
     grid.appendChild(el);
   });
+}
+function cerrarFicha(){const f=document.getElementById("lib-ficha");f.style.display="none";f.innerHTML="";}
+function abrirFicha(id){
+  const it=(content.items||[]).find(i=>i.id===id); if(!it) return;
+  const inf=libInfo[id]||{}, uses=inf.uses||[], f=document.getElementById("lib-ficha");
+  let prev=`<i class="fa-solid ${typeIcon(it.type)}" style="font-size:40px;color:var(--muted)"></i>`;
+  if(it.type==="image") prev=`<img src="${esc(it.src)}" alt="">`;
+  else if(it.type==="video") prev=`<video src="${esc(it.src)}" controls preload="metadata"></video>`;
+  const lista=uses.length
+    ? "<ul>"+uses.map(u=>`<li>${u.kind==="screen"?"Pantalla":"Paquete"}: ${esc(u.name)}</li>`).join("")+"</ul>"
+    : '<p style="font-size:12px;color:var(--muted);margin:0 0 12px">No está en ninguna pantalla ni paquete.</p>';
+  f.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <strong style="font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.name)}</strong>
+      <button class="btn btn-ghost btn-sm" onclick="cerrarFicha()"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="prev">${prev}</div>
+    <dl><dt>Tipo</dt><dd>${esc(it.type)}</dd><dt>Tamaño</dt><dd>${formatoTamano(inf.size)||"—"}</dd>
+      <dt>Resolución</dt><dd id="fi-res">—</dd><dt>Duración</dt><dd id="fi-dur">—</dd>
+      <dt>Subido</dt><dd>${fechaCorta(inf.created)}</dd></dl>
+    <div class="section-lbl" style="margin-bottom:6px">DÓNDE SE USA</div>${lista}
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="renombrarItem('${esc(id)}')"><i class="fa-solid fa-pen"></i> Renombrar</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteItem('${esc(id)}')"><i class="fa-solid fa-trash"></i> Borrar</button></div>`;
+  f.style.display="block";
+  const m=f.querySelector(".prev img,.prev video"); if(!m) return;
+  const poner=(w,h,d)=>{if(w&&h)document.getElementById("fi-res").textContent=w+"×"+h;if(d)document.getElementById("fi-dur").textContent=duracionTxt(d);};
+  if(m.tagName==="IMG"){const r=()=>poner(m.naturalWidth,m.naturalHeight);m.complete?r():m.onload=r;}
+  else m.onloadedmetadata=()=>poner(m.videoWidth,m.videoHeight,m.duration);
+}
+async function renombrarItem(id){
+  const it=(content.items||[]).find(i=>i.id===id); if(!it) return;
+  const nombre=prompt("Nombre nuevo (solo cambia el nombre que se ve):",it.name);
+  if(nombre===null) return;
+  const r=await fetch("/api/rename",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,name:nombre})});
+  if(!r.ok){let m="No se pudo renombrar";try{m=(await r.json()).error||m}catch(e){}toast(m,true);return;}
+  await loadAll();toast("Renombrado");abrirFicha(id);
 }
 // Icono Font Awesome por tipo de contenido (unifica los thumbnails)
 const TYPE_ICONS={image:'fa-image',video:'fa-film',text:'fa-tag',fx:'fa-money-bill-trend-up',weather:'fa-cloud-sun',ticker:'fa-newspaper',url:'fa-globe',qr:'fa-qrcode',product:'fa-box-open',comparison:'fa-scale-balanced',countdown:'fa-stopwatch'};
@@ -4302,5 +4388,6 @@ setInterval(async()=>{
 },8000);
 setInterval(loadPairPending,3000);
 </script>
+<div id="lib-ficha" class="lib-ficha" style="display:none"></div>
 </body>
 </html>

@@ -8,6 +8,20 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.49 — 2026-10-30
+
+### Mejorado
+
+- **Librería más útil.** Buscador por nombre (sin fijarse en acentos), filtro por
+  tipo (imágenes, vídeos, otros) y orden (más nuevos, nombre, tamaño, más usados).
+- Cada archivo enseña su tamaño y tipo, una insignia «en uso» y, en los vídeos,
+  la duración.
+- **Ficha lateral** al pulsar un archivo: vista previa, resolución, duración,
+  fecha de subida y dónde se usa (pantallas y paquetes).
+- **Renombrar** desde la ficha: solo cambia el nombre que se ve.
+- **Borrar con aviso:** si el archivo está en alguna pantalla o paquete, el panel
+  lo dice con los nombres, y al confirmar lo quita también de ahí.
+
 ## 1.0.48 — 2026-10-30
 
 ### Mejorado
