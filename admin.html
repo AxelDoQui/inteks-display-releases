@@ -150,7 +150,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:7px}
 .lib-item{background:var(--s2);border:1px solid var(--b);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:all .2s;position:relative}
 .lib-item:hover{border-color:var(--accent);transform:translateY(-1px)}
-.lib-thumb{width:100%;aspect-ratio:16/9;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:20px}
+.lib-thumb{position:relative;width:100%;aspect-ratio:16/9;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:20px}
 .lib-thumb img,.lib-thumb video{width:100%;height:100%;object-fit:cover}
 .lib-info{padding:5px 7px}
 .lib-name{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -159,7 +159,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .lib-bar input{flex:1;min-width:160px}
 .lib-meta{font-size:9px;color:var(--muted);padding:0 7px 5px}
 .lib-uso{position:absolute;top:3px;left:3px;background:var(--accent);color:#fff;border-radius:8px;padding:0 6px;font-size:9px;line-height:16px}
-.lib-dur{position:absolute;right:3px;bottom:26px;background:rgba(0,0,0,.75);color:#fff;border-radius:3px;padding:0 4px;font-size:9px}
+.lib-dur{position:absolute;right:3px;bottom:3px;background:rgba(0,0,0,.75);color:#fff;border-radius:3px;padding:0 4px;font-size:9px}
 .lib-ficha{position:fixed;top:0;right:0;bottom:0;width:min(380px,100vw);background:var(--s1,var(--s2));border-left:1px solid var(--b);z-index:900;padding:16px;overflow:auto;box-shadow:-8px 0 24px rgba(0,0,0,.35)}
 .lib-ficha .prev{width:100%;aspect-ratio:16/9;background:#000;border-radius:var(--r);overflow:hidden;display:flex;align-items:center;justify-content:center;margin-bottom:12px}
 .lib-ficha .prev img,.lib-ficha .prev video{width:100%;height:100%;object-fit:contain}
@@ -1436,6 +1436,7 @@ const WEATHER_ICONS=["☀️","🌤","⛅","🌥","☁️","🌦","🌧","⛈","
 async function loadAll(){
   await Promise.all([loadContent(),loadScreens(),loadLibInfo()]);
   renderScreens();renderLibrary();updateStats();renderFxSaved();renderUrlList();renderPackages();renderPkgPicker();
+  if(idAbierto){ if((content.items||[]).some(i=>i.id===idAbierto)) abrirFicha(idAbierto); else cerrarFicha(); }
 }
 async function loadContent(){try{const r=await fetch("/api/content");content=await r.json();}catch(e){}}
 async function loadScreens(){
@@ -1453,6 +1454,7 @@ function connectSSE(){
 function showPage(id,btn){
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.remove("active"));
+  cerrarFicha();
   document.getElementById("page-"+id).classList.add("active");
   if(btn) btn.classList.add("active");
   if(id==="packages"){ renderPkgPicker(); renderPackages(); }  // refrescar con la librería actual
@@ -1966,6 +1968,7 @@ async function handlePkgUpload(files){
 function toB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);});}
 async function deleteItem(id,e){
   if(e)e.stopPropagation();
+  await loadLibInfo();
   const it=(content.items||[]).find(i=>i.id===id);
   const uses=(libInfo[id]||{}).uses||[];
   const nombre=it?it.name:id;
@@ -1975,7 +1978,8 @@ async function deleteItem(id,e){
   if(!confirm(msg)) return;
   const r=await fetch("/api/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
   if(!r.ok){toast("No se pudo borrar",true);return;}
-  cerrarFicha();await loadAll();toast("Eliminado");
+  if(idAbierto===id)cerrarFicha();
+  await loadAll();toast("Eliminado");
 }
 // ── Librería: filtrar y ordenar
 function normalizarTexto(s){
@@ -2037,18 +2041,21 @@ function renderLibrary(){
     else if(item.type==="video")thumb=`<video src="${esc(item.src)}" muted preload="metadata"></video>`;
     else if(item.type==="text")thumb=`<div style="width:100%;height:100%;background:${esc(item.bg||'#111')};display:flex;align-items:center;justify-content:center;font-size:9px;color:${esc(item.color||'#fff')};text-align:center;padding:4px">${esc(item.title)}</div>`;
     const ext=(String(item.src||"").split("?")[0].split(".").pop()||"").toUpperCase();
-    const tipoTxt=(item.src&&ext&&ext.length<=5)?ext:item.type;
+    const tipoTxt=(String(item.src||"").startsWith("/uploads/")&&ext&&ext.length<=5)?ext:item.type;
     const tam=formatoTamano(inf.size);
-    el.innerHTML=`<div class="lib-thumb">${thumb}</div>${uses.length?`<span class="lib-uso">en uso · ${uses.length}</span>`:""}${item.type==="video"?'<span class="lib-dur" style="display:none"></span>':""}<div class="lib-info"><div class="lib-name">${esc(item.name)}</div></div><div class="lib-meta">${tam?tam+" · ":""}${esc(tipoTxt)}</div><button class="lib-del" onclick="deleteItem('${esc(item.id)}',event)"><i class="fa-solid fa-xmark"></i></button>`;
+    el.innerHTML=`<div class="lib-thumb">${thumb}${item.type==="video"?'<span class="lib-dur" style="display:none"></span>':""}</div>${uses.length?`<span class="lib-uso">en uso · ${uses.length}</span>`:""}<div class="lib-info"><div class="lib-name">${esc(item.name)}</div></div><div class="lib-meta">${tam?tam+" · ":""}${esc(tipoTxt)}</div><button class="lib-del"><i class="fa-solid fa-xmark"></i></button>`;
+    el.querySelector(".lib-del").onclick=e=>deleteItem(item.id,e);
     el.onclick=()=>abrirFicha(item.id);
     const v=el.querySelector("video"),d=el.querySelector(".lib-dur");
     if(v&&d)v.onloadedmetadata=()=>{const t=duracionTxt(v.duration);if(t){d.textContent=t;d.style.display="";}};
     grid.appendChild(el);
   });
 }
-function cerrarFicha(){const f=document.getElementById("lib-ficha");f.style.display="none";f.innerHTML="";}
+let idAbierto=null;
+function cerrarFicha(){idAbierto=null;const f=document.getElementById("lib-ficha");f.style.display="none";f.innerHTML="";}
 function abrirFicha(id){
   const it=(content.items||[]).find(i=>i.id===id); if(!it) return;
+  idAbierto=id;
   const inf=libInfo[id]||{}, uses=inf.uses||[], f=document.getElementById("lib-ficha");
   let prev=`<i class="fa-solid ${typeIcon(it.type)}" style="font-size:40px;color:var(--muted)"></i>`;
   if(it.type==="image") prev=`<img src="${esc(it.src)}" alt="">`;
@@ -2065,8 +2072,10 @@ function abrirFicha(id){
       <dt>Subido</dt><dd>${fechaCorta(inf.created)}</dd></dl>
     <div class="section-lbl" style="margin-bottom:6px">DÓNDE SE USA</div>${lista}
     <div style="display:flex;gap:8px">
-      <button class="btn btn-ghost btn-sm" onclick="renombrarItem('${esc(id)}')"><i class="fa-solid fa-pen"></i> Renombrar</button>
-      <button class="btn btn-danger btn-sm" onclick="deleteItem('${esc(id)}')"><i class="fa-solid fa-trash"></i> Borrar</button></div>`;
+      <button class="btn btn-ghost btn-sm fi-ren"><i class="fa-solid fa-pen"></i> Renombrar</button>
+      <button class="btn btn-danger btn-sm fi-del"><i class="fa-solid fa-trash"></i> Borrar</button></div>`;
+  f.querySelector(".fi-ren").onclick=()=>renombrarItem(id);
+  f.querySelector(".fi-del").onclick=()=>deleteItem(id);
   f.style.display="block";
   const m=f.querySelector(".prev img,.prev video"); if(!m) return;
   const poner=(w,h,d)=>{if(w&&h)document.getElementById("fi-res").textContent=w+"×"+h;if(d)document.getElementById("fi-dur").textContent=duracionTxt(d);};
@@ -2074,7 +2083,7 @@ function abrirFicha(id){
   else m.onloadedmetadata=()=>poner(m.videoWidth,m.videoHeight,m.duration);
 }
 async function renombrarItem(id){
-  const it=(content.items||[]).find(i=>i.id===id); if(!it) return;
+  const it=(content.items||[]).find(i=>i.id===id); if(!it){toast("Ese archivo ya no existe",true);return;}
   const nombre=prompt("Nombre nuevo (solo cambia el nombre que se ve):",it.name);
   if(nombre===null) return;
   const r=await fetch("/api/rename",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,name:nombre})});
@@ -2110,7 +2119,7 @@ function renderPkgPicker(){
     const sel=pkgSelection.some(x=>x.id===item.id);
     const el=document.createElement("div");
     el.style.cssText=`border:2px solid ${sel?'var(--accent)':'var(--b)'};border-radius:var(--r);overflow:hidden;cursor:pointer;position:relative;background:var(--s2)`;
-    el.innerHTML=`${pkgThumbHtml(item)}<div style="padding:3px 6px;font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</div>${sel?'<div style="position:absolute;top:4px;right:4px;background:var(--accent);color:#000;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700"><i class="fa-solid fa-check"></i></div>':''}`;
+    el.innerHTML=`${pkgThumbHtml(item)}<div style="padding:3px 6px;font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.name)}</div>${sel?'<div style="position:absolute;top:4px;right:4px;background:var(--accent);color:#000;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700"><i class="fa-solid fa-check"></i></div>':''}`;
     el.addEventListener("click",()=>togglePkgItem(item.id));
     c.appendChild(el);
   });
@@ -2137,7 +2146,7 @@ function renderPkgSelected(){
       : `<input class="dur-inp" type="number" min="1" max="3600" value="${sel.duration||8}" onchange="updatePkgDur('${sel.id}',this.value)"><span style="font-size:10px;color:var(--muted)">seg</span>`;
     const el=document.createElement("div");
     el.style.cssText="display:flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--b);border-radius:var(--r);padding:6px 8px;margin-bottom:5px";
-    el.innerHTML=`<span style="font-size:10px;color:var(--muted);width:14px">${i+1}</span><span style="flex:1;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</span>${dur}<button class="btn btn-danger btn-sm" onclick="rmPkgItem('${sel.id}')"><i class="fa-solid fa-xmark"></i></button>`;
+    el.innerHTML=`<span style="font-size:10px;color:var(--muted);width:14px">${i+1}</span><span style="flex:1;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.name)}</span>${dur}<button class="btn btn-danger btn-sm" onclick="rmPkgItem(${esc(JSON.stringify(sel.id))})"><i class="fa-solid fa-xmark"></i></button>`;
     c.appendChild(el);
   });
 }
@@ -2359,7 +2368,7 @@ function renderPlList(sid){
       `onclick="togglePriority('${sid}',${i})"><i class="fa-solid fa-star"></i></button>`;
     const arriba=`<button class="btn btn-ghost btn-sm" ${i===0?"disabled":""} title="Subir" onclick="moverPlItem('${sid}',${i},${i-1})"><i class="fa-solid fa-chevron-up"></i></button>`;
     const abajo=`<button class="btn btn-ghost btn-sm" ${i===pl.length-1?"disabled":""} title="Bajar" onclick="moverPlItem('${sid}',${i},${i+1})"><i class="fa-solid fa-chevron-down"></i></button>`;
-    el.innerHTML=`<span class="pl-handle"><i class="fa-solid fa-grip-vertical"></i></span><div class="pl-mover">${arriba}${abajo}</div><div class="pl-thumb">${thumb}</div><div class="pl-info"><div class="pl-name">${item.name}</div><span class="pl-tbadge ${tc}">${item.type.toUpperCase()}</span>${marca}</div>${durControl}${prioBtn}<button class="btn btn-danger btn-sm" onclick="rmFromPl('${sid}',${i})"><i class="fa-solid fa-xmark"></i></button>${fechas}`;
+    el.innerHTML=`<span class="pl-handle"><i class="fa-solid fa-grip-vertical"></i></span><div class="pl-mover">${arriba}${abajo}</div><div class="pl-thumb">${thumb}</div><div class="pl-info"><div class="pl-name">${esc(item.name)}</div><span class="pl-tbadge ${tc}">${item.type.toUpperCase()}</span>${marca}</div>${durControl}${prioBtn}<button class="btn btn-danger btn-sm" onclick="rmFromPl('${sid}',${i})"><i class="fa-solid fa-xmark"></i></button>${fechas}`;
     el.addEventListener("dragstart",()=>{dragSrc=i;setTimeout(()=>el.classList.add("dragging"),0);});
     el.addEventListener("dragend",()=>el.classList.remove("dragging"));
     el.addEventListener("dragover",e=>{e.preventDefault();el.classList.add("drag-over");});
@@ -2407,7 +2416,7 @@ function renderPlLib(sid){
     const el=document.createElement("div");
     el.style.cssText="background:var(--s2);border:1px solid var(--b);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:border-color .15s";
     let t=item.type==="image"?`<img src="${item.src}" style="width:100%;aspect-ratio:16/9;object-fit:cover">`:item.type==="video"?`<video src="${item.src}" muted style="width:100%;aspect-ratio:16/9;object-fit:cover"></video>`:`<div style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:var(--s3)"><i class="fa-solid ${typeIcon(item.type)}" style="font-size:24px;color:var(--muted)"></i></div>`;
-    el.innerHTML=`${t}<div style="padding:3px 6px;font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</div>`;
+    el.innerHTML=`${t}<div style="padding:3px 6px;font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.name)}</div>`;
     el.addEventListener("mouseover",()=>el.style.borderColor="var(--accent)");
     el.addEventListener("mouseout",()=>el.style.borderColor="var(--b)");
     el.addEventListener("click",()=>addToPl(sid,item));
@@ -3429,7 +3438,7 @@ function renderFxSaved(){
     const el=document.createElement("div");
     el.style.cssText="background:var(--s1);border:1px solid var(--b);border-radius:var(--r);padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px";
     const fresc=frescuraFx(item);
-    el.innerHTML=`<i class="fa-solid fa-money-bill-trend-up" style="font-size:18px;color:${fresc.caducado?"var(--danger, #f05050)":"var(--muted)"};width:22px;text-align:center"></i><div style="flex:1"><div style="font-size:13px;font-weight:500">${item.name}</div><div style="font-size:11px;color:var(--muted)">${(item.rows||[]).length} monedas · ${item.duration}s · <span style="color:${fresc.caducado?"#f05050":"var(--muted)"}">${fresc.texto}</span></div></div><button class="btn btn-a2 btn-sm" onclick="editFxModule('${item.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button><button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}',event)"><i class="fa-solid fa-xmark"></i></button>`;
+    el.innerHTML=`<i class="fa-solid fa-money-bill-trend-up" style="font-size:18px;color:${fresc.caducado?"var(--danger, #f05050)":"var(--muted)"};width:22px;text-align:center"></i><div style="flex:1"><div style="font-size:13px;font-weight:500">${esc(item.name)}</div><div style="font-size:11px;color:var(--muted)">${(item.rows||[]).length} monedas · ${item.duration}s · <span style="color:${fresc.caducado?"#f05050":"var(--muted)"}">${fresc.texto}</span></div></div><button class="btn btn-a2 btn-sm" onclick="editFxModule('${item.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button><button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}',event)"><i class="fa-solid fa-xmark"></i></button>`;
     c.appendChild(el);
   });
 }
@@ -3652,7 +3661,7 @@ function renderUrlList(){
   urls.forEach(item=>{
     const el=document.createElement("div");
     el.style.cssText="background:var(--s1);border:1px solid var(--b);border-radius:var(--r);padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px";
-    el.innerHTML=`<i class="fa-solid fa-globe" style="font-size:18px;color:var(--muted);width:22px;text-align:center"></i><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">${item.name}</div><div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.src}</div></div><button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}',event)"><i class="fa-solid fa-xmark"></i></button>`;
+    el.innerHTML=`<i class="fa-solid fa-globe" style="font-size:18px;color:var(--muted);width:22px;text-align:center"></i><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">${esc(item.name)}</div><div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.src}</div></div><button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}',event)"><i class="fa-solid fa-xmark"></i></button>`;
     c.appendChild(el);
   });
 }
@@ -3989,7 +3998,7 @@ function renderQrSaved(){
   items.forEach(item=>{
     const el=document.createElement("div");
     el.style.cssText="background:var(--s1);border:1px solid var(--b);border-radius:var(--r);padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px";
-    el.innerHTML=`<i class="fa-solid fa-qrcode" style="font-size:18px;color:var(--muted);width:22px;text-align:center"></i><div style="flex:1"><div style="font-size:13px;font-weight:500">${item.name}</div><div style="font-size:11px;color:var(--muted)">QR · ${item.duration}s</div></div><button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}',event)"><i class="fa-solid fa-xmark"></i></button>`;
+    el.innerHTML=`<i class="fa-solid fa-qrcode" style="font-size:18px;color:var(--muted);width:22px;text-align:center"></i><div style="flex:1"><div style="font-size:13px;font-weight:500">${esc(item.name)}</div><div style="font-size:11px;color:var(--muted)">QR · ${item.duration}s</div></div><button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}',event)"><i class="fa-solid fa-xmark"></i></button>`;
     c.appendChild(el);
   });
 }
@@ -4028,7 +4037,7 @@ function renderProductSaved(){
   items.forEach(item=>{
     const el=document.createElement("div");
     el.style.cssText="background:var(--s1);border:1px solid var(--b);border-radius:var(--r);padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px";
-    el.innerHTML=`<i class="fa-solid fa-box-open" style="font-size:18px;color:var(--muted);width:22px;text-align:center"></i><div style="flex:1"><div style="font-size:13px;font-weight:500">${item.name}</div><div style="font-size:11px;color:var(--muted)">$${item.price} · ${item.duration}s</div></div><button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}',event)"><i class="fa-solid fa-xmark"></i></button>`;
+    el.innerHTML=`<i class="fa-solid fa-box-open" style="font-size:18px;color:var(--muted);width:22px;text-align:center"></i><div style="flex:1"><div style="font-size:13px;font-weight:500">${esc(item.name)}</div><div style="font-size:11px;color:var(--muted)">$${item.price} · ${item.duration}s</div></div><button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}',event)"><i class="fa-solid fa-xmark"></i></button>`;
     c.appendChild(el);
   });
 }
@@ -4065,7 +4074,7 @@ function renderComparisonSaved(){
   items.forEach(item=>{
     const el=document.createElement("div");
     el.style.cssText="background:var(--s1);border:1px solid var(--b);border-radius:var(--r);padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px";
-    el.innerHTML=`<i class="fa-solid fa-scale-balanced" style="font-size:18px;color:var(--muted);width:22px;text-align:center"></i><div style="flex:1"><div style="font-size:13px;font-weight:500">${item.name}</div><div style="font-size:11px;color:var(--muted)">${item.duration}s</div></div><button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}',event)"><i class="fa-solid fa-xmark"></i></button>`;
+    el.innerHTML=`<i class="fa-solid fa-scale-balanced" style="font-size:18px;color:var(--muted);width:22px;text-align:center"></i><div style="flex:1"><div style="font-size:13px;font-weight:500">${esc(item.name)}</div><div style="font-size:11px;color:var(--muted)">${item.duration}s</div></div><button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}',event)"><i class="fa-solid fa-xmark"></i></button>`;
     c.appendChild(el);
   });
 }

@@ -1468,6 +1468,9 @@ class RevConflicto(Exception):
     """
     def __init__(self, actual): self.actual = actual
 
+class ArchivoNoExiste(Exception):
+    """Se lanza dentro de contenido_en_edicion() para abortar sin guardar ni subir rev."""
+
 @contextlib.contextmanager
 def contenido_en_edicion():
     """Lee, deja modificar y guarda content.json sin soltar el lock en medio.
@@ -2817,17 +2820,25 @@ class Handler(BaseHTTPRequestHandler):
         # ── Renombrar un contenido (solo el nombre que se ve)
         if path == "/api/rename":
             try:
-                d = json.loads(body)
+                try:
+                    d = json.loads(body)
+                except Exception:
+                    d = None
+                if not isinstance(d, dict) or not isinstance(d.get("id"), str) or not d.get("id"):
+                    jresp(400, {"ok": False, "error": "Petición no válida"}); return
                 item_id = d["id"]
-                nombre = str(d.get("name", "")).strip()
+                nombre = d.get("name")
+                nombre = nombre.strip() if isinstance(nombre, str) else ""
                 if not nombre or len(nombre) > 120:
                     jresp(400, {"ok": False, "error": "Nombre no válido (1 a 120 caracteres)"}); return
-                encontrado = False
-                with contenido_en_edicion() as content:
-                    for it in content.get("items", []):
-                        if it.get("id") == item_id:
-                            it["name"] = nombre; encontrado = True; break
-                if not encontrado:
+                try:
+                    with contenido_en_edicion() as content:
+                        for it in content.get("items", []):
+                            if it.get("id") == item_id:
+                                it["name"] = nombre; break
+                        else:
+                            raise ArchivoNoExiste()
+                except ArchivoNoExiste:
                     jresp(404, {"ok": False, "error": "No existe ese archivo"}); return
                 notify_all()
                 ok()
