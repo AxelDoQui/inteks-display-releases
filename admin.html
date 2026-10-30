@@ -2712,7 +2712,16 @@ function renderPlPackages(){
   const pkgs=content.packages||[];
   if(!pkgs.length){ c.innerHTML=""; return; }
   c.innerHTML='<div style="font-size:9px;color:var(--muted);font-family:\'Space Mono\',monospace;letter-spacing:1px;margin-bottom:5px">PAQUETES (clic para añadir todo)</div>'+
-    '<div style="display:flex;flex-wrap:wrap;gap:6px">'+pkgs.map(p=>`<button class="btn btn-a2 btn-sm" onclick="applyPackage('${p.id}')"><i class="fa-solid fa-box"></i> ${p.name}</button>`).join("")+'</div>';
+    '<div id="plm-packages-btns" style="display:flex;flex-wrap:wrap;gap:6px"></div>';
+  // Nombre con esc() y el id por handler JS: un paquete llamado con < o ' no
+  // rompe el panel ni inyecta código.
+  const caja=document.getElementById("plm-packages-btns");
+  pkgs.forEach(p=>{
+    const b=document.createElement("button");b.className="btn btn-a2 btn-sm";
+    b.innerHTML='<i class="fa-solid fa-box"></i> '+esc(p.name);
+    b.addEventListener("click",()=>applyPackage(p.id));
+    caja.appendChild(b);
+  });
 }
 
 // ── Editor de playlist: lógica pura (probada en tests/editor-playlist.test.js)
