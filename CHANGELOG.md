@@ -8,6 +8,35 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.48 — 2026-10-30
+
+### Mejorado
+
+- **Subida de archivos más robusta.** Los archivos se envían directamente y por
+  trozos, así que un vídeo grande ya no tumba el mini PC. Se ve una barra de
+  progreso por archivo, se puede cancelar, y si algo falla el panel dice cuál y
+  por qué (antes decía «subido» igualmente).
+- El servidor comprueba que el archivo es de verdad una imagen o un vídeo y que
+  cabe en el disco; el panel avisa antes de enviar lo que no vale o pasa del
+  máximo. Nuevo ajuste «Subida de archivos» con el tamaño máximo por archivo
+  (2048 MB por defecto).
+- Los nombres de archivo con caracteres que Windows no admite se limpian solos.
+
+### Arreglado
+
+- **Borrar un archivo de la Librería ahora lo borra también del disco** en los
+  PC con el programa instalado. Antes desaparecía de la lista pero seguía
+  ocupando espacio.
+- Las subidas a medias ya no dejan restos ni entran en las copias de seguridad.
+
+### Limitación conocida
+
+- La copia de seguridad «con multimedia» se arma en memoria y no se puede
+  restaurar si pasa de 512 MB. La copia diaria automática no lleva vídeos, así
+  que no le afecta.
+
+---
+
 ## 1.0.47 — 2026-10-28
 
 ### Mejorado
