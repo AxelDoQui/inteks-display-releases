@@ -168,6 +168,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .lib-ficha ul{margin:0 0 12px;padding-left:18px;font-size:12px}
 .lib-chk{position:absolute;top:4px;left:4px;z-index:2;width:16px;height:16px;margin:0;cursor:pointer;accent-color:var(--accent);opacity:0;transition:opacity .15s}
 .lib-item:hover .lib-chk,.lib-grid.haysel .lib-chk,.lib-chk:focus-visible{opacity:1}
+@media (hover:none){.lib-chk{opacity:1}}
 .lib-item.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 #lib-selbar{display:none;align-items:center;gap:8px;margin-bottom:10px;padding:6px 10px;background:var(--s2);border:1px solid var(--accent);border-radius:var(--r);flex-wrap:wrap;font-size:12px}
 #lib-selbar .sel-n{flex:1;min-width:120px}
@@ -471,7 +472,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     <span class="count-pill" id="lib-count">0</span>
   </div>
   <div class="lib-bar">
-    <input type="search" id="lib-q" placeholder="Buscar por nombre…" oninput="libFiltro.texto=this.value;renderLibrary()">
+    <input type="search" id="lib-q" placeholder="Buscar por nombre, carpeta o etiqueta…" oninput="libFiltro.texto=this.value;renderLibrary()">
     <select id="lib-tipo" onchange="libFiltro.tipo=this.value;renderLibrary()">
       <option value="todos">Todos</option><option value="image">Imágenes</option>
       <option value="video">Vídeos</option><option value="otros">Otros</option>
@@ -1464,7 +1465,19 @@ const WEATHER_ICONS=["☀️","🌤","⛅","🌥","☁️","🌦","🌧","⛈","
 async function loadAll(){
   await Promise.all([loadContent(),loadScreens(),loadLibInfo()]);
   renderScreens();renderLibrary();updateStats();renderFxSaved();renderUrlList();renderPackages();renderPkgPicker();
-  if(idAbierto){ if((content.items||[]).some(i=>i.id===idAbierto)) abrirFicha(idAbierto); else cerrarFicha(); }
+  if(idAbierto){
+    if((content.items||[]).some(i=>i.id===idAbierto)){ if(!fichaOcupada()) abrirFicha(idAbierto); }
+    else cerrarFicha();
+  }
+}
+// La ficha se está usando: tiene el foco dentro o un campo con texto sin enviar.
+// Redibujarla ahora borraría lo que el usuario está tecleando.
+function fichaOcupada(){
+  const f=document.getElementById("lib-ficha");
+  if(!f||f.style.display==="none") return false;
+  const a=document.activeElement;
+  if(a&&a!==f&&f.contains(a)) return true;
+  return Array.from(f.querySelectorAll("input,textarea")).some(c=>c.type==="text"&&c.value.trim()!=="");
 }
 async function loadContent(){try{const r=await fetch("/api/content");content=await r.json();}catch(e){}}
 async function loadScreens(){
@@ -2030,8 +2043,10 @@ function filtrarOrdenar(items,info,opc){
       const pajar=[it.name,it.folder].concat(Array.isArray(it.tags)?it.tags:[]).map(normalizarTexto).join("\n");
       if(pajar.indexOf(texto)===-1) return false;
     }
-    if(carpeta==="__sin__"){ if(it.folder) return false; }
-    else if(carpeta&&carpeta!=="todas"){ if(normalizarTexto(it.folder)!==normalizarTexto(carpeta)) return false; }
+    // Valores con prefijo para que ninguna carpeta choque con los especiales:
+    // "all" (todas), "none" (sin carpeta) y "c:<nombre>".
+    if(carpeta==="none"){ if(it.folder) return false; }
+    else if(typeof carpeta==="string"&&carpeta.slice(0,2)==="c:"){ if(normalizarTexto(it.folder)!==normalizarTexto(carpeta.slice(2))) return false; }
     if(etiquetas.length){
       const suyas=(Array.isArray(it.tags)?it.tags:[]).map(normalizarTexto);
       if(!etiquetas.every(t=>suyas.indexOf(normalizarTexto(t))!==-1)) return false;
@@ -2068,7 +2083,7 @@ function listasDeOrganizacion(items){
 }
 // ── fin de filtrar y ordenar
 let libInfo={};
-let libFiltro={texto:"",tipo:"todos",orden:"nuevos",carpeta:"todas",etiquetas:[]};
+let libFiltro={texto:"",tipo:"todos",orden:"nuevos",carpeta:"all",etiquetas:[]};
 async function loadLibInfo(){try{const r=await fetch("/api/library-info");if(r.ok)libInfo=await r.json();}catch(e){}}
 function fechaCorta(ts){return ts?new Date(ts*1000).toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric"}):"—";}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
@@ -2084,8 +2099,9 @@ function renderLibrary(){
   const total=(content.items||[]).length;
   reconstruirFiltrosOrg();
   const lista=filtrarOrdenar(content.items||[],libInfo,libFiltro);
-  const existentes=new Set((content.items||[]).map(i=>i.id));
-  libSel.forEach(id=>{if(!existentes.has(id))libSel.delete(id);});
+  // Lo que el filtro oculta (o ya no existe) no cuenta como seleccionado ni se manda.
+  const visibles=new Set(lista.map(i=>i.id));
+  libSel.forEach(id=>{if(!visibles.has(id))libSel.delete(id);});
   actualizarSeleccion();
   document.getElementById("lib-count").textContent=lista.length===total?total:lista.length+" de "+total;
   if(!lista.length){grid.innerHTML='<div class="empty-state" style="grid-column:1/-1">'+(total?"Nada coincide con el filtro":"Sin archivos")+'</div>';return;}
@@ -2118,14 +2134,15 @@ function reconstruirFiltrosOrg(){
   if(!sel||!caja) return;
   const l=listasDeOrganizacion(content.items||[]);
   const hay=(lista,v)=>lista.find(x=>normalizarTexto(x)===normalizarTexto(v));
-  if(libFiltro.carpeta!=="todas"&&libFiltro.carpeta!=="__sin__"){
-    libFiltro.carpeta=hay(l.carpetas,libFiltro.carpeta)||"todas";
-  }
+  if(String(libFiltro.carpeta).slice(0,2)==="c:"){
+    const h=hay(l.carpetas,libFiltro.carpeta.slice(2));
+    libFiltro.carpeta=h?"c:"+h:"all";
+  }else if(libFiltro.carpeta!=="none") libFiltro.carpeta="all";
   libFiltro.etiquetas=libFiltro.etiquetas.map(t=>hay(l.etiquetas,t)).filter(Boolean);
   sel.innerHTML="";
   const op=(v,t)=>{const o=document.createElement("option");o.value=v;o.textContent=t;sel.appendChild(o);};
-  op("todas","Todas las carpetas"); op("__sin__","Sin carpeta");
-  l.carpetas.forEach(c=>op(c,c));
+  op("all","Todas las carpetas"); op("none","Sin carpeta");
+  l.carpetas.forEach(c=>op("c:"+c,c));
   sel.value=libFiltro.carpeta;
   caja.innerHTML="";
   l.etiquetas.forEach(t=>{
@@ -2145,13 +2162,38 @@ async function organizar(cuerpo){
     r=await fetch("/api/organize",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cuerpo)});
     try{j=await r.json();}catch(e){}
   }catch(e){toast("No se pudo conectar con el servidor",true);return false;}
-  if(!r.ok||!j.ok){toast(j.error||"No se pudo organizar",true);return false;}
+  if(!r.ok||!j.ok){
+    organizar.error=j.error||"";
+    toast(j.error||"No se pudo organizar",true);
+    if(r.status===404) await loadAll();
+    return false;
+  }
   await loadAll();
   return true;
 }
-function cerrarOrg(){const d=document.getElementById("mp-dlg");if(d)d.remove();}
+// Un 404 «No existe el archivo X» quita X de la lista de ids del diálogo abierto.
+// Devuelve "vacio" si no queda ninguno, "quitado" si quedaron otros, null si no aplica.
+function quitarInexistente(ids,msg){
+  const m=/^No existe el archivo (.+)$/.exec(msg||"");
+  if(!m) return null;
+  const i=ids.indexOf(m[1]); if(i===-1) return null;
+  ids.splice(i,1);
+  return ids.length?"quitado":"vacio";
+}
+let _escMp=null;
+function cerrarOrg(){
+  const d=document.getElementById("mp-dlg");if(d)d.remove();
+  if(_escMp){document.removeEventListener("keydown",_escMp);_escMp=null;}
+}
+// Esc cierra el diálogo abierto (Mandar y Organizar).
+function escCierraDialogo(){
+  _escMp=e=>{if(e.key==="Escape")cerrarOrg();};
+  document.addEventListener("keydown",_escMp);
+}
+function tituloArchivos(pref,ids,suf){return pref+ids.length+(ids.length===1?" archivo":" archivos")+suf;}
 // Diálogo pequeño con el estilo de #mp-dlg. onOk(): promesa que devuelve true si se cierra.
-function dialogoOrg(titulo,cuerpo,textoOk,onOk){
+// habilitado(): opcional; si devuelve false, el botón queda deshabilitado.
+function dialogoOrg(titulo,cuerpo,textoOk,onOk,habilitado){
   cerrarOrg();
   const dlg=document.createElement("div");dlg.id="mp-dlg";
   const box=document.createElement("div");box.className="mp-box";
@@ -2164,43 +2206,71 @@ function dialogoOrg(titulo,cuerpo,textoOk,onOk){
   dlg.onclick=e=>{if(e.target===dlg)cerrarOrg();};
   pie.querySelector(".mp-cancel").onclick=cerrarOrg;
   const ok=pie.querySelector(".mp-enviar");
-  const lanzar=async()=>{ok.disabled=true;const hecho=await onOk();if(hecho)cerrarOrg();else ok.disabled=false;};
+  let enviando=false;
+  const refrescar=()=>{ok.disabled=enviando||(habilitado?!habilitado():false);};
+  const lanzar=async()=>{
+    if(enviando) return;
+    enviando=true;refrescar();
+    let hecho=false;
+    try{hecho=await onOk();}finally{enviando=false;}
+    if(hecho){if(dlg.isConnected)cerrarOrg();}else refrescar();
+  };
   ok.onclick=lanzar;
-  return {dlg,lanzar};
+  escCierraDialogo();
+  refrescar();
+  return {dlg,lanzar,refrescar,titulo:t};
 }
-function cuerpoCarpeta(actual){
+// pedir=true: arranca en «Elige carpeta…» (deshabilitada) y valor() da undefined hasta elegir.
+function cuerpoCarpeta(actual,pedir){
   const l=listasDeOrganizacion(content.items||[]);
   const w=document.createElement("div");
   w.innerHTML='<select class="org-sel"></select><input type="text" class="org-txt" maxlength="40" placeholder="Nombre de la carpeta" style="display:none">';
   const sel=w.querySelector(".org-sel"), txt=w.querySelector(".org-txt");
   const op=(v,t)=>{const o=document.createElement("option");o.value=v;o.textContent=t;sel.appendChild(o);};
-  op("__sin__","Sin carpeta");
+  if(pedir){
+    const p=document.createElement("option");p.value="ph";p.textContent="Elige carpeta…";p.disabled=true;sel.appendChild(p);
+  }
+  op("none","Sin carpeta");
   l.carpetas.forEach(c=>op("c:"+c,c));
-  op("__nueva__","Nueva carpeta…");
-  sel.value=actual?"c:"+actual:"__sin__";
-  if(!sel.value) sel.value="__sin__";
-  sel.onchange=()=>{txt.style.display=sel.value==="__nueva__"?"":"none";if(sel.value==="__nueva__")txt.focus();};
-  // null = sin carpeta, texto = carpeta, undefined = falta el nombre
+  op("new","Nueva carpeta…");
+  sel.value=pedir?"ph":(actual?"c:"+actual:"none");
+  if(!sel.value) sel.value=pedir?"ph":"none";
+  sel.addEventListener("change",()=>{txt.style.display=sel.value==="new"?"":"none";if(sel.value==="new")txt.focus();});
+  // null = sin carpeta, texto = carpeta, undefined = falta elegir o el nombre
   w.valor=()=>{
-    if(sel.value==="__sin__") return null;
-    if(sel.value==="__nueva__"){const n=txt.value.trim();return n?n:undefined;}
+    if(sel.value==="ph") return undefined;
+    if(sel.value==="none") return null;
+    if(sel.value==="new"){const n=txt.value.trim();return n?n:undefined;}
     return sel.value.slice(2);
   };
   w.txt=txt;
   return w;
 }
+// Tras un 404 de organizar(): quita el archivo que ya no existe del diálogo.
+// Devuelve true si el diálogo debe cerrarse (se quedó sin archivos).
+function avisarInexistente(ids,d){
+  const q=quitarInexistente(ids,organizar.error);
+  if(q==="vacio"){toast("Esos archivos ya no existen",true);return true;}
+  if(q==="quitado"&&d&&d.titulo){d.titulo.textContent=d.titulo.textContent.replace(/\d+ archivos?/,ids.length+(ids.length===1?" archivo":" archivos"));}
+  return false;
+}
 function abrirDialogoCarpeta(ids){
   ids=(ids||[]).filter(Boolean); if(!ids.length) return;
-  const cuerpo=cuerpoCarpeta("");
+  ids=ids.slice();
+  const cuerpo=cuerpoCarpeta("",true);
   cuerpo.style.margin="10px 0";
-  const d=dialogoOrg("Poner "+ids.length+(ids.length===1?" archivo":" archivos")+" en una carpeta",cuerpo,"Aplicar",async()=>{
+  const d=dialogoOrg(tituloArchivos("Poner ",ids," en una carpeta"),cuerpo,"Aplicar",async()=>{
     const v=cuerpo.valor();
-    if(v===undefined){toast("Escribe el nombre de la carpeta",true);return false;}
+    if(v===undefined){toast("Elige una carpeta o escribe su nombre",true);return false;}
     const ok=await organizar({ids,folder:v});
-    if(ok){libSel.clear();renderLibrary();toast(v===null?"Quitado de la carpeta":"Puesto en «"+v+"»");}
-    return ok;
-  });
+    if(ok){libSel.clear();renderLibrary();toast(v===null?"Quitado de la carpeta":"Puesto en «"+v+"»");return true;}
+    return avisarInexistente(ids,d);
+  },()=>cuerpo.valor()!==undefined);
+  const sel=cuerpo.querySelector(".org-sel");
+  sel.addEventListener("change",d.refrescar);
+  cuerpo.txt.addEventListener("input",d.refrescar);
   cuerpo.txt.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();d.lanzar();}};
+  sel.focus();
 }
 function abrirDialogoEtiqueta(ids){
   ids=(ids||[]).filter(Boolean); if(!ids.length) return;
@@ -2210,12 +2280,13 @@ function abrirDialogoEtiqueta(ids){
   const dl=w.querySelector("datalist");
   l.etiquetas.forEach(t=>{const o=document.createElement("option");o.value=t;dl.appendChild(o);});
   const txt=w.querySelector(".org-txt");
-  const d=dialogoOrg("Añadir etiqueta a "+ids.length+(ids.length===1?" archivo":" archivos"),w,"Añadir",async()=>{
+  ids=ids.slice();
+  const d=dialogoOrg(tituloArchivos("Añadir etiqueta a ",ids,""),w,"Añadir",async()=>{
     const t=txt.value.trim();
     if(!t){toast("Escribe la etiqueta",true);return false;}
     const ok=await organizar({ids,addTags:[t]});
-    if(ok){libSel.clear();renderLibrary();toast("Etiqueta «"+t+"» añadida");}
-    return ok;
+    if(ok){libSel.clear();renderLibrary();toast("Etiqueta «"+t+"» añadida");return true;}
+    return avisarInexistente(ids,d);
   });
   txt.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();d.lanzar();}};
   txt.focus();
@@ -2233,7 +2304,7 @@ function pintarOrgFicha(f,it){
     if(await organizar({ids:[it.id],folder:v})){toast(v===null?"Sin carpeta":"Carpeta: "+v);abrirFicha(it.id);}
   };
   const sel=cuerpo.querySelector(".org-sel");
-  sel.addEventListener("change",()=>{if(sel.value!=="__nueva__")guardarCarpeta();});
+  sel.addEventListener("change",()=>{if(sel.value!=="new")guardarCarpeta();});
   cuerpo.txt.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();guardarCarpeta();}};
   const chips=caja.querySelector(".fi-chips");
   (Array.isArray(it.tags)?it.tags:[]).forEach(t=>{
@@ -2250,7 +2321,10 @@ function pintarOrgFicha(f,it){
     const t=inp.value.trim(); if(!t) return;
     inp.disabled=true;
     const ok=await organizar({ids:[it.id],addTags:[t]});
-    if(ok)abrirFicha(it.id);else inp.disabled=false;
+    if(ok){
+      abrirFicha(it.id);
+      const n=document.querySelector("#lib-ficha .fi-tag-in"); if(n) n.focus();
+    }else{inp.disabled=false;inp.focus();}
   };
 }
 // ── fin de carpetas y etiquetas
@@ -2318,11 +2392,15 @@ function actualizarSeleccion(){
   grid.classList.toggle("haysel",n>0);
   document.getElementById("lib-seln").textContent=n+(n===1?" seleccionado":" seleccionados");
 }
-function cerrarMandar(){const d=document.getElementById("mp-dlg");if(d)d.remove();}
-function abrirMandar(ids){
+function cerrarMandar(){cerrarOrg();}
+// desdeBarra: el envío sale de la selección múltiple (solo entonces se vacía tras enviar).
+function abrirMandar(ids,desdeBarra){
   cerrarMandar();
   ids=(ids||[]).filter(Boolean); if(!ids.length) return;
-  const pants=Object.entries(regScreens||{}).filter(([k])=>k!=="admin");
+  // Pantallas del registro y las creadas a mano (solo en content.screens).
+  const sids=new Set([...Object.keys(regScreens||{}),...Object.keys(content.screens||{})]);
+  sids.delete("admin");
+  const pants=Array.from(sids).map(k=>[k,(regScreens||{})[k]||null]);
   const dlg=document.createElement("div");dlg.id="mp-dlg";
   const titulo="Mandar "+ids.length+(ids.length===1?" archivo":" archivos")+" a pantallas";
   const cuerpo=pants.length
@@ -2333,9 +2411,11 @@ function abrirMandar(ids){
   dlg.innerHTML=`<div class="mp-box"><strong style="font-size:15px">${esc(titulo)}</strong>${cuerpo}
     <div class="mp-pie"><button class="btn btn-ghost btn-sm mp-cancel">Cancelar</button>${pants.length?'<button class="btn btn-accent btn-sm mp-enviar" disabled>Mandar</button>':""}</div></div>`;
   document.body.appendChild(dlg);
+  escCierraDialogo();
   dlg.onclick=e=>{if(e.target===dlg)cerrarMandar();};
   dlg.querySelector(".mp-cancel").onclick=cerrarMandar;
   if(!pants.length) return;
+  let enviando=false;
   const lista=dlg.querySelector(".mp-lista"), btn=dlg.querySelector(".mp-enviar");
   pants.forEach(([sid,s])=>{
     const l=document.createElement("label");
@@ -2344,27 +2424,38 @@ function abrirMandar(ids){
     lista.appendChild(l);
   });
   const marcadas=()=>Array.from(lista.querySelectorAll(".mp-chk")).filter(c=>c.checked).map(c=>c.dataset.sid);
-  const refrescar=()=>{btn.disabled=marcadas().length===0;};
+  const refrescar=()=>{btn.disabled=enviando||marcadas().length===0;};
   lista.onchange=refrescar;
   dlg.querySelector(".mp-todas").onclick=e=>{e.preventDefault();lista.querySelectorAll(".mp-chk").forEach(c=>c.checked=true);refrescar();};
   btn.onclick=async()=>{
     const dur=duracionValida(dlg.querySelector(".mp-dur").value);
     if(dur===null){toast("Duración no válida (1 a 3600 s)",true);return;}
-    const screens=marcadas(); if(!screens.length) return;
-    btn.disabled=true;
+    const screens=marcadas(); if(!screens.length||enviando) return;
+    enviando=true;refrescar();
     let r,j={};
     try{
       r=await fetch("/api/send-to-screens",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ids,screens,duration:dur})});
       try{j=await r.json();}catch(e){}
-    }catch(e){toast("No se pudo conectar con el servidor",true);refrescar();return;}
-    if(!r.ok||!j.ok){toast(j.error||"No se pudo mandar",true);refrescar();return;}
-    cerrarMandar();libSel.clear();
+    }catch(e){enviando=false;toast("No se pudo conectar con el servidor",true);refrescar();return;}
+    enviando=false;
+    if(!r.ok||!j.ok){
+      toast(j.error||"No se pudo mandar",true);
+      const q=quitarInexistente(ids,j.error);
+      if(q){
+        await loadAll();
+        if(q==="vacio"){if(dlg.isConnected)cerrarMandar();return;}
+        const tt=dlg.querySelector("strong"); if(tt) tt.textContent=tituloArchivos("Mandar ",ids," a pantallas");
+      }
+      refrescar();return;
+    }
+    if(dlg.isConnected)cerrarMandar();
+    if(desdeBarra)libSel.clear();
     await loadAll();toast(mensajeEnvio(j));
   };
 }
 document.addEventListener("DOMContentLoaded",()=>{
   const m=document.getElementById("lib-sel-mandar"),q=document.getElementById("lib-sel-quitar");
-  if(m)m.onclick=()=>abrirMandar(Array.from(libSel));
+  if(m)m.onclick=()=>abrirMandar(Array.from(libSel),true);
   if(q)q.onclick=()=>{libSel.clear();renderLibrary();};
   const c=document.getElementById("lib-sel-carpeta"),e=document.getElementById("lib-sel-etiqueta");
   if(c)c.onclick=()=>abrirDialogoCarpeta(Array.from(libSel));

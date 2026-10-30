@@ -52,7 +52,8 @@ def main():
             {"id": A, "type": "image", "name": "a.png", "src": "/uploads/" + A},
             {"id": B, "type": "image", "name": "b.png", "src": "/uploads/" + B},
             {"id": V, "type": "video", "name": "v.mp4", "src": "/uploads/" + V}],
-          "screens": {"s1": {"mode": "independent", "playlist": [{"id": A, "duration": 10}]}},
+          "screens": {"s1": {"mode": "independent", "playlist": [{"id": A, "duration": 10}]},
+                      "manual": {"mode": "independent", "playlist": []}},
           "rev": 0}, open(os.path.join(work, "content.json"), "w"))
         json.dump({"s1": {"name": "Centro"}, "s2": {"name": "Norte"}, "s3": {"name": "Sur"}},
                   open(os.path.join(work, "screens.json"), "w"))
@@ -87,6 +88,11 @@ def main():
         fallos += comprobar("s3 creada independent",
                             cod == 200 and c["screens"].get("s3", {}).get("mode") == "independent"
                             and ids(c["screens"]["s3"]["playlist"]) == [A], str(c["screens"].get("s3")))
+        # 3b. pantalla creada a mano: solo está en content["screens"], no en screens.json
+        cod, r = enviar({"ids": [B], "screens": ["manual"]})
+        _, c = peticion("GET", "/api/content")
+        fallos += comprobar("pantalla solo en content -> 200",
+                            cod == 200 and r.get("added") == 1 and ids(c["screens"]["manual"]["playlist"]) == [B], f"{cod} {r}")
         # 4. repetir
         _, rev0 = peticion("GET", "/api/content")
         cod, r = enviar({"ids": [A, B], "screens": ["s1", "s2"]})

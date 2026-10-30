@@ -1483,6 +1483,11 @@ def _clave_nombre(s):
     s = unicodedata.normalize("NFD", str(s).strip().lower())
     return "".join(c for c in s if not unicodedata.combining(c))
 
+def _lista_tags(it):
+    """Las etiquetas de un item como lista; si 'tags' no es una lista, vacío."""
+    t = it.get("tags")
+    return list(t) if isinstance(t, list) else []
+
 class DestinoNoExiste(Exception):
     """Archivo o pantalla inexistente: aborta sin guardar; lleva el mensaje para el 404."""
 
@@ -2860,10 +2865,11 @@ class Handler(BaseHTTPRequestHandler):
                         for iid in ids:
                             if iid not in por_id:
                                 raise DestinoNoExiste(f"No existe el archivo {iid}")
-                        for sid in pantallas:
-                            if sid not in registro:
-                                raise DestinoNoExiste(f"No existe la pantalla {sid}")
                         scr_all = content.setdefault("screens", {})
+                        # Vale una pantalla del registro o una creada a mano (solo en content).
+                        for sid in pantallas:
+                            if sid not in registro and sid not in scr_all:
+                                raise DestinoNoExiste(f"No existe la pantalla {sid}")
                         for sid in pantallas:
                             scr = scr_all.get(sid)
                             if not isinstance(scr, dict):
@@ -2918,7 +2924,12 @@ class Handler(BaseHTTPRequestHandler):
                 alta = [t.strip() for t in (alta or [])]
                 if any(not 1 <= len(t) <= 30 for t in alta):
                     malo("Etiqueta no válida (1 a 30 caracteres)"); return
-                alta = list({_clave_nombre(t): t for t in reversed(alta)}.values())[::-1]
+                # Sin repetidas: manda la primera aparición y se conserva el orden.
+                vistas = set(); sin_rep = []
+                for t in alta:
+                    k = _clave_nombre(t)
+                    if k not in vistas: vistas.add(k); sin_rep.append(t)
+                alta = sin_rep
                 if len(alta) > 10:
                     malo("Máximo 10 etiquetas por archivo"); return
                 quitar = {_clave_nombre(t) for t in (baja or [])}
@@ -2936,7 +2947,7 @@ class Handler(BaseHTTPRequestHandler):
                         for it in items:
                             if isinstance(it.get("folder"), str):
                                 carpetas.setdefault(_clave_nombre(it["folder"]), it["folder"])
-                            for t in it.get("tags") or []:
+                            for t in _lista_tags(it):
                                 if isinstance(t, str):
                                     etiquetas.setdefault(_clave_nombre(t), t)
                         if isinstance(carpeta, str):
@@ -2944,21 +2955,24 @@ class Handler(BaseHTTPRequestHandler):
                         alta = [etiquetas.get(_clave_nombre(t), t) for t in alta]
                         for iid in ids:
                             it = por_id[iid]
-                            antes = (it.get("folder"), list(it.get("tags") or []))
+                            previas = _lista_tags(it)
+                            antes = (it.get("folder"), list(previas))
                             if hay_carpeta:
                                 if carpeta is None: it.pop("folder", None)
                                 else: it["folder"] = carpeta
-                            tags = [t for t in (it.get("tags") or [])
+                            tags = [t for t in previas
                                     if isinstance(t, str) and _clave_nombre(t) not in quitar]
                             claves = {_clave_nombre(t) for t in tags}
                             for t in alta:
                                 if _clave_nombre(t) not in claves:
                                     tags.append(t); claves.add(_clave_nombre(t))
-                            if len(tags) > 10:
+                            # Solo se rechaza si pasa de 10 Y crece: quitar etiquetas o
+                            # tocar la carpeta de uno que ya tenía de más debe poder.
+                            if len(tags) > 10 and len(tags) > len(previas):
                                 raise EtiquetasDeMas()
                             if tags: it["tags"] = tags
                             else: it.pop("tags", None)
-                            if (it.get("folder"), list(it.get("tags") or [])) != antes:
+                            if (it.get("folder"), _lista_tags(it)) != antes:
                                 cambiados += 1
                         if cambiados == 0:
                             # Nada cambió: se sale por excepción para no guardar

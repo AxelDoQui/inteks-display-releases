@@ -41,19 +41,24 @@ def main():
     work = tempfile.mkdtemp(prefix="signalos_organizar_")
     proc = None
     A, B, C, D = "0001_a.png", "0002_b.png", "0003_c.png", "0004_d.png"
+    E, F, G = "0005_e.png", "0006_f.png", "0007_g.png"
     try:
         for f in ("server.py", "index.html", "admin.html", "login.html",
                   "player.html", "pair.html", "sw.js", "config.json"):
             shutil.copy2(os.path.join(SRC, f), work)
         json.dump({"api_token": TOKEN, "secret": "s" * 64}, open(os.path.join(work, "admin.json"), "w"))
         up = os.path.join(work, "uploads"); os.makedirs(up, exist_ok=True)
-        for n in (A, B, C, D): open(os.path.join(up, n), "wb").write(PNG)
+        for n in (A, B, C, D, E, F, G): open(os.path.join(up, n), "wb").write(PNG)
         json.dump({"items": [
             {"id": A, "type": "image", "name": "a.png", "src": "/uploads/" + A},
             {"id": B, "type": "image", "name": "b.png", "src": "/uploads/" + B},
             {"id": C, "type": "image", "name": "c.png", "src": "/uploads/" + C},
             {"id": D, "type": "image", "name": "d.png", "src": "/uploads/" + D,
-             "folder": "Verano", "tags": ["Oferta"]}],
+             "folder": "Verano", "tags": ["Oferta"]},
+            {"id": E, "type": "image", "name": "e.png", "src": "/uploads/" + E,
+             "tags": [f"t{i}" for i in range(11)]},
+            {"id": F, "type": "image", "name": "f.png", "src": "/uploads/" + F, "tags": "abc"},
+            {"id": G, "type": "image", "name": "g.png", "src": "/uploads/" + G}],
           "screens": {}, "rev": 0}, open(os.path.join(work, "content.json"), "w"))
         json.dump({}, open(os.path.join(work, "screens.json"), "w"))
         proc = subprocess.Popen([sys.executable, os.path.join(work, "server.py"), "--port", str(PORT)],
@@ -126,6 +131,28 @@ def main():
         cod, r = organizar({"ids": [C], "addTags": ["v1", "v2", "v3"]})
         fallos += comprobar("acumular >10 -> 400 sin tocar",
                             cod == 400 and r.get("error") == "Máximo 10 etiquetas por archivo" and contenido() == antes, f"{cod} {r}")
+        # M1. dedupe de addTags: manda la primera aparición y se conserva el orden
+        cod, r = organizar({"ids": [G], "addTags": ["a", "B", "A"]})
+        fallos += comprobar("dedupe addTags -> ['a','B']",
+                            cod == 200 and item(contenido(), G).get("tags") == ["a", "B"], str(item(contenido(), G).get("tags")))
+        organizar({"ids": [G], "removeTags": ["a", "B"]})
+        # M2. un archivo con más de 10 etiquetas puede perderlas o cambiar de carpeta
+        cod, r = organizar({"ids": [E], "folder": "Grande"})
+        fallos += comprobar("carpeta a un item con 11 etiquetas -> 200",
+                            cod == 200 and r.get("changed") == 1 and len(item(contenido(), E)["tags"]) == 11, f"{cod} {r}")
+        cod, r = organizar({"ids": [E], "removeTags": ["t0"]})
+        fallos += comprobar("quitar etiqueta a uno con 11 -> 200, quedan 10",
+                            cod == 200 and len(item(contenido(), E)["tags"]) == 10, f"{cod} {r}")
+        antes = contenido()
+        cod, r = organizar({"ids": [E], "addTags": ["extra"]})
+        fallos += comprobar("pasar de 10 a 11 -> 400 sin tocar", cod == 400 and contenido() == antes, f"{cod} {r}")
+        # M3. tags que no es lista = vacío (no se itera por caracteres)
+        cod, r = organizar({"ids": [G], "addTags": ["B"]})
+        fallos += comprobar("tags en cadena no inventa etiquetas",
+                            cod == 200 and item(contenido(), G).get("tags") == ["B"], str(item(contenido(), G).get("tags")))
+        cod, r = organizar({"ids": [F], "addTags": ["x"]})
+        fallos += comprobar("tags 'abc' + x -> ['x']",
+                            cod == 200 and item(contenido(), F).get("tags") == ["x"], str(item(contenido(), F).get("tags")))
         # 9. sin token
         cod, _ = organizar({"ids": [A], "folder": "X"}, con_token=False)
         fallos += comprobar("sin token -> 401", cod == 401, str(cod))

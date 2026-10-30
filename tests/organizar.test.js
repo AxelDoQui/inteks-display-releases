@@ -34,15 +34,27 @@ const ids = (opc) => Array.from(cargar().filtrarOrdenar(items, {}, { orden: "nom
 
 test("sin filtro de carpeta: todo", () => {
   assert.deepStrictEqual(ids({}), ["a", "b", "c", "d"]);
-  assert.deepStrictEqual(ids({ carpeta: "todas" }), ["a", "b", "c", "d"]);
+  assert.deepStrictEqual(ids({ carpeta: "all" }), ["a", "b", "c", "d"]);
 });
 test("filtra por carpeta sin fijarse en acentos ni mayúsculas", () => {
-  assert.deepStrictEqual(ids({ carpeta: "verano" }), ["a"]);
-  assert.deepStrictEqual(ids({ carpeta: "ANO NUEVO" }), ["d"]);
-  assert.deepStrictEqual(ids({ carpeta: "Tienda & Cía" }), ["b"]);
+  assert.deepStrictEqual(ids({ carpeta: "c:verano" }), ["a"]);
+  assert.deepStrictEqual(ids({ carpeta: "c:ANO NUEVO" }), ["d"]);
+  assert.deepStrictEqual(ids({ carpeta: "c:Tienda & Cía" }), ["b"]);
 });
-test("__sin__ deja los que no tienen carpeta", () => {
-  assert.deepStrictEqual(ids({ carpeta: "__sin__" }), ["c"]);
+test("none deja los que no tienen carpeta", () => {
+  assert.deepStrictEqual(ids({ carpeta: "none" }), ["c"]);
+});
+test("una carpeta llamada «todas» o «__sin__» no choca con los valores especiales", () => {
+  const raros = [
+    { id: "x", type: "image", name: "x", folder: "todas" },
+    { id: "y", type: "image", name: "y", folder: "__sin__" },
+    { id: "z", type: "image", name: "z" },
+  ];
+  const f = (carpeta) => Array.from(cargar().filtrarOrdenar(raros, {}, { orden: "nombre", carpeta }), (i) => i.id).sort();
+  assert.deepStrictEqual(f("c:todas"), ["x"]);
+  assert.deepStrictEqual(f("c:__sin__"), ["y"]);
+  assert.deepStrictEqual(f("none"), ["z"]);
+  assert.deepStrictEqual(f("all"), ["x", "y", "z"]);
 });
 test("filtra por una y por dos etiquetas (todas)", () => {
   assert.deepStrictEqual(ids({ etiquetas: ["oferta"] }), ["a", "b"]);
@@ -56,8 +68,8 @@ test("el texto también busca en carpeta y etiquetas", () => {
   assert.deepStrictEqual(ids({ texto: "tres" }), ["c"]);
 });
 test("combina carpeta, etiqueta y tipo", () => {
-  assert.deepStrictEqual(ids({ carpeta: "verano", etiquetas: ["oferta"], tipo: "image" }), ["a"]);
-  assert.deepStrictEqual(ids({ carpeta: "verano", tipo: "video" }), []);
+  assert.deepStrictEqual(ids({ carpeta: "c:verano", etiquetas: ["oferta"], tipo: "image" }), ["a"]);
+  assert.deepStrictEqual(ids({ carpeta: "c:verano", tipo: "video" }), []);
 });
 test("listasDeOrganizacion: únicas y ordenadas en español", () => {
   const l = cargar().listasDeOrganizacion([
