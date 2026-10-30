@@ -1946,6 +1946,39 @@ async function deleteItem(id,e){
   await fetch("/api/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
   await loadAll();toast("Eliminado");
 }
+// ── Librería: filtrar y ordenar
+function normalizarTexto(s){
+  return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+}
+function formatoTamano(b){
+  if(typeof b!=="number"||!isFinite(b)) return "";
+  if(b<1024) return b+" B";
+  const u=["KB","MB","GB"]; let v=b/1024, i=0;
+  while(v>=1024&&i<u.length-1){v/=1024;i++;}
+  const t=(v>=10||Math.abs(v-Math.round(v))<0.05)?String(Math.round(v)):v.toFixed(1).replace(".",",");
+  return t+" "+u[i];
+}
+function filtrarOrdenar(items,info,opc){
+  const o=opc||{}, texto=normalizarTexto(o.texto), tipo=o.tipo||"todos", orden=o.orden||"nuevos";
+  const dato=id=>(info&&info[id])||{};
+  let r=(items||[]).filter(it=>{
+    if(texto&&normalizarTexto(it.name).indexOf(texto)===-1) return false;
+    if(tipo==="image"||tipo==="video") return it.type===tipo;
+    if(tipo==="otros") return it.type!=="image"&&it.type!=="video";
+    return true;
+  });
+  const porNombre=(a,b)=>normalizarTexto(a.name).localeCompare(normalizarTexto(b.name),"es");
+  const num=(v)=>typeof v==="number"?v:-1;
+  r=r.slice().sort((a,b)=>{
+    let d=0;
+    if(orden==="nuevos") d=num(dato(b.id).created)-num(dato(a.id).created);
+    else if(orden==="tamano") d=num(dato(b.id).size)-num(dato(a.id).size);
+    else if(orden==="usados") d=((dato(b.id).uses||[]).length)-((dato(a.id).uses||[]).length);
+    return d!==0?d:porNombre(a,b);
+  });
+  return r;
+}
+// ── fin de filtrar y ordenar
 function renderLibrary(){
   const grid=document.getElementById("lib-grid");
   const items=content.items||[];
