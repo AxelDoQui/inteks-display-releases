@@ -1098,8 +1098,10 @@ function reportarAhora(item){
   try{
     if(!item||(typeof PREVIEW!=="undefined"&&PREVIEW)) return;
     const nombre=item.name||item.title||(item.src?decodeURIComponent(String(item.src).split("/").pop().split("?")[0]):"")||item.type||"";
+    const datos={screen:SCREEN_ID,id:String(item.id||""),name:String(nombre),type:String(item.type||"image")};
+    try{ if(window.InTeksApp&&typeof window.InTeksApp.version==="function") datos.apk=String(window.InTeksApp.version()||""); }catch(e){}
     fetch("/api/screen-now",{method:"POST",headers:{"Content-Type":"application/json"},keepalive:true,
-      body:JSON.stringify({screen:SCREEN_ID,id:String(item.id||""),name:String(nombre),type:String(item.type||"image")})}).catch(()=>{});
+      body:JSON.stringify(datos)}).catch(()=>{});
   }catch(e){}
 }
 

@@ -2506,6 +2506,10 @@ class Handler(BaseHTTPRequestHandler):
                     "type": str(d.get("type", "") or "")[:20],
                     "at": time.time(),
                 }
+                # Versión del APK de la caja (solo la manda el reproductor dentro del APK).
+                apk = str(d.get("apk", "") or "")[:20]
+                if apk:
+                    ahora_pantalla[sid]["apk"] = apk
                 jresp(200, {"ok": True}); return
             except Exception as e: err(e)
             return

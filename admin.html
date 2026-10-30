@@ -1571,15 +1571,37 @@ async function duplicarPantalla(sid){
   toast(`«${nombre}» creada como copia de «${sid}» ✓`);
 }
 
+// ── APK de la caja
+// Etiqueta de la versión del APK que manda la pantalla. Sin dato (navegador o
+// APK anterior): null. Si difiere de la del servidor, aviso (no se asume cuál es más vieja).
+function estadoApk(apk, servidor){
+  const a=String(apk==null?"":apk).trim();
+  if(!a) return null;
+  const s=String(servidor==null?"":servidor).trim();
+  if(!s||a===s) return {texto:"APK "+a, aviso:false};
+  return {texto:"APK antiguo: "+a+" (servidor "+s+")", aviso:true};
+}
+// ── fin de APK de la caja
+let versionServidor="";
+function cargarVersionServidor(){
+  fetch("/api/info",{cache:"no-store"}).then(r=>r.json()).then(i=>{ versionServidor=String((i&&i.version)||""); }).catch(()=>{});
+}
+
 // ── Screens
 // «▶ Ahora: …» de una pantalla. Solo si está en línea y el aviso es reciente
 // (el reproductor avisa en cada cambio de diapositiva): un dato viejo
 // engañaría más que no decir nada.
+function etiquetaApk(apk){
+  const e=estadoApk(apk,versionServidor);
+  if(!e) return "";
+  const t=String(e.texto).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  return `<div class="sc-apk" style="font-size:11px;margin-bottom:6px;color:${e.aviso?'#f0a050':'var(--muted)'}"><i class="fa-brands fa-android"></i> ${t}</div>`;
+}
 function textoAhora(reg){
   const n=reg&&reg.now;
   if(!n||!reg.connected||!n.name||(Date.now()/1000-(n.at||0))>300) return "";
   const t=String(n.name).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  return `<div class="sc-now" style="font-size:11px;color:var(--a2);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${t}"><i class="fa-solid fa-play"></i> Ahora: ${t}</div>`;
+  return `<div class="sc-now" style="font-size:11px;color:var(--a2);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${t}"><i class="fa-solid fa-play"></i> Ahora: ${t}</div>`+etiquetaApk(n.apk);
 }
 
 function renderScreens(){
@@ -4760,6 +4782,7 @@ loadSettings();
 loadPairInfo();
 loadPairPending();
 connectSSE();
+cargarVersionServidor();
 loadAll();
 setInterval(async()=>{
   await loadScreens();

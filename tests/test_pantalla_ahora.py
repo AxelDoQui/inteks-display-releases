@@ -80,6 +80,20 @@ def main():
         fallos += comprobar("un nombre enorme se recorta", len(ahora["name"]) <= 80, str(len(ahora["name"])))
         fallos += comprobar("tipos raros no rompen nada", isinstance(ahora["type"], str) and isinstance(ahora["id"], str))
 
+        # Versión del APK de la caja: se guarda, se recorta y es opcional.
+        llamar("/api/screen-now", {"screen": "TV", "name": "a", "apk": "1.0.40"})
+        _, pantallas = llamar("/api/screens", token=TOKEN)
+        fallos += comprobar("apk se guarda y llega al panel", pantallas["TV"]["now"].get("apk") == "1.0.40", str(pantallas["TV"]["now"]))
+        llamar("/api/screen-now", {"screen": "TV", "name": "a", "apk": "9" * 50})
+        _, pantallas = llamar("/api/screens", token=TOKEN)
+        fallos += comprobar("apk se recorta a 20", len(pantallas["TV"]["now"]["apk"]) == 20)
+        llamar("/api/screen-now", {"screen": "TV", "name": "b", "apk": ["raro"]})
+        _, pantallas = llamar("/api/screens", token=TOKEN)
+        fallos += comprobar("apk raro no rompe nada", isinstance(pantallas["TV"]["now"].get("apk", ""), str))
+        llamar("/api/screen-now", {"screen": "TV", "name": "c"})
+        _, pantallas = llamar("/api/screens", token=TOKEN)
+        fallos += comprobar("sin apk no rompe nada", pantallas["TV"]["now"]["name"] == "c" and not pantallas["TV"]["now"].get("apk"))
+
         cod, _ = llamar("/api/screen-now", ["no", "es", "un", "objeto"])
         fallos += comprobar("cuerpo que no es un objeto -> 400", cod == 400, str(cod))
     finally:

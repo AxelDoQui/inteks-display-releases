@@ -22,6 +22,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
   «Añadir etiqueta…» sobre los archivos marcados. La barra de la Librería filtra por
   carpeta («Sin carpeta» incluido) y por etiquetas, y el buscador también las encuentra.
 
+- **Versión del APK visible en el panel.** La tarjeta de cada pantalla muestra «APK 1.0.49»
+  junto al «Ahora»; si la caja lleva otra versión que el servidor, sale en ámbar
+  («APK antiguo: 1.0.40 (servidor 1.0.49)»). Sin dato (navegador o APK anterior) no sale nada.
+
 ## 1.0.49 — 2026-10-30
 
 ### Mejorado
