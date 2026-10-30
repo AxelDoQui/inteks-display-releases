@@ -1471,6 +1471,9 @@ class RevConflicto(Exception):
 class ArchivoNoExiste(Exception):
     """Se lanza dentro de contenido_en_edicion() para abortar sin guardar ni subir rev."""
 
+class DestinoNoExiste(Exception):
+    """Archivo o pantalla inexistente: aborta sin guardar; lleva el mensaje para el 404."""
+
 @contextlib.contextmanager
 def contenido_en_edicion():
     """Lee, deja modificar y guarda content.json sin soltar el lock en medio.
@@ -2814,6 +2817,55 @@ class Handler(BaseHTTPRequestHandler):
                 # cualquier cosa, sube su copia caducada encima.
                 notify_screen("admin")
                 ok({"updated_screens": updated_screens, "rows_count": len(rows)})
+            except Exception as e: err(e)
+            return
+
+        # ── Mandar archivos de la Librería a varias pantallas
+        if path == "/api/send-to-screens":
+            try:
+                try:
+                    d = json.loads(body)
+                except Exception:
+                    d = None
+                ids = d.get("ids") if isinstance(d, dict) else None
+                pantallas = d.get("screens") if isinstance(d, dict) else None
+                listas_ok = (isinstance(ids, list) and isinstance(pantallas, list)
+                             and 0 < len(ids) <= 200 and 0 < len(pantallas) <= 100
+                             and all(isinstance(x, str) and x for x in ids + pantallas))
+                if not listas_ok:
+                    jresp(400, {"ok": False, "error": "Elige al menos un archivo y una pantalla"}); return
+                dur = d.get("duration", 8)
+                if (isinstance(dur, bool) or not isinstance(dur, (int, float))
+                        or not (1 <= dur <= 3600)):
+                    jresp(400, {"ok": False, "error": "Duración no válida (1 a 3600 s)"}); return
+                ids = list(dict.fromkeys(ids)); pantallas = list(dict.fromkeys(pantallas))
+                registro = load_json(SCREENS_FILE)
+                if not isinstance(registro, dict): registro = {}
+                añadidos = saltados = 0
+                try:
+                    with contenido_en_edicion() as content:
+                        por_id = {i.get("id"): i for i in content.get("items", [])}
+                        for iid in ids:
+                            if iid not in por_id:
+                                raise DestinoNoExiste(f"No existe el archivo {iid}")
+                        for sid in pantallas:
+                            if sid not in registro:
+                                raise DestinoNoExiste(f"No existe la pantalla {sid}")
+                        scr_all = content.setdefault("screens", {})
+                        for sid in pantallas:
+                            scr = scr_all.get(sid)
+                            if not isinstance(scr, dict):
+                                scr = scr_all[sid] = {"mode": "independent", "playlist": []}
+                            pl = scr.setdefault("playlist", [])
+                            for iid in ids:
+                                if any(p.get("id") == iid for p in pl):
+                                    saltados += 1
+                                else:
+                                    pl.append({**por_id[iid], "duration": dur}); añadidos += 1
+                except DestinoNoExiste as e:
+                    jresp(404, {"ok": False, "error": str(e)}); return
+                if añadidos > 0: notify_all()
+                jresp(200, {"ok": True, "added": añadidos, "skipped": saltados})
             except Exception as e: err(e)
             return
 
