@@ -1100,6 +1100,13 @@ JPY  Yen        162.5"></textarea>
       </label>
       <p style="font-size:11px;color:var(--muted);margin-left:28px;margin-top:4px">Crea o quita de verdad la tarea programada de Windows — el estado que ves aquí es el real, consultado en cada carga. Necesita permisos de administrador para cambiarlo.</p>
     </div>
+    <div style="margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+        <input type="checkbox" id="set-pantalla-pc" style="cursor:pointer;width:18px;height:18px">
+        <span style="font-size:13px">Este PC reproduce en su propia pantalla (mini PC del televisor)</span>
+      </label>
+      <p style="font-size:11px;color:var(--muted);margin-left:28px;margin-top:4px">Si lo desmarcas y guardas, la pantalla a pantalla completa de este PC se cierra y deja de abrirse sola. <strong style="color:var(--text)">Si hay un televisor conectado a este PC, se quedará sin contenido.</strong> Al volver a marcarlo, reaparece en unos 5 minutos.</p>
+    </div>
   </div>
 
   <div class="card">
@@ -4844,6 +4851,7 @@ async function loadSettings(){
       document.getElementById("set-fallback").value=cfg.port_fallback||8081;
       document.getElementById("set-name").value=cfg.installation_name||"InTeks Display";
       document.getElementById("set-autostart").checked=!!cfg.autostart;
+      document.getElementById("set-pantalla-pc").checked=cfg.pantalla_pc!==false;
       document.getElementById("set-tg-token").value=cfg.telegram_token||"";
       document.getElementById("set-tg-chat").value=cfg.telegram_chat_id||"";
       document.getElementById("set-tg-min").value=cfg.alert_offline_min||15;
@@ -4958,6 +4966,7 @@ async function saveSettings(){
     port_fallback:parseInt(document.getElementById("set-fallback").value),
     installation_name:document.getElementById("set-name").value,
     autostart:document.getElementById("set-autostart").checked,
+    pantalla_pc:document.getElementById("set-pantalla-pc").checked,
     first_run:false
   };
   try{

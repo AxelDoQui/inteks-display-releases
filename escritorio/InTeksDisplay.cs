@@ -42,6 +42,32 @@ static class Programa
         Environment.Exit(1);
     }
 
+    // El ajuste «Este PC reproduce en su propia pantalla» del panel. Solo un
+    // `"pantalla_pc": false` explícito lo apaga: ausente, ilegible o cualquier
+    // otra cosa cuenta como activo, porque un error de lectura nunca debe dejar
+    // un televisor en negro.
+    public static bool LeerPantallaPc(string json)
+    {
+        try { return !Regex.IsMatch(json ?? "", "\"pantalla_pc\"\\s*:\\s*false"); }
+        catch { return true; }
+    }
+
+    // La misma config que lee Ventana.Puertos(): la de la carpeta de datos manda
+    // y la de junto al .exe es solo la plantilla del instalador.
+    public static bool PantallaActiva()
+    {
+        try
+        {
+            string cfg = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "InTeks Display", "config.json");
+            if (!File.Exists(cfg))
+                cfg = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
+            return LeerPantallaPc(File.ReadAllText(cfg));
+        }
+        catch { return true; }
+    }
+
     // Sin argumentos: el panel de administración. Con --pantalla: este equipo ES
     // una pantalla (el mini PC pegado al televisor) y reproduce a pantalla
     // completa, sin marco, sin cursor y sin atajos del navegador.
@@ -63,6 +89,9 @@ static class Programa
         using (var m = new Mutex(true, pantalla ? "InTeksDisplayPantalla" : "InTeksDisplayPanel", out primera))
         {
             if (!primera) return;      // ya hay una abierta
+            // Apagada desde el panel: la tarea programada sigue llamando cada
+            // 5 minutos, pero aquí se queda en nada.
+            if (pantalla && !PantallaActiva()) return;
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new Ventana(pantalla));
@@ -95,6 +124,10 @@ class Ventana : Form
             WindowState = FormWindowState.Maximized;
             BackColor = Color.Black;
             Cursor.Hide();
+            // Si se apaga el ajuste con la pantalla abierta, se cierra sola.
+            var vigia = new System.Windows.Forms.Timer { Interval = 5000 };
+            vigia.Tick += delegate { if (!Programa.PantallaActiva()) { vigia.Stop(); Close(); } };
+            vigia.Start();
         }
 
         aviso.Dock = DockStyle.Fill;

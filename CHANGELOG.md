@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.52 — sin publicar
+
+- Ajustes → Opciones avanzadas: nueva casilla «Este PC reproduce en su propia pantalla (mini PC del televisor)». Desmarcada, la pantalla a pantalla completa de ese PC se cierra y la tarea programada deja de reabrirla cada 5 minutos, sin necesitar permisos de administrador. Al volver a marcarla reaparece en unos 5 minutos. Para que un PC la respete hay que instalar esta versión en él.
+
 ## 1.0.51 — 2026-10-30
 
 - Editor de playlist: el selector de contenido tiene buscador, carpeta, etiquetas y tipo; se pueden marcar varios y añadirlos de golpe, se ve qué ya está en la playlist y se puede arrastrar un contenido al punto exacto.
