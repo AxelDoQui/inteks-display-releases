@@ -7,6 +7,7 @@ Player:   http://TU_IP/player.html?screen=NOMBRE
 Enlazar:  http://signage.local/pair     (nombre mDNS, configurable en config.json)
 """
 import json, os, base64, mimetypes, threading, time, socket, sys, random, struct
+import unicodedata
 import hmac, hashlib, secrets, shutil, io, zipfile, contextlib, subprocess, re
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, unquote
@@ -1474,6 +1475,14 @@ class ArchivoNoExiste(Exception):
 class NadaQueAnadir(Exception):
     pass
 
+class EtiquetasDeMas(Exception):
+    """Un archivo se pasaría de 10 etiquetas: aborta sin guardar."""
+
+def _clave_nombre(s):
+    """Clave de comparación de carpetas/etiquetas: sin mayúsculas ni acentos."""
+    s = unicodedata.normalize("NFD", str(s).strip().lower())
+    return "".join(c for c in s if not unicodedata.combining(c))
+
 class DestinoNoExiste(Exception):
     """Archivo o pantalla inexistente: aborta sin guardar; lleva el mensaje para el 404."""
 
@@ -2876,6 +2885,93 @@ class Handler(BaseHTTPRequestHandler):
                     pass
                 if añadidos > 0: notify_all()
                 jresp(200, {"ok": True, "added": añadidos, "skipped": saltados})
+            except Exception as e: err(e)
+            return
+
+        # ── Carpetas y etiquetas de la Librería (varios archivos a la vez)
+        if path == "/api/organize":
+            try:
+                try:
+                    d = json.loads(body)
+                except Exception:
+                    d = None
+                malo = lambda m: jresp(400, {"ok": False, "error": m})
+                ids = d.get("ids") if isinstance(d, dict) else None
+                if not (isinstance(ids, list) and 0 < len(ids) <= 200
+                        and all(isinstance(x, str) and x for x in ids)):
+                    malo("Petición no válida"); return
+                hay_carpeta = "folder" in d
+                carpeta = d.get("folder")
+                alta, baja = d.get("addTags"), d.get("removeTags")
+                for lst in (alta, baja):
+                    if lst is not None and not (isinstance(lst, list) and len(lst) <= 100
+                                                and all(isinstance(x, str) for x in lst)):
+                        malo("Petición no válida"); return
+                if hay_carpeta and carpeta is not None and not isinstance(carpeta, str):
+                    malo("Petición no válida"); return
+                if not (hay_carpeta or alta or baja):
+                    malo("Petición no válida"); return
+                if isinstance(carpeta, str):
+                    carpeta = carpeta.strip()
+                    if not 1 <= len(carpeta) <= 40:
+                        malo("Carpeta no válida (1 a 40 caracteres)"); return
+                alta = [t.strip() for t in (alta or [])]
+                if any(not 1 <= len(t) <= 30 for t in alta):
+                    malo("Etiqueta no válida (1 a 30 caracteres)"); return
+                alta = list({_clave_nombre(t): t for t in reversed(alta)}.values())[::-1]
+                if len(alta) > 10:
+                    malo("Máximo 10 etiquetas por archivo"); return
+                quitar = {_clave_nombre(t) for t in (baja or [])}
+                ids = list(dict.fromkeys(ids))
+                cambiados = 0
+                try:
+                    with contenido_en_edicion() as content:
+                        items = content.get("items", [])
+                        por_id = {i.get("id"): i for i in items}
+                        for iid in ids:
+                            if iid not in por_id:
+                                raise DestinoNoExiste(f"No existe el archivo {iid}")
+                        # Grafías ya en uso: la primera que aparece manda.
+                        carpetas, etiquetas = {}, {}
+                        for it in items:
+                            if isinstance(it.get("folder"), str):
+                                carpetas.setdefault(_clave_nombre(it["folder"]), it["folder"])
+                            for t in it.get("tags") or []:
+                                if isinstance(t, str):
+                                    etiquetas.setdefault(_clave_nombre(t), t)
+                        if isinstance(carpeta, str):
+                            carpeta = carpetas.get(_clave_nombre(carpeta), carpeta)
+                        alta = [etiquetas.get(_clave_nombre(t), t) for t in alta]
+                        for iid in ids:
+                            it = por_id[iid]
+                            antes = (it.get("folder"), list(it.get("tags") or []))
+                            if hay_carpeta:
+                                if carpeta is None: it.pop("folder", None)
+                                else: it["folder"] = carpeta
+                            tags = [t for t in (it.get("tags") or [])
+                                    if isinstance(t, str) and _clave_nombre(t) not in quitar]
+                            claves = {_clave_nombre(t) for t in tags}
+                            for t in alta:
+                                if _clave_nombre(t) not in claves:
+                                    tags.append(t); claves.add(_clave_nombre(t))
+                            if len(tags) > 10:
+                                raise EtiquetasDeMas()
+                            if tags: it["tags"] = tags
+                            else: it.pop("tags", None)
+                            if (it.get("folder"), list(it.get("tags") or [])) != antes:
+                                cambiados += 1
+                        if cambiados == 0:
+                            # Nada cambió: se sale por excepción para no guardar
+                            # ni subir 'rev'.
+                            raise NadaQueAnadir()
+                except DestinoNoExiste as e:
+                    jresp(404, {"ok": False, "error": str(e)}); return
+                except EtiquetasDeMas:
+                    malo("Máximo 10 etiquetas por archivo"); return
+                except NadaQueAnadir:
+                    pass
+                if cambiados > 0: notify_all()
+                jresp(200, {"ok": True, "changed": cambiados})
             except Exception as e: err(e)
             return
 
