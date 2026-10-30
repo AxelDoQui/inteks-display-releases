@@ -8,6 +8,7 @@ import android.os.Looper
 import android.util.Log
 import android.widget.Button
 import android.widget.EditText
+import android.widget.TextView
 
 /** Cada cuánto se vuelve a barrer la red desde esta pantalla. */
 const val REBARRIDO_SETUP_MS = 15_000L
@@ -31,6 +32,14 @@ class SetupActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_setup)
         ajustes = SettingsStore(this)
+
+        val version = try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: "?"
+        } catch (e: Exception) { "?" }
+        findViewById<TextView>(R.id.diagnostico).text = textoDiagnostico(
+            version, ajustes.base, ajustes.nombrePantalla,
+            ajustes.ultimaConexionOk, System.currentTimeMillis()
+        )
 
         val campo = findViewById<EditText>(R.id.direccion)
         findViewById<Button>(R.id.conectar).setOnClickListener {

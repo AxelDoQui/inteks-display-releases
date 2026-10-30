@@ -66,6 +66,13 @@ class KioskActivity : Activity() {
             // un clic que nadie va a dar.
             mediaPlaybackRequiresUserGesture = false
         }
+        // Solo lectura: el reproductor se lo cuenta al panel.
+        web.addJavascriptInterface(object {
+            @android.webkit.JavascriptInterface
+            fun version(): String = try {
+                packageManager.getPackageInfo(packageName, 0).versionName ?: ""
+            } catch (e: Exception) { "" }
+        }, "InTeksApp")
         web.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 Log.i(TAG, "onPageStarted url=$url")
@@ -82,6 +89,7 @@ class KioskActivity : Activity() {
                     " error=$errorEnEstaCarga titulo=${web.title}")
                 if (errorEnEstaCarga) { reintentar(); return }
                 algoPintado = true
+                ajustes.ultimaConexionOk = System.currentTimeMillis()
                 intentos = 0
                 if (web.parent == null) setContentView(web)
                 aplicarPantallaCompleta()

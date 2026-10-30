@@ -26,4 +26,9 @@ class SettingsStore(context: Context) {
     var mantenimientoHasta: Long
         get() = prefs.getLong("mantenimiento", 0L)
         set(v) { prefs.edit().putLong("mantenimiento", v).apply() }
+
+    /** Epoch ms de la última carga buena del reproductor (0 = nunca). */
+    var ultimaConexionOk: Long
+        get() = prefs.getLong("ultimaConexionOk", 0L)
+        set(v) { prefs.edit().putLong("ultimaConexionOk", v).apply() }
 }
