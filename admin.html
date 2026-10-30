@@ -114,7 +114,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .pl-sel-fila select{flex:1 1 0}
 .pl-sel-tags{display:flex;flex-wrap:wrap;gap:4px}
 .pl-sel-barra{display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:6px 8px;background:var(--s2);border:1px solid var(--a2);border-radius:var(--r);font-size:11px}
-.pl-lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;max-height:520px;overflow-y:auto;overflow-x:hidden;min-width:0}
+.pl-lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;max-height:calc(92vh - 400px);min-height:160px;overflow-y:auto;overflow-x:hidden;min-width:0}
 .pl-lib-card{position:relative;background:var(--s2);border:1px solid var(--b);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:border-color .15s}
 .pl-lib-card:hover{border-color:var(--accent)}
 .pl-lib-card.marcada{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
@@ -122,7 +122,19 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .pl-lib-ya{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.72);color:#7ee2a8;font-size:9px;padding:1px 5px;border-radius:8px;z-index:1}
 .pl-lib-nom{padding:3px 6px;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pl-insert{height:3px;background:var(--accent);border-radius:2px;margin:-2px 0 3px;pointer-events:none}
-.pl-item{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--b);border-radius:var(--r);padding:9px 10px;cursor:grab;transition:border-color .15s;margin-bottom:5px}
+.pl-item{display:flex;flex-wrap:wrap;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--b);border-radius:var(--r);padding:6px 8px;cursor:grab;transition:border-color .15s;margin-bottom:5px}
+/* Fila compacta (~56 px): asa, miniatura, nombre, duracion, estrella y «...».
+   El panel de fechas y acciones cuelga debajo, en su propia linea. */
+.pl-fila{flex:1 1 100%;display:flex;align-items:center;gap:8px;min-width:0;min-height:40px}
+.pl-fila .btn{flex-shrink:0}
+.pl-auto{width:auto;min-width:46px;padding:3px 7px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;justify-content:center;opacity:.6;flex-shrink:0}
+.pl-mas{position:relative}
+.pl-mas.abierto{border-color:var(--accent);color:var(--accent)}
+.pl-punto{position:absolute;top:3px;right:3px;width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.pl-acciones{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.pl-lista{min-height:50px;max-height:calc(92vh - 400px);overflow-y:auto;overflow-x:hidden}
+.pl-pie{margin-top:8px;padding:7px 10px;background:var(--s2);border:1px solid var(--b);border-radius:var(--r);font-size:12px;font-family:'Space Mono',monospace;color:var(--muted)}
+.pl-botones{display:flex;gap:8px;margin-top:14px;justify-content:flex-end;position:sticky;bottom:-22px;background:var(--s1);padding:10px 0 0;z-index:2}
 /* Segunda linea, siempre completa. Con etiquetas: dos campos de fecha a secas
    no dicen cual es el principio y cual el final. */
 .pl-fechas{flex:0 0 100%;display:flex;align-items:center;gap:6px;flex-wrap:wrap;
@@ -138,7 +150,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .pl-mover{display:flex;flex-direction:column;gap:2px;flex-shrink:0}
 .pl-mover .btn{padding:2px 6px;line-height:1}
 .pl-mover .btn[disabled]{opacity:.25;cursor:default}
-.pl-thumb{width:56px;height:36px;border-radius:4px;background:#000;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:16px}
+.pl-thumb{width:48px;height:27px;border-radius:4px;background:#000;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:16px}
 .pl-thumb img,.pl-thumb video{width:100%;height:100%;object-fit:cover}
 /* flex-basis 140px y no 0: con basis 0 el nombre es lo PRIMERO que se encoge y
    acaba en cero mientras los controles conservan su ancho entero. Con una base
@@ -327,6 +339,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
   /* Los pares de flechas no siguen la regla: son dos botones apilados dentro
      de una fila, y estirarlos a 44px cada uno rompe el alto de la fila. */
   .pl-mover .btn,.fx-mover .btn{min-height:0}
+  .pl-fila .btn,.pl-acciones .btn{min-height:36px}
 }
 
 @media (max-width:560px){
@@ -337,6 +350,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
   /* A 375px un modal "centrado" son margenes desperdiciados. */
   .modal{width:100%;max-width:100%;height:100%;max-height:100%;border-radius:0;padding:16px}
   .modal-bd{align-items:stretch;justify-content:stretch}
+  .pl-botones{bottom:-16px}
 
   /* 16px o iOS hace zoom al enfocar el campo, y hay que alejar a mano cada
      vez. Es de las cosas que hacen que una web responsive se sienta rota
@@ -1389,32 +1403,39 @@ JPY  Yen        162.5"></textarea>
         <input type="checkbox" id="plm-shuffle" style="cursor:pointer;width:16px;height:16px" onchange="cambioShuffle()">
         Orden aleatorio
       </label>
-      <span id="plm-priority-wrap" style="display:none;align-items:center;gap:6px;font-size:12px">
-        <span style="color:var(--muted)">prioridad ⭐ cada</span>
-        <input class="finput" id="plm-priority-every" type="number" min="2" max="50" step="1"
-               value="4" style="width:56px" title="Cada cuántos pases sale un contenido marcado con ⭐">
-        <span style="color:var(--muted)">pases</span>
-      </span>
-      <span style="display:flex;align-items:center;gap:6px;font-size:12px">
-        <span style="color:var(--muted)">margen de seguridad</span>
-        <input class="finput" id="plm-safe-margin" type="number" min="0" max="5" step="1"
-               value="0" style="width:56px"
-               title="Separa el contenido de los bordes. Solo hace falta en televisores que recortan la imagen. 0 = sin margen.">
-        <span style="color:var(--muted)">%</span>
-      </span>
+      <button type="button" class="btn btn-ghost btn-sm" id="plm-mas-btn" aria-expanded="false" aria-controls="plm-mas"
+              style="margin-left:auto" onclick="mostrarMasAjustes(document.getElementById('plm-mas').style.display==='none')">Más ajustes <i class="fa-solid fa-chevron-down"></i></button>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">
-      Se aplica a todos los pases de esta pantalla. Con orden aleatorio, cada vuelta
-      se baraja de nuevo y nunca se repite el último de la vuelta anterior. Marca con
-      ⭐ un contenido de la playlist (p.ej. el tablero de divisas) para que salga con
-      esa cadencia fija en vez de quedar al azar como el resto.
+    <div id="plm-mas" style="display:none;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:6px 0">
+        <span id="plm-priority-wrap" style="display:none;align-items:center;gap:6px;font-size:12px">
+          <span style="color:var(--muted)">prioridad ⭐ cada</span>
+          <input class="finput" id="plm-priority-every" type="number" min="2" max="50" step="1"
+                 value="4" style="width:56px" title="Cada cuántos pases sale un contenido marcado con ⭐">
+          <span style="color:var(--muted)">pases</span>
+        </span>
+        <span style="display:flex;align-items:center;gap:6px;font-size:12px">
+          <span style="color:var(--muted)">margen de seguridad</span>
+          <input class="finput" id="plm-safe-margin" type="number" min="0" max="5" step="1"
+                 value="0" style="width:56px"
+                 title="Separa el contenido de los bordes. Solo hace falta en televisores que recortan la imagen. 0 = sin margen.">
+          <span style="color:var(--muted)">%</span>
+        </span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">
+        Se aplica a todos los pases de esta pantalla. Con orden aleatorio, cada vuelta
+        se baraja de nuevo y nunca se repite el último de la vuelta anterior. Marca con
+        ⭐ un contenido de la playlist (p.ej. el tablero de divisas) para que salga con
+        esa cadencia fija en vez de quedar al azar como el resto.
+      </div>
     </div>
 
     <div id="plm-packages" style="margin:6px 0 10px"></div>
     <div class="pl-editor">
       <div>
         <div style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace;letter-spacing:1px;margin-bottom:7px">PLAYLIST</div>
-        <div id="plm-list" style="min-height:50px"></div>
+        <div id="plm-list" class="pl-lista"></div>
+        <div id="plm-resumen" class="pl-pie">Sin contenido</div>
         <button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%" onclick="showPage('library',document.querySelector('.nav-item:nth-child(3)'));closePlModal()">+ Ir a librería</button>
       </div>
       <div>
@@ -1433,7 +1454,7 @@ JPY  Yen        162.5"></textarea>
         <div id="plm-lib" class="pl-lib-grid"></div>
       </div>
     </div>
-    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+    <div class="pl-botones">
       <button class="btn btn-ghost" onclick="closePlModal()">Cancelar</button>
       <button class="btn btn-accent" onclick="savePlModal()">Guardar</button>
     </div>
@@ -2695,14 +2716,33 @@ function renderPlPackages(){
 }
 
 // ── Editor de playlist: lógica pura (probada en tests/editor-playlist.test.js)
-function resumenPlaylist(pl,items){
+// Los vídeos no suman segundos (el player los deja correr hasta el final): cuentan
+// como elemento y activan « + vídeos». Un paquete es un elemento y suma la
+// duración de sus imágenes (y marca sus vídeos) si se le pasan los paquetes.
+function resumenPlaylist(pl,items,paquetes){
   const lista=Array.isArray(pl)?pl:[];
+  const lib=Array.isArray(items)?items:[];
+  const pks=Array.isArray(paquetes)?paquetes:[];
   let segundos=0, videosSinDuracion=0;
-  lista.forEach(it=>{
-    if(!it||it.type==="package") return;
-    const d=Number(it.duration);
-    if(it.type==="video"&&!(d>0)){ videosSinDuracion++; return; }
+  const contar=(tipo,dur)=>{
+    if(tipo==="video"){ videosSinDuracion++; return; }
+    const d=Number(dur);
     if(d>0) segundos+=d;
+  };
+  lista.forEach(it=>{
+    if(!it) return;
+    if(it.type==="package"){
+      const p=pks.find(x=>x&&x.id===it.pkg_id);
+      if(!p) return;
+      const dentro=Array.isArray(p.items)?p.items:(p.itemIds||[]).map(id=>({id}));
+      dentro.forEach(x=>{
+        const li=lib.find(l=>l&&l.id===x.id);
+        if(!li) return;
+        contar(li.type, x.duration||li.duration||8);
+      });
+      return;
+    }
+    contar(it.type, it.duration);
   });
   const n=lista.length;
   let texto;
@@ -2739,6 +2779,7 @@ let plFiltro={texto:"",tipo:"todos",carpeta:"all",etiquetas:[]};
 function openPlModal(sid){
   editingScreen=sid;
   plSel=new Set();
+  plAbiertos=new Set();plVistos=new Set();
   plFiltro={texto:"",tipo:"todos",carpeta:"all",etiquetas:[]};
   renderPlPackages();
   const cfg=(content.screens||{})[sid]||{};
@@ -2753,10 +2794,20 @@ function openPlModal(sid){
   document.getElementById("plm-safe-margin").value=cfg.safe_margin||0;
   cambioTransicion();
   cambioShuffle();
+  mostrarMasAjustes(ajustesDistintosDeDefecto(cfg));
   reconstruirFiltrosPl(sid);
   iniciarSoltarEnPlaylist();
   renderPlList(sid);renderPlLib(sid);
   document.getElementById("pl-modal").classList.add("show");
+}
+// «Más ajustes»: prioridad, margen de seguridad y su explicacion. Plegado salvo
+// que algo ya valga distinto del predeterminado (para que no quede oculto).
+function mostrarMasAjustes(abrir){
+  const m=document.getElementById("plm-mas"), b=document.getElementById("plm-mas-btn");
+  if(!m||!b) return;
+  m.style.display=abrir?"block":"none";
+  b.setAttribute("aria-expanded",abrir?"true":"false");
+  b.innerHTML=(abrir?"Menos ajustes":"Más ajustes")+' <i class="fa-solid fa-chevron-'+(abrir?"up":"down")+'"></i>';
 }
 // El corte seco no tiene duracion que ajustar: dejar el campo activo invita a
 // escribir un numero que no hace nada.
@@ -2778,7 +2829,7 @@ function posicionDeSoltado(e){
   const filas=Array.from(c.querySelectorAll(".pl-item"));
   let pos=filas.length, ref=null;
   for(const f of filas){
-    const r=f.getBoundingClientRect();
+    const r=(f.querySelector(".pl-fila")||f).getBoundingClientRect();
     if(e.clientY<r.top+r.height/2){pos=Number(f.dataset.i);ref=f;break;}
   }
   return {pos,ref,filas};
@@ -2788,7 +2839,7 @@ function iniciarSoltarEnPlaylist(){
   if(!c||c.dataset.soltar) return;
   c.dataset.soltar="1";
   c.addEventListener("dragover",e=>{
-    if(!plArrastrando) return;
+    if(!plArrastrando&&dragSrc===null) return;
     e.preventDefault();
     const {ref}=posicionDeSoltado(e);
     limpiarLineaPl();
@@ -2797,23 +2848,55 @@ function iniciarSoltarEnPlaylist(){
   });
   c.addEventListener("dragleave",e=>{ if(!c.contains(e.relatedTarget)) limpiarLineaPl(); });
   c.addEventListener("drop",e=>{
-    if(!plArrastrando) return;
+    if(!plArrastrando&&dragSrc===null) return;
     e.preventDefault();
     const {pos}=posicionDeSoltado(e);
-    const ids=plArrastrando;plArrastrando=null;
     limpiarLineaPl();
+    if(!plArrastrando){
+      // Reordenar dentro de la lista: pos es un hueco entre filas, y al sacar
+      // la fila de arriba los huecos de despues se corren una posicion.
+      const desde=dragSrc;dragSrc=null;
+      if(editingScreen&&desde!==null) moverPlItem(editingScreen,desde,pos>desde?pos-1:pos);
+      return;
+    }
+    const ids=plArrastrando;plArrastrando=null;
     ids.forEach(id=>plSel.delete(id));
     if(editingScreen) addVariosToPl(editingScreen,ids,pos);
   });
 }
 function closePlModal(){document.getElementById("pl-modal").classList.remove("show");editingScreen=null;}
+// Paneles «⋯» abiertos: se guardan por referencia al elemento de la playlist
+// (los índices cambian al reordenar). Estado de pantalla, no se guarda.
+let plAbiertos=new Set();
+let plVistos=new Set();
+function actualizarResumenPl(sid){
+  const el=document.getElementById("plm-resumen");
+  if(!el) return;
+  const pl=(content.screens[sid]||{}).playlist||[];
+  el.textContent=resumenPlaylist(pl,content.items||[],content.packages||[]).texto;
+}
 function renderPlList(sid){
   const pl=(content.screens[sid]||{}).playlist||[];
   const c=document.getElementById("plm-list");
+  actualizarResumenPl(sid);
   if(!pl.length){c.innerHTML='<div class="empty-state">Sin contenido</div>';return;}
   c.innerHTML="";
+  const boton=(clase,html,titulo,fn,desactivado)=>{
+    const b=document.createElement("button");
+    b.type="button";b.className="btn "+clase+" btn-sm";b.innerHTML=html;
+    if(titulo)b.title=titulo;
+    if(desactivado)b.disabled=true;
+    b.addEventListener("click",e=>{e.stopPropagation();fn();});
+    return b;
+  };
+  const hoyISO=new Date().toISOString().slice(0,10);
   pl.forEach((item,i)=>{
     const el=document.createElement("div");el.className="pl-item";el.draggable=true;el.dataset.i=i;
+    const fila=document.createElement("div");fila.className="pl-fila";
+    el.appendChild(fila);
+    const asa=document.createElement("span");asa.className="pl-handle";
+    asa.innerHTML='<i class="fa-solid fa-grip-vertical"></i>';
+    fila.appendChild(asa);
     // Un paquete no es un contenido: es una referencia que el servidor resuelve
     // al servir la playlist. Aqui se pinta como un bloque, no como una tarjeta
     // mas, para que se entienda que su interior no se edita desde aqui.
@@ -2824,58 +2907,75 @@ function renderPlList(sid){
       const nombre=p?p.name:"Paquete borrado";
       const detalle=p?`PAQUETE · ${n} contenido(s) · se actualiza solo`
                      :"ya no existe — quítalo de aquí";
-      el.innerHTML=`<span class="pl-handle"><i class="fa-solid fa-grip-vertical"></i></span>`+
-        `<div class="pl-thumb"><i class="fa-solid fa-boxes-stacked" style="font-size:16px;color:var(--accent)"></i></div>`+
-        `<div class="pl-info"><div class="pl-name">${nombre}</div>`+
-        `<span class="pl-tbadge tb-package">${detalle}</span></div>`+
-        (p?`<button class="btn btn-a2 btn-sm" onclick="irAEditarPaquete('${item.pkg_id}')" title="Editar el paquete"><i class="fa-solid fa-pen"></i></button>`:"")+
-        `<button class="btn btn-danger btn-sm" onclick="rmFromPl('${sid}',${i})"><i class="fa-solid fa-xmark"></i></button>`;
-      el.addEventListener("dragstart",()=>{dragSrc=i;setTimeout(()=>el.classList.add("dragging"),0);});
-      el.addEventListener("dragend",()=>el.classList.remove("dragging"));
-      el.addEventListener("dragover",e=>{e.preventDefault();el.classList.add("drag-over");});
-      el.addEventListener("dragleave",()=>el.classList.remove("drag-over"));
-      el.addEventListener("drop",e=>{e.preventDefault();el.classList.remove("drag-over");
-        if(dragSrc!==null&&dragSrc!==i){const q=content.screens[sid].playlist;const m=q.splice(dragSrc,1)[0];q.splice(i,0,m);renderPlList(sid);}
-      });
-      c.appendChild(el);
-      return;
+      const th=document.createElement("div");th.className="pl-thumb";
+      th.innerHTML='<i class="fa-solid fa-boxes-stacked" style="font-size:14px;color:var(--accent)"></i>';
+      const info=document.createElement("div");info.className="pl-info";
+      info.innerHTML=`<div class="pl-name">${esc(nombre)}</div><span class="pl-tbadge tb-package">${esc(detalle)}</span>`;
+      fila.appendChild(th);fila.appendChild(info);
+      if(p) fila.appendChild(boton("btn-a2",'<i class="fa-solid fa-pen"></i>',"Editar el paquete",()=>irAEditarPaquete(item.pkg_id)));
+      fila.appendChild(boton("btn-danger",'<i class="fa-solid fa-xmark"></i>',"Quitar de la playlist",()=>rmFromPl(sid,i)));
+    }else{
+      const th=document.createElement("div");th.className="pl-thumb";
+      if(item.type==="image"){const im=document.createElement("img");im.src=item.src;im.alt="";th.appendChild(im);}
+      else if(item.type==="video"){const v=document.createElement("video");v.src=item.src;v.muted=true;v.preload="metadata";th.appendChild(v);}
+      else th.innerHTML=`<i class="fa-solid ${typeIcon(item.type)}" style="font-size:14px;color:var(--muted)"></i>`;
+      // Vigencia: vacio = sin limite. El servidor filtra al servir la playlist;
+      // aqui solo se editan las fechas y se marca lo que ya no se ve.
+      const fuera=(item.desde&&hoyISO<item.desde)||(item.hasta&&hoyISO>item.hasta);
+      if(fuera) el.style.opacity=".5";
+      const conFechas=!!(item.desde||item.hasta);
+      // Con fechas puestas el panel arranca abierto para que no queden ocultas.
+      if(conFechas&&!plVistos.has(item)){plVistos.add(item);plAbiertos.add(item);}
+      const info=document.createElement("div");info.className="pl-info";
+      info.innerHTML=`<div class="pl-name" title="${esc(item.name)}">${esc(item.name)}</div>`+
+        `<span class="pl-tbadge tb-${esc(item.type)}">${esc(String(item.type).toUpperCase())}</span>`+
+        (fuera?' <span class="pl-tbadge" style="background:rgba(240,160,80,.14);color:#f0a050">fuera de fechas</span>':'');
+      fila.appendChild(th);fila.appendChild(info);
+      if(item.type==="video"){
+        const a=document.createElement("span");a.className="dur-inp pl-auto";
+        a.title="El vídeo usa su propia duración";
+        a.innerHTML='<i class="fa-solid fa-film"></i>auto';
+        fila.appendChild(a);
+      }else{
+        const d=document.createElement("input");d.className="dur-inp";d.type="number";d.min=1;d.max=3600;
+        d.value=item.duration||8;d.title="Segundos en pantalla";
+        d.addEventListener("change",()=>{updDur(sid,i,d.value);});
+        fila.appendChild(d);
+      }
+      // La estrella solo cambia algo con orden aleatorio: en orden fijo la
+      // posicion ya la decide el usuario arrastrando, y marcarla no haria nada.
+      fila.appendChild(boton(item.priority?"btn-accent":"btn-ghost",'<i class="fa-solid fa-star"></i>',
+        "Prioridad: con orden aleatorio, sale cada X pases en vez de quedar al azar",()=>togglePriority(sid,i)));
+      const mas=boton("btn-ghost pl-mas"+(plAbiertos.has(item)?" abierto":""),
+        '<i class="fa-solid fa-ellipsis"></i>'+(conFechas?'<span class="pl-punto"></span>':''),
+        "Fechas, subir, bajar y quitar",()=>{
+          if(plAbiertos.has(item))plAbiertos.delete(item);else plAbiertos.add(item);
+          renderPlList(sid);
+        });
+      fila.appendChild(mas);
+      if(plAbiertos.has(item)){
+        const panel=document.createElement("div");panel.className="pl-fechas";
+        panel.innerHTML='<span>se ve del</span><input type="date" class="dur-inp" data-c="desde"><span>al</span><input type="date" class="dur-inp" data-c="hasta"><span style="opacity:.7">vacío = sin límite</span>';
+        panel.querySelectorAll("input").forEach(inp=>{
+          inp.value=item[inp.dataset.c]||"";
+          inp.addEventListener("change",()=>updVigencia(sid,i,inp.dataset.c,inp.value));
+        });
+        const acc=document.createElement("span");acc.className="pl-acciones";
+        acc.appendChild(boton("btn-ghost",'<i class="fa-solid fa-chevron-up"></i> Subir',"Subir",()=>moverPlItem(sid,i,i-1),i===0));
+        acc.appendChild(boton("btn-ghost",'<i class="fa-solid fa-chevron-down"></i> Bajar',"Bajar",()=>moverPlItem(sid,i,i+1),i===pl.length-1));
+        acc.appendChild(boton("btn-danger",'<i class="fa-solid fa-xmark"></i> Quitar',"Quitar de la playlist",()=>rmFromPl(sid,i)));
+        panel.appendChild(acc);
+        el.appendChild(panel);
+      }
     }
-    let thumb=`<i class="fa-solid ${typeIcon(item.type)}" style="font-size:16px;color:var(--muted)"></i>`;
-    if(item.type==="image")thumb=`<img src="${item.src}" alt="">`;
-    else if(item.type==="video")thumb=`<video src="${item.src}" muted preload="metadata"></video>`;
-    const tc=`tb-${item.type}`;
-    const durControl = item.type==="video"
-      // width:auto porque .dur-inp mide 46px, pensados para un numero de tres
-      // cifras. "auto" con su icono necesita mas y salia recortado.
-      ? `<span class="dur-inp" style="width:auto;min-width:46px;padding:3px 7px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;justify-content:center;opacity:.6" title="El vídeo usa su propia duración"><i class="fa-solid fa-film"></i>auto</span>`
-      : `<input class="dur-inp" type="number" min="1" max="3600" value="${item.duration||8}" onchange="updDur('${sid}',${i},this.value)">`;
-    // Vigencia: vacio = sin limite. El servidor filtra al servir la playlist;
-    // aqui solo se editan las fechas y se marca lo que ya no se ve.
-    const hoyISO=new Date().toISOString().slice(0,10);
-    const fuera=(item.desde&&hoyISO<item.desde)||(item.hasta&&hoyISO>item.hasta);
-    if(fuera) el.style.opacity=".5";
-    const fechas=`<div class="pl-fechas"><span>se ve del</span>`+
-      `<input type="date" class="dur-inp" value="${item.desde||''}" `+
-      `onchange="updVigencia('${sid}',${i},'desde',this.value)"><span>al</span>`+
-      `<input type="date" class="dur-inp" value="${item.hasta||''}" `+
-      `onchange="updVigencia('${sid}',${i},'hasta',this.value)">`+
-      `<span style="opacity:.7">vacío = sin límite</span></div>`;
-    const marca=fuera?'<span class="pl-tbadge" style="background:rgba(240,160,80,.14);color:#f0a050">fuera de fechas</span>':'';
-    // La estrella solo cambia algo con orden aleatorio: en orden fijo la
-    // posicion ya la decide el usuario arrastrando, y marcarla no haria nada.
-    const prioBtn=`<button class="btn ${item.priority?'btn-accent':'btn-ghost'} btn-sm" `+
-      `title="Prioridad: con orden aleatorio, sale cada X pases en vez de quedar al azar" `+
-      `onclick="togglePriority('${sid}',${i})"><i class="fa-solid fa-star"></i></button>`;
-    const arriba=`<button class="btn btn-ghost btn-sm" ${i===0?"disabled":""} title="Subir" onclick="moverPlItem('${sid}',${i},${i-1})"><i class="fa-solid fa-chevron-up"></i></button>`;
-    const abajo=`<button class="btn btn-ghost btn-sm" ${i===pl.length-1?"disabled":""} title="Bajar" onclick="moverPlItem('${sid}',${i},${i+1})"><i class="fa-solid fa-chevron-down"></i></button>`;
-    el.innerHTML=`<span class="pl-handle"><i class="fa-solid fa-grip-vertical"></i></span><div class="pl-mover">${arriba}${abajo}</div><div class="pl-thumb">${thumb}</div><div class="pl-info"><div class="pl-name">${esc(item.name)}</div><span class="pl-tbadge ${tc}">${item.type.toUpperCase()}</span>${marca}</div>${durControl}${prioBtn}<button class="btn btn-danger btn-sm" onclick="rmFromPl('${sid}',${i})"><i class="fa-solid fa-xmark"></i></button>${fechas}`;
-    el.addEventListener("dragstart",()=>{dragSrc=i;setTimeout(()=>el.classList.add("dragging"),0);});
-    el.addEventListener("dragend",()=>el.classList.remove("dragging"));
-    el.addEventListener("dragover",e=>{e.preventDefault();el.classList.add("drag-over");});
-    el.addEventListener("dragleave",()=>el.classList.remove("drag-over"));
-    el.addEventListener("drop",e=>{e.preventDefault();el.classList.remove("drag-over");
-      if(dragSrc!==null) moverPlItem(sid,dragSrc,i);
+    // Reordenar arrastrando: el destino lo calcula el contenedor (linea de
+    // insercion), igual que al soltar desde el selector.
+    el.addEventListener("dragstart",e=>{
+      dragSrc=i;plArrastrando=null;
+      try{e.dataTransfer.setData("text/plain","fila");e.dataTransfer.effectAllowed="move";}catch(_){}
+      setTimeout(()=>el.classList.add("dragging"),0);
     });
+    el.addEventListener("dragend",()=>{dragSrc=null;el.classList.remove("dragging");limpiarLineaPl();});
     c.appendChild(el);
   });
 }
@@ -3008,8 +3108,8 @@ function addToPl(sid,item){
   content.screens[sid].playlist.push({...item,duration:item.duration||8});
   renderPlList(sid);toast(`"${item.name}" añadido`);
 }
-function rmFromPl(sid,idx){content.screens[sid].playlist.splice(idx,1);renderPlList(sid);}
-function updDur(sid,idx,v){if(content.screens[sid]?.playlist[idx])content.screens[sid].playlist[idx].duration=parseFloat(v)||8;}
+function rmFromPl(sid,idx){const q=content.screens[sid].playlist;const [x]=q.splice(idx,1);plAbiertos.delete(x);renderPlList(sid);}
+function updDur(sid,idx,v){if(content.screens[sid]?.playlist[idx]){content.screens[sid].playlist[idx].duration=parseFloat(v)||8;actualizarResumenPl(sid);}}
 function togglePriority(sid,idx){
   const it=content.screens[sid]?.playlist[idx];
   if(!it) return;

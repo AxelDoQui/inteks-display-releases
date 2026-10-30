@@ -51,10 +51,11 @@ test("resumenPlaylist: vídeo sin duración añade + vídeos", () => {
   assert.strictEqual(r.videosSinDuracion, 1);
   assert.strictEqual(r.texto, "2 elementos · 8 s por vuelta + vídeos");
 });
-test("resumenPlaylist: vídeo con duración la suma", () => {
-  const r = E.resumenPlaylist([{ id: "v", type: "video", name: "v", duration: 20 }], []);
-  assert.strictEqual(r.segundos, 20);
-  assert.strictEqual(r.videosSinDuracion, 0);
+test("resumenPlaylist: el vídeo no suma segundos aunque traiga duration", () => {
+  const r = E.resumenPlaylist([{ id: "v", type: "video", name: "v", duration: 20 }, img("a", 8)], []);
+  assert.strictEqual(r.segundos, 8);
+  assert.strictEqual(r.videosSinDuracion, 1);
+  assert.strictEqual(r.texto, "2 elementos · 8 s por vuelta + vídeos");
 });
 test("resumenPlaylist: un paquete cuenta como un elemento", () => {
   const r = E.resumenPlaylist([img("a", 8), { type: "package", pkg_id: "p1" }], []);
@@ -97,4 +98,24 @@ test("ajustesDistintosDeDefecto", () => {
   assert.strictEqual(f({ priority_every: 6 }), true);
   assert.strictEqual(f({ safe_margin: 3 }), true);
   assert.strictEqual(f({ playlist: [{ id: "a", priority: true }] }), true);
+});
+
+test("resumenPlaylist: paquete suma sus imágenes y marca sus vídeos", () => {
+  const items = [img("a", 8), img("b", 8), { id: "v", type: "video", name: "v" }];
+  const paquetes = [{ id: "p1", items: [{ id: "a", duration: 10 }, { id: "b" }, { id: "v" }, { id: "borrado", duration: 99 }] }];
+  const r = E.resumenPlaylist([img("x", 5), { type: "package", pkg_id: "p1" }], items, paquetes);
+  assert.strictEqual(r.n, 2);
+  assert.strictEqual(r.segundos, 5 + 10 + 8);
+  assert.strictEqual(r.videosSinDuracion, 1);
+  assert.strictEqual(r.texto, "2 elementos · 23 s por vuelta + vídeos");
+});
+test("resumenPlaylist: paquete con itemIds antiguos usa la librería", () => {
+  const items = [{ id: "a", type: "image", name: "a", duration: 12 }, { id: "b", type: "image", name: "b" }];
+  const r = E.resumenPlaylist([{ type: "package", pkg_id: "p1" }], items, [{ id: "p1", itemIds: ["a", "b"] }]);
+  assert.strictEqual(r.segundos, 20);
+});
+test("resumenPlaylist: paquete inexistente cuenta como un elemento", () => {
+  const r = E.resumenPlaylist([{ type: "package", pkg_id: "zz" }], [], []);
+  assert.strictEqual(r.n, 1);
+  assert.strictEqual(r.segundos, 0);
 });
