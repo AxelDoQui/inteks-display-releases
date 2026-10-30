@@ -158,7 +158,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .lib-bar input,.lib-bar select{background:var(--s2);border:1px solid var(--b);color:inherit;border-radius:var(--r);padding:6px 8px;font-size:12px}
 .lib-bar input{flex:1;min-width:160px}
 .lib-meta{font-size:9px;color:var(--muted);padding:0 7px 5px}
-.lib-uso{position:absolute;top:3px;left:3px;background:var(--accent);color:#fff;border-radius:8px;padding:0 6px;font-size:9px;line-height:16px}
+.lib-uso{position:absolute;top:3px;left:24px;background:var(--accent);color:#fff;border-radius:8px;padding:0 6px;font-size:9px;line-height:16px}
 .lib-dur{position:absolute;right:3px;bottom:3px;background:rgba(0,0,0,.75);color:#fff;border-radius:3px;padding:0 4px;font-size:9px}
 .lib-ficha{position:fixed;top:0;right:0;bottom:0;width:min(380px,100vw);background:var(--s1,var(--s2));border-left:1px solid var(--b);z-index:900;padding:16px;overflow:auto;box-shadow:-8px 0 24px rgba(0,0,0,.35)}
 .lib-ficha .prev{width:100%;aspect-ratio:16/9;background:#000;border-radius:var(--r);overflow:hidden;display:flex;align-items:center;justify-content:center;margin-bottom:12px}
@@ -166,6 +166,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .lib-ficha dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;margin:0 0 12px}
 .lib-ficha dt{color:var(--muted)}
 .lib-ficha ul{margin:0 0 12px;padding-left:18px;font-size:12px}
+.lib-chk{position:absolute;top:4px;left:4px;z-index:2;width:16px;height:16px;margin:0;cursor:pointer;accent-color:var(--accent);opacity:0;transition:opacity .15s}
+.lib-item:hover .lib-chk,.lib-grid.haysel .lib-chk,.lib-chk:focus-visible{opacity:1}
+.lib-item.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+#lib-selbar{display:none;align-items:center;gap:8px;margin-bottom:10px;padding:6px 10px;background:var(--s2);border:1px solid var(--accent);border-radius:var(--r);flex-wrap:wrap;font-size:12px}
+#lib-selbar .sel-n{flex:1;min-width:120px}
+#mp-dlg{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px}
+#mp-dlg .mp-box{background:var(--s1,var(--s2));border:1px solid var(--b);border-radius:var(--r);padding:18px;width:min(420px,100%);max-height:90vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+#mp-dlg .mp-lista{display:flex;flex-direction:column;gap:6px;margin:10px 0;max-height:260px;overflow:auto}
+#mp-dlg label{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
+#mp-dlg .mp-dur{width:80px;background:var(--s2);border:1px solid var(--b);color:inherit;border-radius:var(--r);padding:5px 8px;font-size:12px}
+#mp-dlg .mp-pie{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
 .lib-del{position:absolute;top:3px;right:3px;background:rgba(0,0,0,.75);border:none;color:var(--danger);border-radius:3px;width:18px;height:18px;font-size:11px;cursor:pointer;display:none;align-items:center;justify-content:center}
 .lib-item:hover .lib-del{display:flex}
 /* Dropzone */
@@ -460,6 +472,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
       <option value="tamano">Tamaño</option><option value="usados">Más usados</option>
     </select>
   </div>
+  <div id="lib-selbar"><span class="sel-n" id="lib-seln"></span>
+    <button class="btn btn-accent btn-sm" id="lib-sel-mandar"><i class="fa-solid fa-paper-plane"></i> Mandar a pantallas</button>
+    <button class="btn btn-ghost btn-sm" id="lib-sel-quitar">Quitar selección</button></div>
   <div class="lib-grid" id="lib-grid"><div class="empty-state" style="grid-column:1/-1">Sin archivos</div></div>
 </div>
 
@@ -2030,6 +2045,9 @@ function renderLibrary(){
   const grid=document.getElementById("lib-grid");
   const total=(content.items||[]).length;
   const lista=filtrarOrdenar(content.items||[],libInfo,libFiltro);
+  const existentes=new Set((content.items||[]).map(i=>i.id));
+  libSel.forEach(id=>{if(!existentes.has(id))libSel.delete(id);});
+  actualizarSeleccion();
   document.getElementById("lib-count").textContent=lista.length===total?total:lista.length+" de "+total;
   if(!lista.length){grid.innerHTML='<div class="empty-state" style="grid-column:1/-1">'+(total?"Nada coincide con el filtro":"Sin archivos")+'</div>';return;}
   grid.innerHTML="";
@@ -2043,8 +2061,12 @@ function renderLibrary(){
     const ext=(String(item.src||"").split("?")[0].split(".").pop()||"").toUpperCase();
     const tipoTxt=(String(item.src||"").startsWith("/uploads/")&&ext&&ext.length<=5)?ext:item.type;
     const tam=formatoTamano(inf.size);
-    el.innerHTML=`<div class="lib-thumb">${thumb}${item.type==="video"?'<span class="lib-dur" style="display:none"></span>':""}</div>${uses.length?`<span class="lib-uso">en uso · ${uses.length}</span>`:""}<div class="lib-info"><div class="lib-name">${esc(item.name)}</div></div><div class="lib-meta">${tam?tam+" · ":""}${esc(tipoTxt)}</div><button class="lib-del"><i class="fa-solid fa-xmark"></i></button>`;
+    el.innerHTML=`<div class="lib-thumb">${thumb}${item.type==="video"?'<span class="lib-dur" style="display:none"></span>':""}</div>${uses.length?`<span class="lib-uso">en uso · ${uses.length}</span>`:""}<div class="lib-info"><div class="lib-name">${esc(item.name)}</div></div><div class="lib-meta">${tam?tam+" · ":""}${esc(tipoTxt)}</div><input type="checkbox" class="lib-chk" title="Seleccionar"><button class="lib-del"><i class="fa-solid fa-xmark"></i></button>`;
     el.querySelector(".lib-del").onclick=e=>deleteItem(item.id,e);
+    const chk=el.querySelector(".lib-chk");
+    chk.checked=libSel.has(item.id);el.classList.toggle("sel",chk.checked);
+    chk.onclick=e=>e.stopPropagation();
+    chk.onchange=()=>{if(chk.checked)libSel.add(item.id);else libSel.delete(item.id);el.classList.toggle("sel",chk.checked);actualizarSeleccion();};
     el.onclick=()=>abrirFicha(item.id);
     const v=el.querySelector("video"),d=el.querySelector(".lib-dur");
     if(v&&d)v.onloadedmetadata=()=>{const t=duracionTxt(v.duration);if(t){d.textContent=t;d.style.display="";}};
@@ -2071,9 +2093,11 @@ function abrirFicha(id){
       <dt>Resolución</dt><dd id="fi-res">—</dd><dt>Duración</dt><dd id="fi-dur">—</dd>
       <dt>Subido</dt><dd>${fechaCorta(inf.created)}</dd></dl>
     <div class="section-lbl" style="margin-bottom:6px">DÓNDE SE USA</div>${lista}
-    <div style="display:flex;gap:8px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-accent btn-sm fi-mandar"><i class="fa-solid fa-paper-plane"></i> Mandar a pantallas</button>
       <button class="btn btn-ghost btn-sm fi-ren"><i class="fa-solid fa-pen"></i> Renombrar</button>
       <button class="btn btn-danger btn-sm fi-del"><i class="fa-solid fa-trash"></i> Borrar</button></div>`;
+  f.querySelector(".fi-mandar").onclick=()=>abrirMandar([id]);
   f.querySelector(".fi-ren").onclick=()=>renombrarItem(id);
   f.querySelector(".fi-del").onclick=()=>deleteItem(id);
   f.style.display="block";
@@ -2090,6 +2114,76 @@ async function renombrarItem(id){
   if(!r.ok){let m="No se pudo renombrar";try{m=(await r.json()).error||m}catch(e){}toast(m,true);return;}
   await loadAll();toast("Renombrado");abrirFicha(id);
 }
+// ── Mandar a pantallas
+function mensajeEnvio(r){
+  const a=(r&&r.added)||0, k=(r&&r.skipped)||0;
+  if(a===0) return "No se añadió nada: ya lo tenían";
+  const t="Añadido en "+a+(a===1?" sitio":" sitios");
+  return k>0?t+" · "+k+(k===1?" ya lo tenía":" ya lo tenían"):t;
+}
+function duracionValida(v){
+  if(v===null||v===undefined||String(v).trim()==="") return null;
+  const n=Number(v);
+  return isFinite(n)&&n>=1&&n<=3600?n:null;
+}
+// ── fin de mandar a pantallas
+let libSel=new Set();
+function actualizarSeleccion(){
+  const n=libSel.size, bar=document.getElementById("lib-selbar"), grid=document.getElementById("lib-grid");
+  if(!bar||!grid) return;
+  bar.style.display=n?"flex":"none";
+  grid.classList.toggle("haysel",n>0);
+  document.getElementById("lib-seln").textContent=n+(n===1?" seleccionado":" seleccionados");
+}
+function cerrarMandar(){const d=document.getElementById("mp-dlg");if(d)d.remove();}
+function abrirMandar(ids){
+  cerrarMandar();
+  ids=(ids||[]).filter(Boolean); if(!ids.length) return;
+  const pants=Object.entries(regScreens||{}).filter(([k])=>k!=="admin");
+  const dlg=document.createElement("div");dlg.id="mp-dlg";
+  const titulo="Mandar "+ids.length+(ids.length===1?" archivo":" archivos")+" a pantallas";
+  const cuerpo=pants.length
+    ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px"><span class="section-lbl">PANTALLAS</span><a href="#" class="mp-todas" style="font-size:12px">Marcar todas</a></div>
+       <div class="mp-lista"></div>
+       <label>Duración por imagen (s) <input type="number" class="mp-dur" min="1" max="3600" value="8"></label>`
+    : '<p style="font-size:13px;color:var(--muted);margin:12px 0">Todavía no hay pantallas conectadas</p>';
+  dlg.innerHTML=`<div class="mp-box"><strong style="font-size:15px">${esc(titulo)}</strong>${cuerpo}
+    <div class="mp-pie"><button class="btn btn-ghost btn-sm mp-cancel">Cancelar</button>${pants.length?'<button class="btn btn-accent btn-sm mp-enviar" disabled>Mandar</button>':""}</div></div>`;
+  document.body.appendChild(dlg);
+  dlg.onclick=e=>{if(e.target===dlg)cerrarMandar();};
+  dlg.querySelector(".mp-cancel").onclick=cerrarMandar;
+  if(!pants.length) return;
+  const lista=dlg.querySelector(".mp-lista"), btn=dlg.querySelector(".mp-enviar");
+  pants.forEach(([sid,s])=>{
+    const l=document.createElement("label");
+    l.innerHTML=`<input type="checkbox" class="mp-chk"> <span>${esc((s&&s.name)||sid)}</span>`;
+    l.querySelector("input").dataset.sid=sid;
+    lista.appendChild(l);
+  });
+  const marcadas=()=>Array.from(lista.querySelectorAll(".mp-chk")).filter(c=>c.checked).map(c=>c.dataset.sid);
+  const refrescar=()=>{btn.disabled=marcadas().length===0;};
+  lista.onchange=refrescar;
+  dlg.querySelector(".mp-todas").onclick=e=>{e.preventDefault();lista.querySelectorAll(".mp-chk").forEach(c=>c.checked=true);refrescar();};
+  btn.onclick=async()=>{
+    const dur=duracionValida(dlg.querySelector(".mp-dur").value);
+    if(dur===null){toast("Duración no válida (1 a 3600 s)",true);return;}
+    const screens=marcadas(); if(!screens.length) return;
+    btn.disabled=true;
+    let r,j={};
+    try{
+      r=await fetch("/api/send-to-screens",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ids,screens,duration:dur})});
+      try{j=await r.json();}catch(e){}
+    }catch(e){toast("No se pudo conectar con el servidor",true);refrescar();return;}
+    if(!r.ok||!j.ok){toast(j.error||"No se pudo mandar",true);refrescar();return;}
+    cerrarMandar();libSel.clear();
+    await loadAll();toast(mensajeEnvio(j));
+  };
+}
+document.addEventListener("DOMContentLoaded",()=>{
+  const m=document.getElementById("lib-sel-mandar"),q=document.getElementById("lib-sel-quitar");
+  if(m)m.onclick=()=>abrirMandar(Array.from(libSel));
+  if(q)q.onclick=()=>{libSel.clear();renderLibrary();};
+});
 // Icono Font Awesome por tipo de contenido (unifica los thumbnails)
 const TYPE_ICONS={image:'fa-image',video:'fa-film',text:'fa-tag',fx:'fa-money-bill-trend-up',weather:'fa-cloud-sun',ticker:'fa-newspaper',url:'fa-globe',qr:'fa-qrcode',product:'fa-box-open',comparison:'fa-scale-balanced',countdown:'fa-stopwatch'};
 function typeIcon(type){ return TYPE_ICONS[type]||'fa-file'; }

@@ -8,6 +8,15 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.50 — sin publicar
+
+### Nuevo
+
+- **Mandar archivos a pantallas desde la Librería.** Marca uno o varios archivos
+  con la casilla de su miniatura (o abre su ficha) y pulsa «Mandar a pantallas»:
+  eliges las pantallas, la duración por imagen y se añaden al final de su lista.
+  Si una pantalla ya lo tenía, se salta. El panel dice cuántos sitios se añadieron.
+
 ## 1.0.49 — 2026-10-30
 
 ### Mejorado
