@@ -24,7 +24,7 @@ class DiagnosticoTest {
     @Test
     fun `base y pantalla nulos`() {
         val t = textoDiagnostico("1.0.49", null, null, 0L, 5_000L)
-        assertTrue(t.contains("sin servidor"))
+        assertTrue(t.contains("Servidor ninguno"))
         assertTrue(t.contains("sin nombre"))
     }
 

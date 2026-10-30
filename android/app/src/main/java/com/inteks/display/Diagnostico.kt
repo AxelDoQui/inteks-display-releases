@@ -11,7 +11,7 @@ fun textoDiagnostico(
     ultimaOk: Long,
     ahora: Long,
 ): String {
-    val servidor = if (base.isNullOrBlank()) "sin servidor" else base
+    val servidor = if (base.isNullOrBlank()) "ninguno" else base
     val nombre = if (pantalla.isNullOrBlank()) "sin nombre" else pantalla
     val cuando = if (ultimaOk <= 0L) "nunca" else hace(maxOf(0L, ahora - ultimaOk))
     return "Versión APK $version · Servidor $servidor · Pantalla $nombre · " +
