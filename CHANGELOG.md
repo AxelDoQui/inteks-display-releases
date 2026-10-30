@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.51 — sin publicar
+
+- Editor de playlist: el selector de contenido tiene buscador, carpeta, etiquetas y tipo; se pueden marcar varios y añadirlos de golpe, se ve qué ya está en la playlist y se puede arrastrar un contenido al punto exacto.
+
 ## 1.0.50 — 2026-10-30
 
 ### Nuevo

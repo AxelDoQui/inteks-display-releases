@@ -101,12 +101,27 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
    automatico impide que la columna se encoja por debajo del ancho minimo de su
    contenido. Con nombres de archivo largos la columna crecia y arrastraba al
    modal entero fuera de la ventana. */
-.pl-editor{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:14px;margin-top:14px;min-width:0}
+#pl-modal .modal{width:980px}
+.pl-editor{display:grid;grid-template-columns:minmax(0,1fr) 410px;gap:14px;margin-top:14px;min-width:0}
 /* En ventanas estrechas, una columna debajo de otra: ver la CAPA RESPONSIVE
    del final del <style>, donde viven todos los puntos de corte juntos. */
 /* flex-wrap para que las fechas de vigencia bajen a su propia linea. Sin esto
    comparten fila con el nombre y, como .pl-info tiene min-width:0, lo aplastan
    hasta cero: el nombre del contenido desaparecia del todo. */
+.pl-sel-cab{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.pl-sel-cab input[type=search],.pl-sel-cab select{width:100%;min-width:0}
+.pl-sel-fila{display:flex;gap:6px;min-width:0}
+.pl-sel-fila select{flex:1 1 0}
+.pl-sel-tags{display:flex;flex-wrap:wrap;gap:4px}
+.pl-sel-barra{display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:6px 8px;background:var(--s2);border:1px solid var(--a2);border-radius:var(--r);font-size:11px}
+.pl-lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;max-height:520px;overflow-y:auto;overflow-x:hidden;min-width:0}
+.pl-lib-card{position:relative;background:var(--s2);border:1px solid var(--b);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:border-color .15s}
+.pl-lib-card:hover{border-color:var(--accent)}
+.pl-lib-card.marcada{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.pl-lib-card input[type=checkbox]{position:absolute;top:4px;left:4px;width:16px;height:16px;cursor:pointer;z-index:1}
+.pl-lib-ya{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.72);color:#7ee2a8;font-size:9px;padding:1px 5px;border-radius:8px;z-index:1}
+.pl-lib-nom{padding:3px 6px;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-insert{height:3px;background:var(--accent);border-radius:2px;margin:-2px 0 3px;pointer-events:none}
 .pl-item{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--b);border-radius:var(--r);padding:9px 10px;cursor:grab;transition:border-color .15s;margin-bottom:5px}
 /* Segunda linea, siempre completa. Con etiquetas: dos campos de fecha a secas
    no dicen cual es el principio y cual el final. */
@@ -1404,7 +1419,18 @@ JPY  Yen        162.5"></textarea>
       </div>
       <div>
         <div style="font-size:9px;color:var(--muted);font-family:'Space Mono',monospace;letter-spacing:1px;margin-bottom:7px">LIBRERÍA</div>
-        <div id="plm-lib" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px;max-height:380px;overflow-y:auto;overflow-x:hidden;min-width:0"></div>
+        <div class="pl-sel-cab">
+          <input type="search" id="plm-q" placeholder="Buscar por nombre, carpeta o etiqueta…" oninput="plFiltro.texto=this.value;renderPlLib(editingScreen)">
+          <div class="pl-sel-fila">
+            <select id="plm-tipo" onchange="plFiltro.tipo=this.value;renderPlLib(editingScreen)">
+              <option value="todos">Todos los tipos</option><option value="image">Imágenes</option><option value="video">Vídeos</option><option value="otros">Otros</option>
+            </select>
+            <select id="plm-carpeta" title="Carpeta" onchange="plFiltro.carpeta=this.value;renderPlLib(editingScreen)"></select>
+          </div>
+          <div class="pl-sel-tags" id="plm-tags"></div>
+        </div>
+        <div id="plm-barra"></div>
+        <div id="plm-lib" class="pl-lib-grid"></div>
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
@@ -2668,9 +2694,52 @@ function renderPlPackages(){
     '<div style="display:flex;flex-wrap:wrap;gap:6px">'+pkgs.map(p=>`<button class="btn btn-a2 btn-sm" onclick="applyPackage('${p.id}')"><i class="fa-solid fa-box"></i> ${p.name}</button>`).join("")+'</div>';
 }
 
+// ── Editor de playlist: lógica pura (probada en tests/editor-playlist.test.js)
+function resumenPlaylist(pl,items){
+  const lista=Array.isArray(pl)?pl:[];
+  let segundos=0, videosSinDuracion=0;
+  lista.forEach(it=>{
+    if(!it||it.type==="package") return;
+    const d=Number(it.duration);
+    if(it.type==="video"&&!(d>0)){ videosSinDuracion++; return; }
+    if(d>0) segundos+=d;
+  });
+  const n=lista.length;
+  let texto;
+  if(!n) texto="Sin contenido";
+  else{
+    const m=Math.floor(segundos/60), s=Math.round(segundos-m*60);
+    const dur=m?(s?m+" min "+s+" s":m+" min"):s+" s";
+    texto=n+(n===1?" elemento":" elementos")+" · "+dur+" por vuelta"+(videosSinDuracion?" + vídeos":"");
+  }
+  return {n,segundos,videosSinDuracion,texto};
+}
+function idsEnPlaylist(pl){
+  const r=new Set();
+  (Array.isArray(pl)?pl:[]).forEach(it=>{ if(it&&it.type!=="package"&&it.id!=null) r.add(it.id); });
+  return r;
+}
+function insertarEn(lista,nuevos,posicion){
+  const base=Array.isArray(lista)?lista.slice():[];
+  const nu=Array.isArray(nuevos)?nuevos:[];
+  const p=(typeof posicion==="number"&&isFinite(posicion)&&posicion>=0&&posicion<=base.length)?Math.floor(posicion):base.length;
+  base.splice(p,0,...nu);
+  return base;
+}
+function ajustesDistintosDeDefecto(cfg){
+  const c=cfg||{};
+  if(c.priority_every!=null&&Number(c.priority_every)!==4) return true;
+  if(Number(c.safe_margin)>0) return true;
+  return (Array.isArray(c.playlist)?c.playlist:[]).some(it=>it&&it.priority);
+}
+// ── fin del editor de playlist
 // ── Playlist modal
+let plSel=new Set();
+let plFiltro={texto:"",tipo:"todos",carpeta:"all",etiquetas:[]};
 function openPlModal(sid){
   editingScreen=sid;
+  plSel=new Set();
+  plFiltro={texto:"",tipo:"todos",carpeta:"all",etiquetas:[]};
   renderPlPackages();
   const cfg=(content.screens||{})[sid]||{};
   document.getElementById("plm-title").textContent=`PLAYLIST — ${sid.toUpperCase()}`;
@@ -2684,6 +2753,8 @@ function openPlModal(sid){
   document.getElementById("plm-safe-margin").value=cfg.safe_margin||0;
   cambioTransicion();
   cambioShuffle();
+  reconstruirFiltrosPl(sid);
+  iniciarSoltarEnPlaylist();
   renderPlList(sid);renderPlLib(sid);
   document.getElementById("pl-modal").classList.add("show");
 }
@@ -2698,6 +2769,42 @@ function cambioTransicion(){
 function cambioShuffle(){
   const on=document.getElementById("plm-shuffle").checked;
   document.getElementById("plm-priority-wrap").style.display=on?"flex":"none";
+}
+// Soltar contenido del selector sobre la lista de la playlist: se inserta donde
+// se ve la linea (antes o despues de la fila bajo el puntero). Se delega en el
+// contenedor para no tocar el pintado de cada fila.
+function posicionDeSoltado(e){
+  const c=document.getElementById("plm-list");
+  const filas=Array.from(c.querySelectorAll(".pl-item"));
+  let pos=filas.length, ref=null;
+  for(const f of filas){
+    const r=f.getBoundingClientRect();
+    if(e.clientY<r.top+r.height/2){pos=Number(f.dataset.i);ref=f;break;}
+  }
+  return {pos,ref,filas};
+}
+function iniciarSoltarEnPlaylist(){
+  const c=document.getElementById("plm-list");
+  if(!c||c.dataset.soltar) return;
+  c.dataset.soltar="1";
+  c.addEventListener("dragover",e=>{
+    if(!plArrastrando) return;
+    e.preventDefault();
+    const {ref}=posicionDeSoltado(e);
+    limpiarLineaPl();
+    const linea=document.createElement("div");linea.className="pl-insert";
+    if(ref) c.insertBefore(linea,ref); else c.appendChild(linea);
+  });
+  c.addEventListener("dragleave",e=>{ if(!c.contains(e.relatedTarget)) limpiarLineaPl(); });
+  c.addEventListener("drop",e=>{
+    if(!plArrastrando) return;
+    e.preventDefault();
+    const {pos}=posicionDeSoltado(e);
+    const ids=plArrastrando;plArrastrando=null;
+    limpiarLineaPl();
+    ids.forEach(id=>plSel.delete(id));
+    if(editingScreen) addVariosToPl(editingScreen,ids,pos);
+  });
 }
 function closePlModal(){document.getElementById("pl-modal").classList.remove("show");editingScreen=null;}
 function renderPlList(sid){
@@ -2800,21 +2907,101 @@ function vigentesHoy(pl){
   }).length;
 }
 
+// Cabecera del selector (carpetas y etiquetas): se reconstruye al abrir el modal.
+function reconstruirFiltrosPl(sid){
+  const sel=document.getElementById("plm-carpeta"), caja=document.getElementById("plm-tags");
+  if(!sel||!caja) return;
+  const l=listasDeOrganizacion(content.items||[]);
+  document.getElementById("plm-q").value=plFiltro.texto;
+  document.getElementById("plm-tipo").value=plFiltro.tipo;
+  sel.innerHTML="";
+  const op=(v,t)=>{const o=document.createElement("option");o.value=v;o.textContent=t;sel.appendChild(o);};
+  op("all","Todas las carpetas"); op("none","Sin carpeta");
+  l.carpetas.forEach(c=>op("c:"+c,c));
+  sel.value=plFiltro.carpeta;
+  caja.innerHTML="";
+  l.etiquetas.forEach(t=>{
+    const b=document.createElement("button");b.type="button";b.className="chip"+(plFiltro.etiquetas.indexOf(t)!==-1?" on":"");
+    b.textContent=t;
+    b.onclick=()=>{
+      const i=plFiltro.etiquetas.indexOf(t);
+      if(i===-1)plFiltro.etiquetas.push(t);else plFiltro.etiquetas.splice(i,1);
+      b.classList.toggle("on");
+      renderPlLib(sid);
+    };
+    caja.appendChild(b);
+  });
+}
+// Ids que se estan arrastrando desde el selector hacia la lista de la playlist.
+let plArrastrando=null;
+function limpiarLineaPl(){document.querySelectorAll("#plm-list .pl-insert").forEach(x=>x.remove());}
 function renderPlLib(sid){
   const c=document.getElementById("plm-lib");
   const items=content.items||[];
-  if(!items.length){c.innerHTML='<div style="font-size:11px;color:var(--muted);padding:6px">Librería vacía</div>';return;}
+  if(!items.length){c.innerHTML='<div style="font-size:11px;color:var(--muted);padding:6px">Librería vacía</div>';document.getElementById("plm-barra").innerHTML="";return;}
+  const lista=filtrarOrdenar(items,libInfo,{...plFiltro,orden:"nombre"});
+  const ya=idsEnPlaylist((content.screens[sid]||{}).playlist);
   c.innerHTML="";
-  items.forEach(item=>{
+  if(!lista.length) c.innerHTML='<div style="font-size:11px;color:var(--muted);padding:6px;grid-column:1/-1">Nada coincide con el filtro</div>';
+  lista.forEach(item=>{
     const el=document.createElement("div");
-    el.style.cssText="background:var(--s2);border:1px solid var(--b);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:border-color .15s";
-    let t=item.type==="image"?`<img src="${item.src}" style="width:100%;aspect-ratio:16/9;object-fit:cover">`:item.type==="video"?`<video src="${item.src}" muted style="width:100%;aspect-ratio:16/9;object-fit:cover"></video>`:`<div style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:var(--s3)"><i class="fa-solid ${typeIcon(item.type)}" style="font-size:24px;color:var(--muted)"></i></div>`;
-    el.innerHTML=`${t}<div style="padding:3px 6px;font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.name)}</div>`;
-    el.addEventListener("mouseover",()=>el.style.borderColor="var(--accent)");
-    el.addEventListener("mouseout",()=>el.style.borderColor="var(--b)");
-    el.addEventListener("click",()=>addToPl(sid,item));
+    el.className="pl-lib-card"+(plSel.has(item.id)?" marcada":"");
+    el.draggable=true;
+    const t=item.type==="image"?`<img src="${esc(item.src)}" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block" draggable="false">`
+      :item.type==="video"?`<video src="${esc(item.src)}" muted preload="metadata" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block"></video>`
+      :`<div style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:var(--s3)"><i class="fa-solid ${typeIcon(item.type)}" style="font-size:24px;color:var(--muted)"></i></div>`;
+    el.innerHTML=`<input type="checkbox" title="Marcar para añadir varios"${plSel.has(item.id)?" checked":""}>`+
+      (ya.has(item.id)?'<span class="pl-lib-ya">✓ ya está</span>':"")+t+
+      `<div class="pl-lib-nom" title="${esc(item.name)}">${esc(item.name)}</div>`;
+    const cb=el.querySelector("input");
+    cb.addEventListener("click",e=>e.stopPropagation());
+    cb.addEventListener("change",()=>{
+      if(cb.checked)plSel.add(item.id);else plSel.delete(item.id);
+      el.classList.toggle("marcada",cb.checked);
+      pintarBarraPl(sid,lista);
+    });
+    el.addEventListener("click",()=>addVariosToPl(sid,[item.id]));
+    el.addEventListener("dragstart",e=>{
+      dragSrc=null;
+      // Si la miniatura arrastrada esta marcada, se arrastran todas las marcadas visibles.
+      plArrastrando=plSel.has(item.id)?lista.filter(i=>plSel.has(i.id)).map(i=>i.id):[item.id];
+      try{e.dataTransfer.setData("text/plain",item.id);e.dataTransfer.effectAllowed="copy";}catch(_){}
+    });
+    el.addEventListener("dragend",()=>{plArrastrando=null;limpiarLineaPl();});
     c.appendChild(el);
   });
+  pintarBarraPl(sid,lista);
+}
+function pintarBarraPl(sid,lista){
+  const barra=document.getElementById("plm-barra");
+  const n=lista.filter(i=>plSel.has(i.id)).length;
+  barra.innerHTML="";
+  if(!n) return;
+  const d=document.createElement("div");d.className="pl-sel-barra";
+  d.innerHTML=`<span style="flex:1">${n} marcado${n===1?"":"s"}</span>`;
+  const a=document.createElement("button");a.className="btn btn-accent btn-sm";a.textContent="Añadir "+n;
+  a.onclick=()=>{
+    // En el orden en que aparecen en pantalla.
+    const ids=lista.filter(i=>plSel.has(i.id)).map(i=>i.id);
+    ids.forEach(id=>plSel.delete(id));
+    addVariosToPl(sid,ids);
+  };
+  const q=document.createElement("button");q.className="btn btn-ghost btn-sm";q.textContent="Quitar marca";
+  q.onclick=()=>{lista.forEach(i=>plSel.delete(i.id));renderPlLib(sid);};
+  d.appendChild(a);d.appendChild(q);barra.appendChild(d);
+}
+// Añade contenidos de la libreria por id. posicion opcional: sin ella, al final.
+function addVariosToPl(sid,ids,posicion){
+  if(!content.screens[sid])content.screens[sid]={mode:"independent",playlist:[]};
+  const nuevos=[];
+  (ids||[]).forEach(id=>{
+    const item=(content.items||[]).find(x=>x.id===id);
+    if(item)nuevos.push({...item,duration:item.duration||8});
+  });
+  if(!nuevos.length) return;
+  content.screens[sid].playlist=insertarEn(content.screens[sid].playlist||[],nuevos,posicion);
+  renderPlList(sid);renderPlLib(sid);
+  toast(nuevos.length===1?`"${nuevos[0].name}" añadido`:`${nuevos.length} contenidos añadidos`);
 }
 function addToPl(sid,item){
   if(!content.screens[sid])content.screens[sid]={mode:"independent",playlist:[]};
