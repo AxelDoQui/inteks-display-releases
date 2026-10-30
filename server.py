@@ -887,6 +887,29 @@ def restaurar_backup(datos):
         + (f", {saltados} descartado(s)" if saltados else ""))
     return True, f"{escritos} archivo(s) restaurados"
 
+def usos_de_items(content, registro_pantallas):
+    """Dónde se usa cada contenido: {id: [{"kind", "id", "name"}]}.
+
+    Una pantalla usa un contenido si está directo en su playlist; un paquete,
+    si está en sus itemIds. Las pantallas que usan un paquete no se cuentan
+    aquí: el paquete ya sale en la lista.
+    """
+    usos = {}
+    def anotar(item_id, kind, ident, nombre):
+        lista = usos.setdefault(item_id, [])
+        if not any(u["kind"] == kind and u["id"] == ident for u in lista):
+            lista.append({"kind": kind, "id": ident, "name": nombre})
+    for sid, scr in (content.get("screens") or {}).items():
+        reg = registro_pantallas.get(sid) if isinstance(registro_pantallas, dict) else None
+        nombre = (reg.get("name") if isinstance(reg, dict) else None) or sid
+        for p in scr.get("playlist", []):
+            if isinstance(p, dict) and p.get("type") != "package" and p.get("id"):
+                anotar(p["id"], "screen", sid, nombre)
+    for pkg in content.get("packages", []):
+        for item_id in pkg.get("itemIds", []):
+            anotar(item_id, "package", pkg.get("id", ""), pkg.get("name") or pkg.get("id", ""))
+    return usos
+
 def expandir_paquetes(playlist, content):
     """Sustituye las referencias a paquetes por los contenidos que tienen AHORA.
 
@@ -2014,6 +2037,27 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control","no-store")
             self.cors(); self.end_headers(); self.wfile.write(body); return
 
+        # ── API: datos de la Librería (tamaño, fecha y dónde se usa cada archivo)
+        if path == "/api/library-info":
+            if not self.require_auth(): return
+            content = load_json(CONTENT_FILE)
+            usos = usos_de_items(content, load_json(SCREENS_FILE))
+            salida = {}
+            for it in content.get("items", []):
+                iid = it.get("id")
+                if not iid: continue
+                dato = {"uses": usos.get(iid, [])}
+                if it.get("src"):
+                    try:
+                        st = os.stat(os.path.join(UPLOAD_DIR, os.path.basename(str(iid))))
+                        dato["size"] = st.st_size
+                        dato["created"] = int(st.st_mtime)
+                    except OSError: pass
+                salida[iid] = dato
+            body = json.dumps(salida).encode()
+            self.send_response(200); self.send_header("Content-Type","application/json")
+            self.cors(); self.end_headers(); self.wfile.write(body); return
+
         # ── API: obtener pantallas registradas  (solo admin / extensión con token)
         if path == "/api/screens":
             if not self.require_auth(): return
@@ -2770,6 +2814,26 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e: err(e)
             return
 
+        # ── Renombrar un contenido (solo el nombre que se ve)
+        if path == "/api/rename":
+            try:
+                d = json.loads(body)
+                item_id = d["id"]
+                nombre = str(d.get("name", "")).strip()
+                if not nombre or len(nombre) > 120:
+                    jresp(400, {"ok": False, "error": "Nombre no válido (1 a 120 caracteres)"}); return
+                encontrado = False
+                with contenido_en_edicion() as content:
+                    for it in content.get("items", []):
+                        if it.get("id") == item_id:
+                            it["name"] = nombre; encontrado = True; break
+                if not encontrado:
+                    jresp(404, {"ok": False, "error": "No existe ese archivo"}); return
+                notify_all()
+                ok()
+            except Exception as e: err(e)
+            return
+
         # ── Eliminar item de librería
         if path == "/api/delete":
             try:
@@ -2789,6 +2853,10 @@ class Handler(BaseHTTPRequestHandler):
                     # Eliminar de todas las playlists de pantallas
                     for sid, scr in content.get("screens",{}).items():
                         scr["playlist"] = [p for p in scr.get("playlist",[]) if p.get("id")!=item_id]
+                    # Y de los paquetes: un paquete con un id que ya no existe
+                    # se reproduciría saltándose huecos.
+                    for pkg in content.get("packages", []):
+                        pkg["itemIds"] = [i for i in pkg.get("itemIds", []) if i != item_id]
                 notify_all()
                 ok()
             except Exception as e: err(e)
