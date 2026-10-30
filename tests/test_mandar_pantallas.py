@@ -88,8 +88,11 @@ def main():
                             cod == 200 and c["screens"].get("s3", {}).get("mode") == "independent"
                             and ids(c["screens"]["s3"]["playlist"]) == [A], str(c["screens"].get("s3")))
         # 4. repetir
+        _, rev0 = peticion("GET", "/api/content")
         cod, r = enviar({"ids": [A, B], "screens": ["s1", "s2"]})
         fallos += comprobar("repetido added 0", cod == 200 and r.get("added") == 0 and r.get("skipped") == 4, str(r))
+        _, rev1 = peticion("GET", "/api/content")
+        fallos += comprobar("repetido no sube rev", rev0["rev"] == rev1["rev"])
         # 5/6. inexistentes sin subir rev
         _, antes = peticion("GET", "/api/content")
         cod, r = enviar({"ids": [A], "screens": ["s1", "zz"]})

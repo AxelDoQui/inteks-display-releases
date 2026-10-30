@@ -1471,6 +1471,9 @@ class RevConflicto(Exception):
 class ArchivoNoExiste(Exception):
     """Se lanza dentro de contenido_en_edicion() para abortar sin guardar ni subir rev."""
 
+class NadaQueAnadir(Exception):
+    pass
+
 class DestinoNoExiste(Exception):
     """Archivo o pantalla inexistente: aborta sin guardar; lleva el mensaje para el 404."""
 
@@ -2862,8 +2865,15 @@ class Handler(BaseHTTPRequestHandler):
                                     saltados += 1
                                 else:
                                     pl.append({**por_id[iid], "duration": dur}); añadidos += 1
+                        if añadidos == 0:
+                            # Nada nuevo: se sale por excepción para no guardar
+                            # ni subir 'rev' (los demás paneles no se enterarían
+                            # y su siguiente cambio rebotaría con 409).
+                            raise NadaQueAnadir()
                 except DestinoNoExiste as e:
                     jresp(404, {"ok": False, "error": str(e)}); return
+                except NadaQueAnadir:
+                    pass
                 if añadidos > 0: notify_all()
                 jresp(200, {"ok": True, "added": añadidos, "skipped": saltados})
             except Exception as e: err(e)
