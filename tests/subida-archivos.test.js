@@ -182,3 +182,36 @@ test("subirArchivos: no envía el que pasa del máximo y sigue con el resto", as
   assert.deepStrictEqual(Array.from(res, r => r.ok), [true, false, true]);
   assert.match(res[1].error, /Pasa del máximo de 1 MB por archivo/);
 });
+
+test("tipoPorCabecera espeja al servidor", () => {
+  const { tipoPorCabecera } = cargar();
+  const b = (...v) => { const a = new Uint8Array(Math.max(12, v.length)); a.set(v); return a; };
+  const asc = s => Array.from(s, c => c.charCodeAt(0));
+  assert.strictEqual(tipoPorCabecera(b(0xff, 0xd8, 0xff, 0xe0)), "image");
+  assert.strictEqual(tipoPorCabecera(b(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)), "image");
+  assert.strictEqual(tipoPorCabecera(b(...asc("GIF89a"))), "image");
+  assert.strictEqual(tipoPorCabecera(b(...asc("GIF87a"))), "image");
+  assert.strictEqual(tipoPorCabecera(b(...asc("RIFF"), 0, 0, 0, 0, ...asc("WEBP"))), "image");
+  assert.strictEqual(tipoPorCabecera(b(0, 0, 0, 0x18, ...asc("ftypmp42"))), "video");
+  assert.strictEqual(tipoPorCabecera(b(0x1a, 0x45, 0xdf, 0xa3)), "video");
+  assert.strictEqual(tipoPorCabecera(b(0, 0, 0, 0x18, ...asc("ftypheic"))), null);
+  assert.strictEqual(tipoPorCabecera(b(0, 0, 0, 0x18, ...asc("ftypavif"))), null);
+  assert.strictEqual(tipoPorCabecera(b(...asc("hola, soy texto"))), null);
+});
+
+test("subirArchivos: no envía el que tiene cabecera inválida y sigue con el resto", async () => {
+  const { subirArchivos } = cargar();
+  const cuenta = { n: 0 };
+  const base = fabricaXHR({});
+  const xhr = () => { const x = base(); const s = x.send.bind(x); x.send = f => { cuenta.n++; s(f); }; return x; };
+  const falso = (name, bytes) => ({ name, size: 10, slice: () => ({ arrayBuffer: async () => Uint8Array.from(bytes).buffer }) });
+  const png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0];
+  const eventos = [];
+  const res = await subirArchivos(
+    [falso("a.png", png), falso("malo.png", Array.from("texto de prueba", c => c.charCodeAt(0))), falso("c.png", png)], xhr,
+    { alEmpezar: i => eventos.push("E" + i), alProgreso() {}, alTerminar: i => eventos.push("T" + i), cancelado: () => false });
+  assert.strictEqual(cuenta.n, 2);
+  assert.deepStrictEqual(Array.from(res, r => r.ok), [true, false, true]);
+  assert.match(res[1].error, /No es una imagen ni un vídeo que se pueda mostrar/);
+  assert.deepStrictEqual(eventos, ["E0", "T0", "E1", "T1", "E2", "T2"]);
+});

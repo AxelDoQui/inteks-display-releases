@@ -717,6 +717,7 @@ def crear_backup(incluir_media=True):
         if incluir_media and os.path.isdir(UPLOAD_DIR):
             for raiz, _, ficheros in os.walk(UPLOAD_DIR):
                 for f in ficheros:
+                    if f.endswith(".part"): continue    # subida a medias
                     completa = os.path.join(raiz, f)
                     rel = os.path.relpath(completa, UPLOAD_DIR).replace("\\", "/")
                     z.write(completa, f"uploads/{rel}")
@@ -1505,11 +1506,30 @@ def nombre_seguro(name):
     nombre = os.path.basename(str(name).replace("\\", "/"))
     nombre = "".join("_" if (c in '<>:"/\\|?*' or ord(c) < 32) else c for c in nombre)
     nombre = nombre.strip().rstrip(". ")
+    # Un .part es una subida a medias: el arranque los borra, así que un archivo
+    # de verdad no puede acabar así (p. ej. una descarga de Firefox sin terminar).
+    if nombre.lower().endswith(".part"):
+        nombre = nombre[:-5] + "_part"
     if len(nombre) > 120:
         raiz, ext = os.path.splitext(nombre)
         ext = ext[:20]
         nombre = (raiz[:120 - len(ext)] + ext).rstrip(". ")
     return nombre or "archivo"
+
+def reservar_nombre(nombre):
+    """Primer número libre y el .part reservado a la vez, bajo candado: dos
+    subidas simultáneas no pueden elegir el mismo nombre. Devuelve
+    (filename, destino, parcial); el .part ya existe (vacío)."""
+    with _subida_lock:
+        idx = len(os.listdir(UPLOAD_DIR))
+        while (os.path.exists(os.path.join(UPLOAD_DIR, f"{idx:04d}_{nombre}"))
+               or os.path.exists(os.path.join(UPLOAD_DIR, f"{idx:04d}_{nombre}.part"))):
+            idx += 1
+        filename = f"{idx:04d}_{nombre}"
+        destino = os.path.join(UPLOAD_DIR, filename)
+        parcial = destino + ".part"
+        open(parcial, "xb").close()
+    return filename, destino, parcial
 
 def _espacio_legible(n):
     return f"{n // (1024**3)} GB" if n >= 1024**3 else f"{n // (1024**2)} MB"
@@ -1534,17 +1554,7 @@ def guardar_subida_raw(lector, length, name):
     if not tipo:
         raise SubidaRechazada(415, "No es una imagen ni un vídeo que se pueda mostrar "
                                    "(vale JPG, PNG, GIF, WEBP, MP4, MOV o WEBM)")
-    # Primer número libre y el .part reservado a la vez: dos subidas simultáneas
-    # no pueden elegir el mismo nombre.
-    with _subida_lock:
-        idx = len(os.listdir(UPLOAD_DIR))
-        while (os.path.exists(os.path.join(UPLOAD_DIR, f"{idx:04d}_{nombre}"))
-               or os.path.exists(os.path.join(UPLOAD_DIR, f"{idx:04d}_{nombre}.part"))):
-            idx += 1
-        filename = f"{idx:04d}_{nombre}"
-        destino = os.path.join(UPLOAD_DIR, filename)
-        parcial = destino + ".part"
-        open(parcial, "xb").close()
+    filename, destino, parcial = reservar_nombre(nombre)
     recibido = len(primero)
     try:
         with open(parcial, "wb") as f:
@@ -2242,19 +2252,37 @@ class Handler(BaseHTTPRequestHandler):
         comprobó en do_POST."""
         nombre = (parse_qs(parsed.query).get("name", [""])[0])
         lector = _Lector(self.rfile)
+        # Solo aquí: un cliente parado no puede retener el hilo (y su .part) para
+        # siempre. En todo el manejador no, porque /api/events es de larga vida.
+        self.connection.settimeout(120)
         try:
             item = guardar_subida_raw(lector, length, nombre)
             codigo, cuerpo = 200, {"ok": True, "item": item}
         except SubidaRechazada as e:
             codigo, cuerpo = e.codigo, {"ok": False, "error": e.mensaje}
             sin_leer = length - lector.leido
-            if 0 < sin_leer <= 8 * 1024 * 1024:
-                while sin_leer > 0:                 # pequeño: se vacía y la respuesta llega limpia
-                    d = self.rfile.read(min(SUBIDA_TROZO, sin_leer))
-                    if not d: break
-                    sin_leer -= len(d)
-            elif sin_leer > 0:
-                self.close_connection = True        # grande: no se lee, se corta
+            # Cerrar con cuerpo sin leer provoca un reset TCP que puede borrar la
+            # respuesta (el panel vería «se perdió la conexión» en vez del motivo).
+            # Se vacía el cuerpo entero salvo el 413 (ya filtrado en el panel) o
+            # si pasa del tope.
+            if sin_leer > 0:
+                if e.codigo != 413 and sin_leer <= 4 * 1024 ** 3:
+                    try:
+                        while sin_leer > 0:
+                            d = self.rfile.read(min(SUBIDA_TROZO, sin_leer))
+                            if not d:
+                                self.close_connection = True
+                                break
+                            sin_leer -= len(d)
+                    except OSError:
+                        self.close_connection = True; return
+                else:
+                    self.close_connection = True    # no se lee, se corta
+        except (TimeoutError, socket.timeout, ConnectionError):
+            # Cliente parado o desconectado: como una subida cortada. El .part ya
+            # lo borró guardar_subida_raw; no hay a quién contestar ni traza que dar.
+            self.close_connection = True
+            return
         except Exception as e:
             codigo, cuerpo = 500, {"ok": False, "error": f"Error del servidor: {e}"}
             self.close_connection = True
@@ -2501,14 +2529,16 @@ class Handler(BaseHTTPRequestHandler):
                 if "," in raw_data: raw_data = raw_data.split(",",1)[1]
                 raw = base64.b64decode(raw_data)
                 # Solo el nombre, sin carpetas: "../../x" no sale de uploads/.
-                name = os.path.basename(str(d["name"]).replace("\\", "/")).strip() or "archivo"
-                # Primer número libre, no "cuántos hay": si se borró alguno, el
-                # recuento repetía un número y una subida pisaba a otra.
-                idx = len(os.listdir(UPLOAD_DIR))
-                while os.path.exists(os.path.join(UPLOAD_DIR, f"{idx:04d}_{name}")):
-                    idx += 1
-                filename = f"{idx:04d}_{name}"
-                with open(os.path.join(UPLOAD_DIR, filename),"wb") as f: f.write(raw)
+                name = nombre_seguro(d["name"])
+                # Primer número libre bajo candado (y sin chocar con un .part).
+                filename, destino, parcial = reservar_nombre(name)
+                try:
+                    with open(parcial, "wb") as f: f.write(raw)
+                    os.replace(parcial, destino)
+                except BaseException:
+                    try: os.remove(parcial)
+                    except OSError: pass
+                    raise
                 item = {"id": filename, "name": name, "type": d["type"],
                         "src": f"/uploads/{filename}", "size": len(raw)}
                 with contenido_en_edicion() as content:
@@ -2749,8 +2779,12 @@ class Handler(BaseHTTPRequestHandler):
                     item = next((i for i in content.get("items",[]) if i["id"]==item_id), None)
                     if item:
                         # Sólo los archivos subidos tienen 'src'; los módulos (fx, weather, qr...) no
-                        fp = item.get("src", "").lstrip("/")
-                        if fp and os.path.exists(fp): os.remove(fp)
+                        # Los archivos viven en UPLOAD_DIR (DATA_DIR), no en el cwd.
+                        if item.get("src"):
+                            fp = os.path.join(UPLOAD_DIR, os.path.basename(str(item["id"])))
+                            if os.path.realpath(fp).startswith(os.path.realpath(UPLOAD_DIR) + os.sep):
+                                try: os.remove(fp)
+                                except OSError: pass
                     content["items"] = [i for i in content.get("items",[]) if i["id"]!=item_id]
                     # Eliminar de todas las playlists de pantallas
                     for sid, scr in content.get("screens",{}).items():

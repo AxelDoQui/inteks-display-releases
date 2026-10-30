@@ -1833,6 +1833,21 @@ function subirUno(f,nuevoXHR,alProgreso,ctl){
   });
 }
 function excedeMaximo(f,maxMb){ return !!maxMb&&f.size>maxMb*1024*1024; }
+// Espejo de detectar_tipo del servidor: mira los primeros bytes, no la extensión.
+function tipoPorCabecera(b){
+  const t=(i,s)=>{ for(let k=0;k<s.length;k++) if(b[i+k]!==s.charCodeAt(k)) return false; return true; };
+  const h=(i,arr)=>arr.every((v,k)=>b[i+k]===v);
+  if(h(0,[0xff,0xd8,0xff])) return "image";
+  if(h(0,[0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a])) return "image";
+  if(t(0,"GIF87a")||t(0,"GIF89a")) return "image";
+  if(t(0,"RIFF")&&t(8,"WEBP")) return "image";
+  if(t(4,"ftyp")){
+    if(["heic","heix","mif1","msf1","avif"].some(m=>t(8,m))) return null;
+    return "video";
+  }
+  if(h(0,[0x1a,0x45,0xdf,0xa3])) return "video";
+  return null;
+}
 async function subirArchivos(files,nuevoXHR,g){
   const res=[];
   for(let i=0;i<files.length;i++){
@@ -1847,6 +1862,9 @@ async function subirArchivos(files,nuevoXHR,g){
     let r;
     if(excedeMaximo(files[i],g.maxMb))
       r={ok:false,nombre:files[i].name,error:"Pasa del máximo de "+g.maxMb+" MB por archivo"};
+    else if(typeof files[i].slice==="function"&&
+            tipoPorCabecera(new Uint8Array(await files[i].slice(0,12).arrayBuffer()))===null)
+      r={ok:false,nombre:files[i].name,error:"No es una imagen ni un vídeo que se pueda mostrar (vale JPG, PNG, GIF, WEBP, MP4, MOV o WEBM)"};
     else r=await subirUno(files[i],nuevoXHR,fr=>g.alProgreso(i,fr),g.ctl||{});
     g.alTerminar(i,r);
     res.push(r);

@@ -158,6 +158,37 @@ def main():
             {"name": "viejo.png", "type": "image", "data": base64.b64encode(PNG).decode(), "size": len(PNG)}).encode(),
             cabeceras={"Content-Type": "application/json"})
         fallos += comprobar("el /api/upload antiguo sigue funcionando", cod == 200 and r.get("ok"), f"{cod} {r}")
+
+        # Ruta antigua con un nombre que en NTFS crearía un flujo alterno.
+        cod, r = peticion("POST", "/api/upload", json.dumps(
+            {"name": "a:b.png", "type": "image", "data": base64.b64encode(PNG).decode(), "size": len(PNG)}).encode(),
+            cabeceras={"Content-Type": "application/json"})
+        idv = r.get("item", {}).get("id", "")
+        fallos += comprobar("/api/upload antiguo: a:b.png se guarda con nombre seguro",
+                            cod == 200 and ":" not in idv and os.path.isfile(os.path.join(up, idv)), f"{cod} {r}")
+
+        # Un archivo no puede terminar en .part (el arranque los borra).
+        cod, r = subir("descarga.PART", PNG)
+        n = r.get("item", {}).get("name", "")
+        fallos += comprobar("nombre acabado en .part -> _part",
+                            cod == 200 and n == "descarga_part" and not r["item"]["id"].lower().endswith(".part"), f"{cod} {r}")
+
+        # Rechazo con cuerpo grande: el motivo llega (no un reset de conexión).
+        cod, r = subir("falso.png", b"esto no es una imagen" * (1024 * 1024))   # ~21 MB
+        fallos += comprobar("415 con 21 MB de cuerpo llega con su motivo",
+                            cod == 415 and "imagen" in r.get("error", ""), f"{cod} {r}")
+
+        # El backup no incluye subidas a medias.
+        import zipfile, io
+        open(os.path.join(up, "7777_a_medias.mp4.part"), "wb").write(b"x")
+        c = http.client.HTTPConnection("127.0.0.1", PORT, timeout=60)
+        c.request("GET", "/api/backup?media=1", headers={"X-SignalOS-Token": TOKEN})
+        rb = c.getresponse(); zb = rb.read(); c.close()
+        try: nombres = zipfile.ZipFile(io.BytesIO(zb)).namelist()
+        except Exception: nombres = None
+        fallos += comprobar("el backup omite los .part",
+                            nombres is not None and not any(x.endswith(".part") for x in nombres)
+                            and any(x.startswith("uploads/") for x in nombres), str(nombres))
     finally:
         if proc:
             proc.terminate()
