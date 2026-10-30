@@ -8,7 +8,7 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
-## 1.0.50 — sin publicar
+## 1.0.50 — 2026-10-30
 
 ### Nuevo
 
