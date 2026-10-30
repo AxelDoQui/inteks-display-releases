@@ -8,7 +8,7 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
-## 1.0.52 — sin publicar
+## 1.0.52 — 2026-10-30
 
 - Ajustes → Opciones avanzadas: nueva casilla «Este PC reproduce en su propia pantalla (mini PC del televisor)». Desmarcada, la pantalla a pantalla completa de ese PC se cierra y la tarea programada deja de reabrirla cada 5 minutos, sin necesitar permisos de administrador. Al volver a marcarla reaparece en unos 5 minutos. Para que un PC la respete hay que instalar esta versión en él.
 
