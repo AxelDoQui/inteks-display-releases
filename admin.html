@@ -4564,26 +4564,44 @@ async function cambiarLg(id,accion,nombre,activo){
 async function instalarActualizacion(version){
   if(!confirm("Se instalará la versión "+version+".\n\n"+
               "El servidor se reiniciará durante un minuto aproximadamente. Las pantallas "+
-              "seguirán mostrando su contenido y se reconectarán solas.\n\n¿Actualizar ahora?")) return;
+              "seguirán mostrando su contenido y se reconectarán solas.\n\n"+
+              "Si estás en la aplicación de escritorio, su ventana se cerrará sola durante la "+
+              "instalación: ábrela de nuevo pasado un minuto.\n\n¿Actualizar ahora?")) return;
   const el={set innerHTML(v){ponerEstadoUpdate(v);}};
-  el.innerHTML='<span style="color:var(--muted)">descargando e instalando… no cierres esta ventana</span>';
+  // No hay porcentaje real: el servidor baja el instalador de golpe. Se enseña una
+  // barra en movimiento y los segundos que lleva, para que se vea que sigue vivo.
+  const t0=Date.now();
+  const barra=fase=>'<span style="color:var(--muted)">'+fase+' · '+Math.round((Date.now()-t0)/1000)+' s</span>'+
+    '<span style="display:block;margin-top:6px;height:6px;border-radius:3px;background:var(--b);overflow:hidden">'+
+    '<span style="display:block;height:100%;width:35%;background:var(--accent);border-radius:3px;animation:barraEspera 1.2s ease-in-out infinite alternate"></span></span>';
+  if(!document.getElementById("estilo-barra-espera")){
+    const st=document.createElement("style");st.id="estilo-barra-espera";
+    st.textContent="@keyframes barraEspera{from{margin-left:0}to{margin-left:65%}}";
+    document.head.appendChild(st);
+  }
+  let fase="Descargando el instalador…";
+  el.innerHTML=barra(fase);
+  const tic=setInterval(()=>{ el.innerHTML=barra(fase); },1000);
   try{
     const r=await fetch("/api/update-install",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
     const d=await r.json().catch(()=>({}));
     if(!r.ok){
-      el.innerHTML='<span style="color:var(--danger,#e5484d)">'+(d.error||"No se pudo actualizar")+'</span>';
+      clearInterval(tic);
+      el.innerHTML='<span style="color:var(--danger,#e5484d)">'+esc(d.error||"No se pudo actualizar")+'</span>';
       return;
     }
-  }catch(e){ el.innerHTML='<span style="color:var(--danger,#e5484d)">No se pudo contactar con el servidor</span>'; return; }
+  }catch(e){ clearInterval(tic); el.innerHTML='<span style="color:var(--danger,#e5484d)">No se pudo contactar con el servidor</span>'; return; }
   // Esperar a que vuelva con la versión nueva (hasta 4 minutos).
+  fase="Instalando (el servidor se reinicia solo)…";
   const fin=Date.now()+240000;
   while(Date.now()<fin){
     await new Promise(ok=>setTimeout(ok,3000));
     try{
       const i=await (await fetch("/api/info",{cache:"no-store"})).json();
-      if(i.version===version){ location.reload(); return; }
+      if(i.version===version){ clearInterval(tic); location.reload(); return; }
     }catch(e){ /* el servidor está reiniciándose */ }
   }
+  clearInterval(tic);
   el.innerHTML='<span style="color:var(--muted)">La actualización tarda más de lo normal. Recarga la página en un momento.</span>';
 }
 

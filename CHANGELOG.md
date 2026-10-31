@@ -8,6 +8,11 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.59 — sin publicar
+
+- Arreglo importante de «Actualizar ahora»: si se lanzaba desde la aplicación de escritorio, su propia ventana agarraba `InTeksDisplay.exe`, el instalador no podía sustituirlo, abortaba y **dejaba el servidor parado**. Ahora el instalador cierra esa ventana antes de copiar (hay que abrirla de nuevo al terminar).
+- La actualización enseña una barra en movimiento y los segundos que lleva, y avisa antes de que la ventana de escritorio se va a cerrar.
+
 ## 1.0.58 — 2026-10-31
 
 - Pantallas: botón «Renombrar» (en «Más»). Cambia solo el nombre que se ve en el panel; el televisor sigue enlazado, porque su identificador interno no cambia (sale entre paréntesis junto al nombre). El nombre nuevo también sale en los títulos de Playlist y Horario, y «Duplicar» no lo copia.

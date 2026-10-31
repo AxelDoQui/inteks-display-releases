@@ -54,6 +54,17 @@ Get-Process python, pythonw -ErrorAction SilentlyContinue | ForEach-Object {
     }
 }
 
+# La ventana del panel (InTeksDisplay.exe) también agarra su propio .exe: si la
+# actualización se lanza desde esa ventana, el instalador no puede sustituirlo
+# («DeleteFile falló; código 5»), aborta, deshace lo hecho y deja el servidor
+# parado. Pasó el 2026-10-31. Se cierran las de esta instalación; el panel se
+# vuelve a abrir con su acceso directo.
+Get-Process InTeksDisplay -ErrorAction SilentlyContinue | ForEach-Object {
+    if ($AppDir -and $_.Path -and $_.Path.StartsWith($AppDir, [StringComparison]::OrdinalIgnoreCase)) {
+        try { Stop-Process -Id $_.Id -Force -ErrorAction Stop; $muertos++ } catch {}
+    }
+}
+
 # Windows no suelta los handles en el mismo instante en que muere el proceso.
 # Sin esta espera, el instalador puede llegar al DeleteFile antes de tiempo y
 # fallar igual, que es justo lo que veniamos a evitar.
