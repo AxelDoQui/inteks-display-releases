@@ -23,7 +23,7 @@ import urllib.request
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.55"
+APP_VERSION = "1.0.56"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
