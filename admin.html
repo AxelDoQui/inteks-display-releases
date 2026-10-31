@@ -2837,6 +2837,8 @@ function cambioTransicion(){
 function cambioShuffle(){
   const on=document.getElementById("plm-shuffle").checked;
   document.getElementById("plm-priority-wrap").style.display=on?"flex":"none";
+  // Las estrellas de las filas solo salen con orden aleatorio.
+  if(editingScreen&&document.getElementById("pl-modal").classList.contains("show")) renderPlList(editingScreen);
 }
 // Soltar contenido del selector sobre la lista de la playlist: se inserta donde
 // se ve la linea (antes o despues de la fila bajo el puntero). Se delega en el
@@ -2961,8 +2963,10 @@ function renderPlList(sid){
       }
       // La estrella solo cambia algo con orden aleatorio: en orden fijo la
       // posicion ya la decide el usuario arrastrando, y marcarla no haria nada.
-      fila.appendChild(boton(item.priority?"btn-accent":"btn-ghost",'<i class="fa-solid fa-star"></i>',
-        "Prioridad: con orden aleatorio, sale cada X pases en vez de quedar al azar",()=>togglePriority(sid,i)));
+      // Se oculta si no aplica, salvo que el contenido ya la tenga: así se puede quitar.
+      if(document.getElementById("plm-shuffle").checked||item.priority)
+        fila.appendChild(boton(item.priority?"btn-accent":"btn-ghost",'<i class="fa-solid fa-star"></i>',
+          "Prioridad: con orden aleatorio, sale cada X pases en vez de quedar al azar",()=>togglePriority(sid,i)));
       const mas=boton("btn-ghost pl-mas"+(plAbiertos.has(item)?" abierto":""),
         '<i class="fa-solid fa-ellipsis"></i>'+(conFechas?'<span class="pl-punto"></span>':''),
         "Fechas, subir, bajar y quitar",()=>{

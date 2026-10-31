@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.54 — 2026-10-31
+
+- Editor de playlist: «prioridad ⭐ cada N pases» sale junto a «Orden aleatorio» en vez de esconderse en «Más ajustes». Las estrellas de las filas solo salen con orden aleatorio (que es cuando tienen efecto), salvo en un contenido que ya la tenga marcada, para poder quitársela.
+
 ## 1.0.53 — 2026-10-31
 
 - Televisores LG: el navegador del LG cierra la página cada ~2 minutos, así que ahora hay una mini-app para webOS (carpeta `webos\`) que abre el reproductor desde el entorno de apps del TV. `instalar-lg.ps1` la instala pidiendo solo la IP del TV, su passphrase (app «Developer Mode») y la IP del servidor.
