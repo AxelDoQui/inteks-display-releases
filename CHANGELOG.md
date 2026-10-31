@@ -8,7 +8,7 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
-## 1.0.59 — sin publicar
+## 1.0.59 — 2026-10-31
 
 - Arreglo importante de «Actualizar ahora»: si se lanzaba desde la aplicación de escritorio, su propia ventana agarraba `InTeksDisplay.exe`, el instalador no podía sustituirlo, abortaba y **dejaba el servidor parado**. Ahora el instalador cierra esa ventana antes de copiar (hay que abrirla de nuevo al terminar).
 - La actualización enseña una barra en movimiento y los segundos que lleva, y avisa antes de que la ventana de escritorio se va a cerrar.
