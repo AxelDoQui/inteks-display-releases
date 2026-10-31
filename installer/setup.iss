@@ -35,6 +35,11 @@ Name: "desktopicon"; Description: "Crear acceso directo en escritorio"; GroupDes
 ; Sin marcar por defecto, porque en el ordenador del dueño tapa el escritorio.
 Name: "pantalla"; Description: "Este equipo reproduce en su propia pantalla (mini PC del televisor): abrir el reproductor a pantalla completa al iniciar sesión y no dejar que se suspenda"; GroupDescription: "Mini PC del televisor:"; Flags: unchecked
 Name: "startupicon"; Description: "Iniciar InTeks Display automáticamente al encender el equipo (recomendado)"; GroupDescription: "Arranque:"
+; Para poner la pantalla en un televisor LG: el navegador del LG cierra la página
+; cada ~2 min, así que se le instala una mini-app (webos\). Esta casilla deja en la
+; app un Node.js portable y la herramienta de LG para hacerlo. Descarga de internet
+; (unos 200 MB en disco) y no toca ningún Node que el equipo ya tenga.
+Name: "lg"; Description: "Herramientas para instalar la pantalla en un televisor LG (descarga unos 60 MB de internet y ocupa unos 200 MB; solo si vas a usar un LG)"; GroupDescription: "Televisores LG:"; Flags: unchecked
 
 [InstallDelete]
 ; Restos de cuando el producto se llamaba SignalOS Pro. La clave Run apuntaba a
@@ -116,6 +121,10 @@ Source: "..\inteks-extension\*"; DestDir: "{app}\extension"; Flags: ignoreversio
 Source: "instalar-extension.html"; DestDir: "{app}"; Flags: ignoreversion
 Source: "registrar-tarea.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "registrar-pantalla.ps1"; DestDir: "{app}"; Flags: ignoreversion
+; Mini-app para televisores LG y lo que la instala. Solo con la casilla «lg».
+Source: "..\webos\*"; DestDir: "{app}\webos"; Flags: ignoreversion recursesubdirs createallsubdirs; Tasks: lg
+Source: "..\tools\instalar-lg.ps1"; DestDir: "{app}"; Flags: ignoreversion; Tasks: lg
+Source: "instalar-herramientas-lg.ps1"; DestDir: "{app}"; Flags: ignoreversion; Tasks: lg
 ; Este NO se instala: se extrae a la carpeta temporal y se ejecuta antes de
 ; copiar nada. Ver [Code] / PrepareToInstall.
 Source: "parar-servidor.ps1"; Flags: dontcopy
@@ -134,6 +143,8 @@ Source: "parar-servidor.ps1"; Flags: dontcopy
 Name: "{group}\InTeks Display"; Filename: "{app}\InTeksDisplay.exe"; WorkingDir: "{app}"
 Name: "{group}\Instalar extension de divisas"; Filename: "{app}\instalar-extension.html"; WorkingDir: "{app}"; IconFilename: "{app}\assets\icon.ico"
 Name: "{group}\Desinstalar"; Filename: "{uninstallexe}"
+; Pregunta IP del TV, passphrase e IP del servidor y deja la mini-app en el LG.
+Name: "{group}\Instalar la pantalla en un TV LG"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -NoExit -File ""{app}\instalar-lg.ps1"""; WorkingDir: "{app}"; IconFilename: "{app}\assets\icon.ico"; Tasks: lg
 Name: "{commondesktop}\InTeks Display"; Filename: "{app}\InTeksDisplay.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 ; Al iniciar sesión, la pantalla completa. La app espera sola a que el servidor
 ; esté listo (lo despierta con la tarea programada), así que no hace falta retraso.
@@ -171,7 +182,18 @@ Filename: "powercfg.exe"; Parameters: "/change standby-timeout-ac 0"; Flags: run
 Filename: "powercfg.exe"; Parameters: "/change monitor-timeout-ac 0"; Flags: runhidden waituntilterminated; Tasks: pantalla
 Filename: "powercfg.exe"; Parameters: "/change hibernate-timeout-ac 0"; Flags: runhidden waituntilterminated; Tasks: pantalla
 
+; Node.js portable + herramienta de LG dentro de la app. Tarda uno o dos minutos y
+; si falla no aborta la instalación (deja el motivo en lg-tools\instalacion.log).
+Filename: "powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\instalar-herramientas-lg.ps1"" -AppDir ""{app}"""; \
+  StatusMsg: "Descargando las herramientas para televisores LG..."; \
+  Flags: runhidden waituntilterminated; Tasks: lg
+
 Filename: "{app}\InTeksDisplay.exe"; Description: "Abrir el panel de administracion"; Flags: nowait postinstall skipifsilent
+
+[UninstallDelete]
+; Lo descargado por la casilla «lg»: no lo conoce el desinstalador.
+Type: filesandordirs; Name: "{app}\lg-tools"
 
 [UninstallRun]
 ; Quitar la tarea al desinstalar, o quedaría intentando arrancar un programa

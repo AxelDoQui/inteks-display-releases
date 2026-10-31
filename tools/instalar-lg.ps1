@@ -7,23 +7,31 @@
 # Antes, en el TV: instalar «Developer Mode» (LG Content Store), iniciar sesión con
 # la cuenta de desarrollador de LG, activar «Dev Mode Status» y «Key Server».
 # Ahí salen la IP del TV y la Passphrase. Este PC y el TV deben estar en la
-# misma red. Hace falta Node.js (la herramienta de LG se instala sola).
+# misma red. Las herramientas (Node.js y la de LG) vienen con la app si se marcó
+# «Herramientas para televisores LG» al instalar; si no, hace falta Node.js.
 #
 # Uso:
 #   powershell -File tools\instalar-lg.ps1 -TV 192.168.0.108 -Passphrase 6DC7B4 -Servidor 192.168.0.90
 #   -Servidor es la IP del PC con InTeks Display (o su dirección completa, http://...).
+#   Sin parámetros los pregunta (es lo que hace el acceso directo del menú Inicio).
 param(
-    [Parameter(Mandatory = $true)][string]$TV,
-    [Parameter(Mandatory = $true)][string]$Passphrase,
-    [Parameter(Mandatory = $true)][string]$Servidor,
+    [string]$TV,
+    [string]$Passphrase,
+    [string]$Servidor,
     [string]$Nombre = "tienda-lg"
 )
 $ErrorActionPreference = "Stop"
-$raiz = Split-Path -Parent $PSScriptRoot
+# En el proyecto este script vive en tools\; instalado, junto a webos\ y lg-tools\.
+$raiz = if (Test-Path (Join-Path $PSScriptRoot "webos")) { $PSScriptRoot } else { Split-Path -Parent $PSScriptRoot }
 $app = Join-Path $raiz "webos"
 $ID = "com.inteks.display"
 
 function Falla($txt) { Write-Host "ERROR: $txt" -ForegroundColor Red; exit 1 }
+
+if (-not $TV) { $TV = Read-Host "IP del televisor (sale en la app Developer Mode del TV)" }
+if (-not $Passphrase) { $Passphrase = Read-Host "Passphrase (la misma pantalla de Developer Mode)" }
+if (-not $Servidor) { $Servidor = Read-Host "IP del PC con InTeks Display (el servidor)" }
+if (-not $TV -or -not $Passphrase -or -not $Servidor) { Falla "faltan datos." }
 
 # La dirección del servidor, con http:// y barra final.
 $url = $Servidor.Trim()
@@ -31,7 +39,23 @@ if ($url -notmatch '^https?://') { $url = "http://$url" }
 if (-not $url.EndsWith("/")) { $url += "/" }
 
 if (-not (Test-Path (Join-Path $app "index.html"))) { Falla "no encuentro la carpeta webos\ del proyecto." }
-if (-not (Get-Command node -ErrorAction SilentlyContinue)) { Falla "falta Node.js (https://nodejs.org). Instálalo y vuelve a ejecutar esto." }
+
+# Las herramientas que trae la app van primero: así no hace falta tener Node en el PC.
+$herr = Join-Path $raiz "lg-tools"
+$instaladorHerr = Join-Path $raiz "installer\instalar-herramientas-lg.ps1"
+if (-not (Test-Path $instaladorHerr)) { $instaladorHerr = Join-Path $raiz "instalar-herramientas-lg.ps1" }
+if (-not (Test-Path (Join-Path $herr "cli\node_modules\.bin\ares-install.cmd")) -and (Test-Path $instaladorHerr) -and
+    -not (Get-Command ares-install -ErrorAction SilentlyContinue)) {
+    # Se marcó la casilla pero la descarga falló (sin internet, por ejemplo): reintentar.
+    Write-Host "Preparando las herramientas para LG (descarga, unos minutos)..." -ForegroundColor Cyan
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $instaladorHerr -AppDir $raiz
+}
+if (Test-Path (Join-Path $herr "cli\node_modules\.bin\ares-install.cmd")) {
+    $env:PATH = (Join-Path $herr "node") + ";" + (Join-Path $herr "cli\node_modules\.bin") + ";" + $env:PATH
+}
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Falla "faltan las herramientas para LG. Reinstala InTeks Display marcando «Herramientas para televisores LG», o instala Node.js (https://nodejs.org) y vuelve a ejecutar esto."
+}
 
 if (-not (Get-Command ares-install -ErrorAction SilentlyContinue)) {
     Write-Host "Instalando la herramienta de LG (una sola vez)..." -ForegroundColor Cyan

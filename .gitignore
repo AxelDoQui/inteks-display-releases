@@ -52,3 +52,6 @@ escritorio/bin/
 
 # Lo que se lleva a una tienda: copia de dist\installer y del .apk (tools\preparar-entrega.ps1)
 Entregables/
+
+# Node portable y herramienta de LG que baja el instalador (casilla «lg»)
+lg-tools/
