@@ -1623,6 +1623,7 @@ function clonarConfigPantalla(cfg){
   // Lo que ata esta pantalla a un televisor o a otra pantalla NO se copia.
   delete c.connected; delete c.last_seen; delete c.id;
   delete c.partner; delete c.wall_pos;
+  delete c.label;  // el nombre para mostrar es de la original; la copia ya trae el suyo
   c.mode="independent";
   if(!Array.isArray(c.playlist)) c.playlist=[];
   return c;
@@ -1841,7 +1842,7 @@ const DEFAULT_SCHEDULE={lunes:{enabled:true,start:"08:00",end:"20:00"},martes:{e
 
 function openScheduleModal(sid){
   currentScheduleScreen=sid;
-  document.getElementById("sched-title").textContent=`HORARIO - ${sid}`;
+  document.getElementById("sched-title").textContent=`HORARIO - ${((content.screens||{})[sid]||{}).label||sid}`;
 
   const cfg=(content.screens||{})[sid]||{};
   const schedule=cfg.schedule||{...DEFAULT_SCHEDULE};
@@ -2829,7 +2830,7 @@ function openPlModal(sid){
   plFiltro={texto:"",tipo:"todos",carpeta:"all",etiquetas:[]};
   renderPlPackages();
   const cfg=(content.screens||{})[sid]||{};
-  document.getElementById("plm-title").textContent=`PLAYLIST — ${sid.toUpperCase()}`;
+  document.getElementById("plm-title").textContent=`PLAYLIST — ${(cfg.label||sid).toUpperCase()}`;
   document.getElementById("plm-sub").textContent=cfg.mode==="wall"?`Modo videowall (${cfg.wall_pos||''}).`:"Modo independiente.";
   // Un solo tipo de transicion por pantalla, para todos sus pases.
   document.getElementById("plm-trans").value=cfg.transition||"fade";

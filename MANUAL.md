@@ -402,10 +402,15 @@ vez:
    TV, passphrase e IP del PC servidor. Con «Key Server» encendido: se apaga
    solo al rato.
 4. En el TV sale el código de siempre: enlázalo desde el panel.
+5. Si es un televisor **dedicado** a la cartelería, en el panel (Ajustes →
+   *Televisores LG*) marca **«Mantenerla abierta»**: una tarea del PC
+   («InTeks Display LG», cada 5 minutos) abre la mini-app si el TV está
+   encendido y no la tiene abierta, por ejemplo tras un corte de luz. Déjala
+   sin marcar en un TV que uses para otras cosas, o te la volvería a abrir.
 
 En el televisor desactiva el **ahorro de energía** (y «apagar pantalla»): si no,
 apaga la imagen aunque la app siga abierta. LG **no permite** arrancar una app
-sola al encender el TV: tras un corte de luz hay que abrirla con el mando.
+sola al encender el TV: tras un corte de luz la abre el PC (paso 5) o, si no lo marcaste, hay que abrirla con el mando.
 Si no quieres usar la mini-app, sirve una caja Android (ver *Con qué
 reproducir*, más arriba). La pantalla configurada no se
 pierde: cuando la caja nueva enseñe su código, usa el desplegable **«reenlazar
@@ -437,3 +442,10 @@ instalada se ve en Ajustes.
 | Extensión de Chrome | `C:\Program Files\InTeks Display\extension\` |
 
 Los datos **no** se borran al desinstalar.
+
+## Cambiar el nombre de una pantalla
+
+En la tarjeta de la pantalla: **Más → Renombrar**. Solo cambia el nombre que se
+ve en el panel; el original sale a su lado entre paréntesis. El televisor sigue
+enlazado, porque su identificador interno no cambia. Con el campo vacío vuelve
+al nombre original.

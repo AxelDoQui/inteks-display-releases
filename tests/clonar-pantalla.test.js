@@ -103,3 +103,8 @@ test("no se arrastra el estado de conexion", () => {
   assert.strictEqual(c.connected, undefined);
   assert.strictEqual(c.last_seen, undefined);
 });
+
+test("el nombre para mostrar no se copia a la pantalla nueva", () => {
+  const c = cargar().clonarConfigPantalla({ label: "Entrada", playlist: [] });
+  assert.strictEqual(c.label, undefined);
+});
