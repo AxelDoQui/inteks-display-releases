@@ -75,6 +75,14 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 @keyframes fxCaducada{0%,100%{opacity:.85}50%{opacity:.3}}
 .mod-fx-page{font-size:1.7vmin;font-size:clamp(11px,1.7vmin,20px);opacity:.55;font-family:monospace;letter-spacing:1px;padding:2px 10px;border:1px solid rgba(255,255,255,.2);border-radius:99px;white-space:nowrap}
 .mod-fx-logo{height:3.4vmin;height:clamp(16px,3.4vmin,40px);max-width:26%;object-fit:contain;flex-shrink:0}
+/* Tamaños del logo (el editor de divisas los llama «Grande» y «Muy grande»). Misma
+   regla que arriba: el valor con vmin va delante y el clamp detrás, en declaraciones
+   separadas, para los navegadores viejos de las teles. */
+.mod-fx-logo.logo-g{height:7vmin;height:clamp(28px,7vmin,90px);max-width:40%}
+.mod-fx-logo.logo-xg{height:11vmin;height:clamp(40px,11vmin,140px);max-width:55%}
+/* Logo en lugar del título: ocupa el sitio del título, a la izquierda. */
+.mod-fx-logo-solo{display:flex;align-items:center;min-width:0;flex:1 1 auto}
+.mod-fx-logo-solo .mod-fx-logo{max-width:100%}
 /* Cabecera apilada: el título en su propia línea y debajo el logo con la fecha.
    La activa ajustarCabeceraFx() cuando el título no cabe compitiendo con ellos,
    que es lo que pasa en pantallas verticales. En horizontal no se activa y la
@@ -849,15 +857,18 @@ function buildFxSlide(item){
     </div>`).join("");
   const now=fechaTasas(item, Date.now());
   const caducadas=tasasCaducadas(item, Date.now());
-  const logoHtml=item.logo?`<img src="${item.logo}" class="mod-fx-logo">`:"";
+  // Logo: de tamaño normal, grande o muy grande, y junto al título o EN LUGAR de él.
+  const tamLogo={grande:" logo-g",enorme:" logo-xg"}[item.logo_tamano]||"";
+  const logoSolo=!!item.logo && item.logo_modo==="sustituye";
+  const logoHtml=item.logo?`<img src="${item.logo}" class="mod-fx-logo${tamLogo}" alt="">`:"";
   // Pie fijo, visible en todas las páginas. Al ser hermano de .mod-fx-rows
   // (flex:1;min-height:0) le resta alto, y setupFxPagination recalcula solo.
   const noteHtml=item.footer_note?`<div class="mod-fx-note">${item.footer_note}</div>`:"";
   div.innerHTML=`
     <div class="mod-fx-header">
-      <div class="mod-fx-title">${item.title||"Tipos de cambio"}</div>
+      ${logoSolo?`<div class="mod-fx-logo-solo">${logoHtml}</div>`:`<div class="mod-fx-title">${item.title||"Tipos de cambio"}</div>`}
       <div style="display:flex;align-items:center;gap:2vw">
-        ${logoHtml}
+        ${logoSolo?"":logoHtml}
         <span class="mod-fx-page" style="display:none"></span>
         <div class="mod-fx-date${caducadas?" caducada":""}">${now}</div>
       </div>

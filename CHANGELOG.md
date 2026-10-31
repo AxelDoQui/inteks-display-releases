@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.62 — sin publicar
+
+- Cambios de divisas: el logo se puede poner **Normal, Grande o Muy grande**, y hay una casilla «Usar el logo en lugar del título» para que ocupe el sitio del título, a la izquierda de la cabecera. Se ve en la vista previa del editor y en la pantalla. Los módulos que ya existían se quedan como estaban (logo normal junto al título).
+
 ## 1.0.61 — 2026-10-31
 
 - Librería y Paquetes: se pueden marcar varios y borrarlos de una vez. En la Librería, la barra de selección tiene «Seleccionar todo» (lo que se ve con el filtro actual) y «Borrar»; en Paquetes, cada paquete tiene su casilla y una barra con lo mismo. Una sola pregunta, que avisa de cuántos están en uso, y una sola petición al servidor (`/api/delete` acepta `ids`). Al borrar archivos también se quitan de los paquetes en formato nuevo.

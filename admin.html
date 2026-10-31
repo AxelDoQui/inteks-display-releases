@@ -629,6 +629,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 
         <button class="btn btn-danger btn-sm" type="button" id="fx-logo-remove" onclick="removeFxLogo()" style="display:none">Quitar</button>
       </div>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:8px">
+        <label style="font-size:12px;display:flex;align-items:center;gap:6px">Tamaño del logo
+          <select class="finput" id="fx-logo-tam" style="width:auto"><option value="normal">Normal</option><option value="grande">Grande</option><option value="enorme">Muy grande</option></select></label>
+        <label style="font-size:12px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="fx-logo-sust"> Usar el logo en lugar del título</label>
+      </div>
       <div style="font-size:10px;color:var(--muted);margin-top:4px">Útil cuando el tipo de cambio lo proporciona otra compañía</div>
     </div>
 
@@ -4018,8 +4023,10 @@ function updateFxPreview(){
   const title=document.getElementById("fx-title").value||"Tipos de cambio";
   const c=document.getElementById("fx-preview");
   c.style.background=bg;
-  const logoHtml=fxLogo?`<img src="${fxLogo}" style="height:24px;object-fit:contain">`:"";
-  c.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div style="font-size:13px;font-weight:700;color:${color};letter-spacing:2px;opacity:.6">${title}</div>${logoHtml}</div>`+
+  const altoLogo={normal:24,grande:40,enorme:60}[document.getElementById("fx-logo-tam").value]||24;
+  const logoSolo=!!fxLogo&&document.getElementById("fx-logo-sust").checked;
+  const logoHtml=fxLogo?`<img src="${fxLogo}" style="height:${altoLogo}px;max-width:60%;object-fit:contain">`:"";
+  c.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">${logoSolo?logoHtml:`<div style="font-size:13px;font-weight:700;color:${color};letter-spacing:2px;opacity:.6">${title}</div>${logoHtml}`}</div>`+
     fxRows.map(r=>{
       const agentHtml=r.agent?` <span style="opacity:.55;font-size:10px">· ${r.agent}</span>`:"";
       return `<div class="fx-prev-row" style="color:${color}"><span style="margin-right:8px">${flagImg(r.flag,"24px")}</span><span style="flex:1;font-size:13px;font-weight:600">${r.country||"—"} <span style="opacity:.4;font-size:10px;font-family:monospace">${r.currency}</span>${agentHtml}</span><span style="font-family:monospace;font-size:15px;font-weight:700">${r.rate||"—"}</span><span style="font-size:9px;opacity:.35;font-family:monospace;margin-left:6px">${base}→${r.code||"?"}</span></div>`;
@@ -4049,7 +4056,7 @@ function saveFxModule(){
   // tasas valen ahora. Sin el, el tablero enseñaria la fecha de hoy aunque las
   // tasas fueran de la semana pasada, que es justo lo que hacia antes.
   const _stale=document.getElementById("fx-stale").value;
-  const data={name:title,type:"fx",title,base_currency:document.getElementById("fx-base").value||"EUR",rows:[...fxRows],bg:document.getElementById("fx-bg").value,color:document.getElementById("fx-color").value,duration:parseInt(document.getElementById("fx-dur").value)||15,logo:fxLogo||"",footer_note:document.getElementById("fx-note").value.trim(),
+  const data={name:title,type:"fx",title,base_currency:document.getElementById("fx-base").value||"EUR",rows:[...fxRows],bg:document.getElementById("fx-bg").value,color:document.getElementById("fx-color").value,duration:parseInt(document.getElementById("fx-dur").value)||15,logo:fxLogo||"",logo_tamano:document.getElementById("fx-logo-tam").value,logo_modo:document.getElementById("fx-logo-sust").checked?"sustituye":"junto",footer_note:document.getElementById("fx-note").value.trim(),
     stale_hours:_stale===""?24:(parseFloat(_stale)||0),
     updated_at:Date.now()/1000};
   if(!content.items)content.items=[];
@@ -4084,6 +4091,8 @@ function editFxModule(id){
     (item.stale_hours===undefined||item.stale_hours===null)?24:item.stale_hours;
   fxRows=(item.rows||[]).map(r=>({...r}));
   fxLogo=item.logo||""; updateFxLogoPreview();
+  document.getElementById("fx-logo-tam").value=item.logo_tamano||"normal";
+  document.getElementById("fx-logo-sust").checked=item.logo_modo==="sustituye";
   renderFxRows();
   document.getElementById("fx-save-btn").innerHTML='<i class="fa-solid fa-floppy-disk"></i> Guardar cambios';
   document.getElementById("fx-cancel-btn").style.display="";
@@ -4093,6 +4102,8 @@ function editFxModule(id){
 function cancelFxEdit(){
   editingFxId=null;
   document.getElementById("fx-stale").value=24;
+  document.getElementById("fx-logo-tam").value="normal";
+  document.getElementById("fx-logo-sust").checked=false;
   document.getElementById("fx-save-btn").textContent="+ Añadir a librería";
   document.getElementById("fx-cancel-btn").style.display="none";
 }
@@ -4174,6 +4185,8 @@ function fxDraftItem(){
     bg:document.getElementById("fx-bg").value,
     color:document.getElementById("fx-color").value,
     logo:fxLogo||"",
+    logo_tamano:document.getElementById("fx-logo-tam").value,
+    logo_modo:document.getElementById("fx-logo-sust").checked?"sustituye":"junto",
     footer_note:document.getElementById("fx-note").value.trim(),
     duration:9999};
   // duration alto A PROPÓSITO: la previa se queda en la página 1 en lugar de
@@ -5282,6 +5295,7 @@ async function restartServer(){
 
 // Wire up live previews
 ["fx-bg","fx-color","fx-base","fx-title"].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener("input",updateFxPreview);});
+["fx-logo-tam","fx-logo-sust"].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener("change",updateFxPreview);});
 ["w-bg","w-color"].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener("input",updateWeatherPreview);});
 ["qr-url","qr-text","qr-bg","qr-color"].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener("input",updateQrPreview);});
 document.getElementById("w-unit")?.addEventListener("change",()=>{if(weatherCity)fetchWeather();});
