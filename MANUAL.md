@@ -61,7 +61,9 @@ Cualquier pantalla con navegador vale para empezar. Lo que cambia entre unas y
 otras es cuánto aguantan encendidas: **el navegador de fábrica de un televisor
 no está pensado para tener una página abierta doce horas seguidas**, y cuando
 falla no avisa —cierra la página y deja el escaparate en negro—. Pasó con un LG
-en una tienda y se resolvió cambiando el aparato, no la página.
+en una tienda. **Con un LG (webOS) ya hay arreglo sin cambiar de televisor**: una
+mini-app que abre el reproductor fuera del navegador (ver *El navegador de un
+Smart TV se cierra solo*, en Problemas).
 
 Para un escaparate que está encendido todo el día, lo recomendado es una **caja
 Android barata** enchufada al HDMI, con la app de InTeks o con Fully Kiosk.
@@ -384,9 +386,28 @@ propio soporte) cierran páginas que llevan mucho abiertas por límites de
 memoria del propio televisor, no por InTeks Display. Revisa primero que el
 protector de pantalla y el ahorro de energía estén apagados en el TV.
 
-Si sigue pasando, **no pierdas tiempo peleándote con el televisor**: en el caso
-real que tuvimos no había nada que ajustar y no se arregló hasta cambiar de
-aparato. Ver *Con qué reproducir*, más arriba. La pantalla configurada no se
+**En un LG con webOS, la solución es la mini-app** (carpeta `webos\`): abre el
+reproductor desde el entorno de apps del televisor y no desde su navegador, y
+ahí no se cierra (probado más de una hora en un LG 55UR78006LK). Se instala una
+vez:
+
+1. En el TV: instala **«Developer Mode»** (LG Content Store), entra con una
+   cuenta gratuita de desarrollador de LG y activa **«Dev Mode Status»** y
+   **«Key Server»**. Apunta la **IP del TV** y la **Passphrase**. El modo
+   desarrollador dura unas **999 horas**: pasado ese tiempo hay que pulsar
+   «Extend Session Time» en esa misma app.
+2. En el instalador de InTeks Display, marca **«Herramientas para instalar la
+   pantalla en un televisor LG»** (trae Node.js y la herramienta de LG).
+3. Abre **«Instalar la pantalla en un TV LG»** (menú Inicio) y contesta: IP del
+   TV, passphrase e IP del PC servidor. Con «Key Server» encendido: se apaga
+   solo al rato.
+4. En el TV sale el código de siempre: enlázalo desde el panel.
+
+En el televisor desactiva el **ahorro de energía** (y «apagar pantalla»): si no,
+apaga la imagen aunque la app siga abierta. LG **no permite** arrancar una app
+sola al encender el TV: tras un corte de luz hay que abrirla con el mando.
+Si no quieres usar la mini-app, sirve una caja Android (ver *Con qué
+reproducir*, más arriba). La pantalla configurada no se
 pierde: cuando la caja nueva enseñe su código, usa el desplegable **«reenlazar
 a: …»** y elige la pantalla que era. Hereda su playlist, su horario y su
 rotación tal cual.
