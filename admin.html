@@ -494,10 +494,15 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
   <h1 style="font-size:18px;font-weight:500;margin-bottom:4px">Librería</h1>
   <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Imágenes y videos disponibles para asignar a pantallas</p>
   <div class="dz" id="dz">
-    <input type="file" id="fi" multiple accept="image/*,video/*" onchange="handleUpload(this.files)">
+    <input type="file" id="fi" multiple accept="image/*,video/*,.pdf,application/pdf" onchange="handleUpload(this.files)">
     <div style="font-size:26px;margin-bottom:8px;opacity:.4"><i class="fa-solid fa-cloud-arrow-up"></i></div>
     <div style="font-size:14px;font-weight:500;margin-bottom:4px">Arrastra archivos o haz clic</div>
-    <div style="font-size:12px;color:var(--muted)">JPG · PNG · GIF · WEBP · MP4 · WEBM · MOV — se sube de uno en uno, con progreso</div>
+    <div style="font-size:12px;color:var(--muted)">JPG · PNG · GIF · WEBP · MP4 · WEBM · MOV · PDF — se sube de uno en uno, con progreso</div>
+  </div>
+  <div style="margin:8px 0 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <input type="file" id="pdf-fi" accept=".pdf,application/pdf" style="display:none" onchange="handlePdf(this.files)">
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('pdf-fi').click()"><i class="fa-solid fa-file-pdf"></i> Subir un PDF</button>
+    <span style="font-size:11px;color:var(--muted)">Cada página pasa a ser una imagen, en una carpeta con el nombre del PDF</span>
   </div>
   <div class="uprog" id="uprog">
     <div id="uprog-lista" class="sub-lista"></div>
@@ -2211,11 +2216,85 @@ async function subirConPanel(files,cont,btnCancelar){
   }
 }
 async function handleUpload(files){
+  // Los PDF no se suben tal cual: cada página se convierte en una imagen.
+  const todos=Array.from(files||[]);
+  const esPdf=f=>/\.pdf$/i.test(f.name)||f.type==="application/pdf";
+  const pdfs=todos.filter(esPdf), resto=todos.filter(f=>!esPdf(f));
   document.getElementById("uprog").classList.add("show");
   try{
-    await subirConPanel(files,document.getElementById("uprog-lista"),document.getElementById("uprog-cancel"));
-    await loadAll();
+    if(resto.length){
+      await subirConPanel(resto,document.getElementById("uprog-lista"),document.getElementById("uprog-cancel"));
+      await loadAll();
+    }
   } finally { document.getElementById("fi").value=""; }
+  for(const f of pdfs) await handlePdf([f]);
+}
+
+// ── PDF → imágenes (pdf.js, incluido en la app: no necesita internet) ────────
+// Cada página se dibuja en un canvas, se guarda como JPG y se sube como cualquier
+// otra imagen, dentro de una carpeta con el nombre del PDF. Todo ocurre en el
+// navegador del panel: el servidor no sabe nada de PDF.
+const PDF_LADO_MAX=1920;       // píxeles del lado largo de cada página
+const PDF_AVISO_PAGINAS=40;    // por encima de esto se pregunta antes de convertir
+let pdfjsPromesa=null;
+function cargarPdfJs(){
+  if(window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if(!pdfjsPromesa){
+    pdfjsPromesa=new Promise((ok,mal)=>{
+      const s=document.createElement("script");s.src="/vendor/pdfjs/pdf.min.js";
+      s.onload=()=>{ window.pdfjsLib.GlobalWorkerOptions.workerSrc="/vendor/pdfjs/pdf.worker.min.js"; ok(window.pdfjsLib); };
+      s.onerror=()=>{ pdfjsPromesa=null; mal(new Error("No se pudo cargar el lector de PDF")); };
+      document.head.appendChild(s);
+    });
+  }
+  return pdfjsPromesa;
+}
+async function handlePdf(files){
+  const f=files&&files[0];
+  const entrada=document.getElementById("pdf-fi"); if(entrada) entrada.value="";
+  if(!f) return;
+  if(subiendo){ toast("Ya hay una subida en marcha, espera a que termine",true); return; }
+  const cont=document.getElementById("uprog-lista");
+  document.getElementById("uprog").classList.add("show");
+  cont.innerHTML="";cont.classList.add("show");
+  const fila=filaSubida(cont,f.name+" (convirtiendo)");
+  let paginas=[];
+  try{
+    const lib=await cargarPdfJs();
+    const pdf=await lib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;
+    const n=pdf.numPages;
+    if(n>PDF_AVISO_PAGINAS && !await confirmar("Este PDF tiene "+n+" páginas. Cada una será una imagen en la librería. ¿Convertirlas todas?",{titulo:"PDF largo",si:"Sí, convertir",peligro:false})){
+      fila.fin({ok:false,cancelado:true,error:"Cancelado"}); return;
+    }
+    const base=f.name.replace(/\.pdf$/i,"").trim()||"PDF";
+    for(let i=1;i<=n;i++){
+      fila.progreso((i-1)/n);
+      const pag=await pdf.getPage(i);
+      const v1=pag.getViewport({scale:1});
+      const escala=PDF_LADO_MAX/Math.max(v1.width,v1.height);
+      const vp=pag.getViewport({scale:escala});
+      const lienzo=document.createElement("canvas");
+      lienzo.width=Math.round(vp.width);lienzo.height=Math.round(vp.height);
+      const cx=lienzo.getContext("2d");
+      cx.fillStyle="#fff";cx.fillRect(0,0,lienzo.width,lienzo.height);   // sin fondo, un PDF sale negro en JPG
+      await pag.render({canvasContext:cx,viewport:vp}).promise;
+      const blob=await new Promise(r=>lienzo.toBlob(r,"image/jpeg",0.88));
+      lienzo.width=0;lienzo.height=0;                                    // suelta la memoria de la página
+      if(!blob) throw new Error("No se pudo convertir la página "+i);
+      paginas.push(new File([blob],base+" - pág "+String(i).padStart(2,"0")+".jpg",{type:"image/jpeg"}));
+    }
+    fila.fin({ok:true});
+    await pdf.destroy();
+    const items=await subirConPanel(paginas,cont,document.getElementById("uprog-cancel"));
+    if(items.length){
+      await loadAll();
+      await organizar({ids:items.map(i=>i.id),folder:base});
+      toast("PDF convertido: "+items.length+(items.length===1?" página":" páginas")+" en la carpeta «"+base+"»");
+    }
+  }catch(e){
+    fila.fin({ok:false,error:String(e&&e.message||e)});
+    toast("No se pudo convertir el PDF: "+String(e&&e.message||e),true);
+  }
 }
 // Sube contenido directamente desde la página de Paquetes y lo añade al paquete en edición.
 // El archivo queda también en la Librería (reutilizable), pero sin el paso manual de ir allí.

@@ -10,6 +10,8 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ## 1.0.62 — sin publicar
 
+- **Librería: «Subir un PDF».** Cada página del PDF pasa a ser una imagen (JPG, lado largo 1920 px) dentro de una carpeta con el nombre del PDF. También se puede arrastrar o elegir un PDF en el selector normal de archivos. Se convierte en el navegador del panel con pdf.js incluido en la app, así que no necesita internet. Si el PDF tiene más de 40 páginas pregunta antes. Un PDF con fuentes no incrustadas puede verse con otra letra.
+
 - **Grupos de pantallas.** En «Más → Grupo» se mete una pantalla en un grupo (por ejemplo «Tienda Centro»). Con grupos, el panel enseña botones para filtrar por grupo y, dentro de un grupo, «Copiar una playlist al grupo…» (sustituye la playlist de sus pantallas por la de otra, con aviso previo) y «Reiniciar reproductores». Al mandar archivos desde la Librería hay atajos «Grupo …» que marcan sus pantallas. Cada pantalla sigue con su propia playlist; el grupo es solo una etiqueta.
 
 - Pantallas: cada tarjeta enseña una **miniatura de lo que está mostrando ahora** (junto a «Ahora: …»). No es una captura real de la tele: es el contenido de la librería que la pantalla dice estar reproduciendo.
