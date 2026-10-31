@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.58 — sin publicar
+
+- Pantallas: botón «Renombrar» (en «Más»). Cambia solo el nombre que se ve en el panel; el televisor sigue enlazado, porque su identificador interno no cambia (sale entre paréntesis junto al nombre).
+
 ## 1.0.57 — 2026-10-31
 
 - Televisores LG: casilla «Mantenerla abierta» por televisor (Ajustes → Televisores LG). Una tarea del PC («InTeks Display LG», cada 5 minutos) abre la mini-app si el TV está encendido y no la tiene abierta: tras un corte de luz o si alguien la cerró. Apagada por defecto, para no molestar en un TV de uso normal.

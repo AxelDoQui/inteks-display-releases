@@ -1709,7 +1709,7 @@ function renderScreens(){
       <div class="sc-hdr">
         <div class="sc-preview ${isVert?'vert':''}">${thumbHtml}</div>
         <div class="sc-info">
-          <div class="sc-name">${sid}</div>
+          <div class="sc-name">${esc(cfg.label||sid)}${cfg.label?` <span style="font-size:10px;color:var(--muted);font-weight:400" title="Nombre interno con el que se enlazó el televisor">(${esc(sid)})</span>`:''}</div>
           <div class="sc-meta">
             <span class="pill ${isOn?'pill-on':'pill-off'}">${isOn?'● online':'○ offline'}</span>
             ${isWall?'<span class="pill pill-wall">videowall</span>':'<span class="pill pill-ind">independiente</span>'}
@@ -1732,6 +1732,7 @@ function renderScreens(){
           <button class="btn btn-ghost btn-sm" onclick="this.closest('.sc-body').querySelector('.sc-mas').classList.toggle('abierto')" title="Más acciones"><i class="fa-solid fa-ellipsis"></i> Más</button>
         </div>
         <div class="sc-mas">
+          <button class="btn btn-ghost btn-sm" onclick="renombrarPantalla('${sid}')" title="Cambiar el nombre que se ve en el panel (el televisor sigue enlazado)"><i class="fa-solid fa-pen"></i> Renombrar</button>
           <button class="btn btn-ghost btn-sm" onclick="duplicarPantalla('${sid}')" title="Crear otra pantalla igual que esta"><i class="fa-solid fa-clone"></i> Duplicar</button>
           <button class="btn btn-ghost btn-sm" onclick="copiarEnlace('${sid}')" title="Copiar el enlace directo de esta pantalla"><i class="fa-solid fa-copy"></i> Copiar enlace</button>
           <button class="btn btn-a4 btn-sm" onclick="desenlazar('${sid}')" title="Soltar el televisor sin borrar la pantalla"><i class="fa-solid fa-link-slash"></i> Soltar TV</button>
@@ -1804,6 +1805,17 @@ function confirmNewScreen(){
   if(content.screens[name]){ toast("Ya existe una pantalla con ese nombre",true); return; }
   content.screens[name]={mode:"independent",playlist:[],rotation:0};
   saveScreensConfig();renderScreens();updateStats();closeNewScreenModal();toast(`Pantalla "${name}" creada`);
+}
+// Cambia solo el nombre que se ve: el identificador (con el que el televisor está
+// enlazado y por el que lo conocen videowalls y enlaces) no se toca. Vacío = quitarlo.
+function renombrarPantalla(sid){
+  const cfg=(content.screens||{})[sid]; if(!cfg) return;
+  const nuevo=prompt("Nombre nuevo para esta pantalla (solo cambia lo que ves en el panel; el televisor sigue enlazado). Déjalo vacío para volver al original:",cfg.label||sid);
+  if(nuevo===null) return;
+  const t=nuevo.trim();
+  if(!t||t===sid) delete cfg.label; else cfg.label=t.slice(0,60);
+  saveScreensConfig();renderScreens();
+  toast(cfg.label?`Ahora se llama «${cfg.label}»`:"Vuelve a su nombre original");
 }
 async function deleteScreen(sid){
   if(!confirm(`¿Eliminar "${sid}"?`))return;
