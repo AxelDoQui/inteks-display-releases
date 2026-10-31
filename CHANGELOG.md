@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.60 — sin publicar
+
+- Los avisos y preguntas del panel («localhost dice…») son ahora cuadros propios del panel, con título claro y botones como «Sí, borrar» o «Sí, reiniciar» (en rojo si es destructivo). Intro acepta y Esc cancela. Afecta a borrar, restaurar copia, reiniciar servidor, actualizar, soltar televisor, renombrar y duplicar.
+
 ## 1.0.59 — 2026-10-31
 
 - Arreglo importante de «Actualizar ahora»: si se lanzaba desde la aplicación de escritorio, su propia ventana agarraba `InTeksDisplay.exe`, el instalador no podía sustituirlo, abortaba y **dejaba el servidor parado**. Ahora el instalador cierra esa ventana antes de copiar (hay que abrirla de nuevo al terminar).

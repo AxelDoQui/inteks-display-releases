@@ -1633,7 +1633,7 @@ function clonarConfigPantalla(cfg){
 async function duplicarPantalla(sid){
   const origen=(content.screens||{})[sid];
   if(!origen){ toast("Esa pantalla no tiene nada que copiar",true); return; }
-  const nombre=(prompt("Nombre de la pantalla nueva:", sid+" (copia)")||"").trim();
+  const nombre=((await preguntar("Nombre de la pantalla nueva:", sid+" (copia)",{titulo:"Duplicar pantalla",si:"Crear"}))||"").trim();
   if(!nombre) return;
   const existentes=new Set([...Object.keys(regScreens||{}),
                             ...Object.keys(content.screens||{})]);
@@ -1769,7 +1769,7 @@ async function copiarEnlace(sid){
     // navigator.clipboard solo existe en contexto seguro. Con el panel abierto
     // por localhost lo hay; si alguien entra por la IP de la red, no. En ese
     // caso al menos se deja el enlace a la vista para copiarlo a mano.
-    prompt("Copia este enlace:", url);
+    await preguntar("Copia este enlace (Ctrl+C):", url,{titulo:"Enlace de la pantalla",si:"Cerrar",soloLectura:true,sinCancelar:true});
   }
 }
 
@@ -1777,7 +1777,7 @@ async function copiarEnlace(sid){
 // y solo el televisor olvida quien era. Es la forma de reenlazar un televisor
 // sin ir a tocarlo con el mando.
 async function desenlazar(sid){
-  if(!confirm("Soltar «"+sid+"» de su televisor.\n\n"+
+  if(!await confirmar("Soltar «"+sid+"» de su televisor.\n\n"+
               "La pantalla NO se borra: conserva su playlist, su horario y su rotación.\n"+
               "El televisor volverá a pedir un código para que lo reenlaces.\n\n¿Continuar?")) return;
   try{
@@ -1809,9 +1809,9 @@ function confirmNewScreen(){
 }
 // Cambia solo el nombre que se ve: el identificador (con el que el televisor está
 // enlazado y por el que lo conocen videowalls y enlaces) no se toca. Vacío = quitarlo.
-function renombrarPantalla(sid){
+async function renombrarPantalla(sid){
   const cfg=(content.screens||{})[sid]; if(!cfg) return;
-  const nuevo=prompt("Nombre nuevo para esta pantalla (solo cambia lo que ves en el panel; el televisor sigue enlazado). Déjalo vacío para volver al original:",cfg.label||sid);
+  const nuevo=await preguntar("Nombre nuevo para esta pantalla (solo cambia lo que ves en el panel; el televisor sigue enlazado). Déjalo vacío para volver al original:",cfg.label||sid,{titulo:"Renombrar pantalla"});
   if(nuevo===null) return;
   const t=nuevo.trim();
   if(!t||t===sid) delete cfg.label; else cfg.label=t.slice(0,60);
@@ -1819,7 +1819,7 @@ function renombrarPantalla(sid){
   toast(cfg.label?`Ahora se llama «${cfg.label}»`:"Vuelve a su nombre original");
 }
 async function deleteScreen(sid){
-  if(!confirm(`¿Eliminar "${sid}"?`))return;
+  if(!await confirmar(`¿Eliminar "${sid}"?`))return;
   if(content.screens) delete content.screens[sid];
   // Borra del registro (screens.json) Y de la config; si no, la pantalla reaparece
   await fetch("/api/screens/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:sid})});
@@ -2123,7 +2123,7 @@ async function deleteItem(id,e){
   const msg=uses.length
     ? `«${nombre}» está en ${resumenUsos(uses)}: ${uses.map(u=>u.name).join(", ")}.\n\nSi lo borras, se quita también de ahí. ¿Borrar igualmente?`
     : `¿Borrar «${nombre}»?`;
-  if(!confirm(msg)) return;
+  if(!await confirmar(msg)) return;
   const r=await fetch("/api/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
   if(!r.ok){toast("No se pudo borrar",true);return;}
   if(idAbierto===id)cerrarFicha();
@@ -2193,6 +2193,61 @@ let libInfo={};
 let libFiltro={texto:"",tipo:"todos",orden:"nuevos",carpeta:"all",etiquetas:[]};
 async function loadLibInfo(){try{const r=await fetch("/api/library-info");if(r.ok)libInfo=await r.json();}catch(e){}}
 function fechaCorta(ts){return ts?new Date(ts*1000).toLocaleDateString("es-ES",{day:"2-digit",month:"2-digit",year:"numeric"}):"—";}
+// ── Cuadros propios (en vez de los del navegador, que ponen «localhost dice») ──
+// confirmar(texto) → Promise<boolean>; preguntar(texto, valor, opciones) → Promise<string|null>.
+// Intro o el botón principal aceptan; Esc, clic fuera o Cancelar cancelan.
+function _dialogoPanel(o){
+  return new Promise(resolve=>{
+    const fondo=document.createElement("div");
+    fondo.className="modal-bd show";fondo.style.zIndex="400";
+    const caja=document.createElement("div");caja.className="modal";caja.style.cssText="width:440px;max-width:94vw";
+    const h=document.createElement("h3");h.textContent=o.titulo;h.style.marginBottom="10px";
+    const p=document.createElement("p");p.textContent=o.texto;
+    p.style.cssText="font-size:13px;line-height:1.5;color:var(--text);white-space:pre-line;margin-bottom:14px";
+    caja.append(h,p);
+    let campo=null;
+    if(o.entrada){
+      campo=document.createElement("input");campo.className="finput";campo.value=o.valor||"";
+      campo.style.marginBottom="14px";campo.readOnly=!!o.soloLectura;caja.appendChild(campo);
+    }
+    const fila=document.createElement("div");fila.style.cssText="display:flex;gap:8px;justify-content:flex-end";
+    const no=document.createElement("button");no.className="btn btn-ghost";no.textContent="Cancelar";
+    const si=document.createElement("button");si.className="btn "+(o.peligro?"btn-danger":"btn-accent");si.textContent=o.si;
+    if(!o.sinCancelar) fila.appendChild(no);
+    fila.appendChild(si);caja.appendChild(fila);fondo.appendChild(caja);document.body.appendChild(fondo);
+    let listo=false;
+    const cerrar=v=>{
+      if(listo) return; listo=true;
+      document.removeEventListener("keydown",tecla,true);fondo.remove();resolve(v);
+    };
+    const aceptar=()=>cerrar(o.entrada?campo.value:true);
+    const cancelar=()=>cerrar(o.entrada?null:false);
+    function tecla(e){
+      if(e.key==="Escape"){e.preventDefault();e.stopPropagation();o.sinCancelar?aceptar():cancelar();}
+      else if(e.key==="Enter"&&document.activeElement!==no){e.preventDefault();e.stopPropagation();aceptar();}
+    }
+    document.addEventListener("keydown",tecla,true);
+    si.addEventListener("click",aceptar);no.addEventListener("click",cancelar);
+    fondo.addEventListener("mousedown",e=>{ if(e.target===fondo) (o.sinCancelar?aceptar:cancelar)(); });
+    setTimeout(()=>{ if(campo){campo.focus();campo.select();} else si.focus(); },30);
+  });
+}
+function confirmar(texto,o){
+  o=o||{};
+  const peligro=o.peligro!==undefined?o.peligro:/eliminar|borrar|restaurar|soltar|reiniciar|quitar/i.test(texto);
+  const reglas=[[/reiniciar/i,"Reiniciar el servidor","Sí, reiniciar"],[/eliminar|borrar/i,"Borrar","Sí, borrar"],
+    [/restaurar/i,"Restaurar copia","Sí, restaurar"],[/soltar/i,"Soltar televisor","Sí, soltar"],
+    [/quitar/i,"Quitar de la lista","Sí, quitar"],[/se instalará/i,"Actualizar","Sí, actualizar"],
+    [/conectada ahora/i,"Pantalla en uso","Sí, seguir"]];
+  const r=reglas.find(x=>x[0].test(texto))||[null,"Confirmar","Aceptar"];
+  return _dialogoPanel({texto,titulo:o.titulo||r[1],si:o.si||r[2],peligro});
+}
+function preguntar(texto,valor,o){
+  o=o||{};
+  return _dialogoPanel({texto,valor,entrada:true,titulo:o.titulo||"Nombre",si:o.si||"Guardar",
+    soloLectura:o.soloLectura,sinCancelar:o.sinCancelar,peligro:false});
+}
+
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function duracionTxt(s){if(!isFinite(s))return"";const m=Math.floor(s/60),x=Math.round(s%60);return m+":"+String(x).padStart(2,"0");}
 function resumenUsos(uses){
@@ -2472,7 +2527,7 @@ function abrirFicha(id){
 }
 async function renombrarItem(id){
   const it=(content.items||[]).find(i=>i.id===id); if(!it){toast("Ese archivo ya no existe",true);return;}
-  const nombre=prompt("Nombre nuevo (solo cambia el nombre que se ve):",it.name);
+  const nombre=await preguntar("Nombre nuevo (solo cambia el nombre que se ve):",it.name,{titulo:"Renombrar archivo"});
   if(nombre===null) return;
   const r=await fetch("/api/rename",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,name:nombre})});
   if(!r.ok){let m="No se pudo renombrar";try{m=(await r.json()).error||m}catch(e){}toast(m,true);return;}
@@ -2672,13 +2727,13 @@ function cancelPkgEdit(){
   document.getElementById("pkg-cancel-btn").style.display="none";
   renderPkgPicker(); renderPkgSelected();
 }
-function deletePackage(id){
+async function deletePackage(id){
   const p=(content.packages||[]).find(x=>x.id===id);
   const usan=Object.entries(content.screens||{})
     .filter(([,cfg])=>((cfg||{}).playlist||[]).some(x=>x.type==="package"&&x.pkg_id===id))
     .map(([sid])=>sid);
   if(usan.length){
-    if(!confirm(`«${p?p.name:id}» está en ${usan.length} pantalla(s): ${usan.join(", ")}.\n\n`+
+    if(!await confirmar(`«${p?p.name:id}» está en ${usan.length} pantalla(s): ${usan.join(", ")}.\n\n`+
                 "Sus contenidos se quedarán sueltos en esas playlists: no se pierde nada, "+
                 "pero dejarán de actualizarse juntos.\n\n¿Continuar?")) return;
     // Desagrupar antes de borrar. Si solo quitaramos el paquete, la referencia
@@ -2695,7 +2750,7 @@ function deletePackage(id){
         }
       }
     });
-  }else if(!confirm("¿Borrar este paquete? (no borra los contenidos, solo el grupo)")) return;
+  }else if(!await confirmar("¿Borrar este paquete? (no borra los contenidos, solo el grupo)")) return;
   content.packages=(content.packages||[]).filter(x=>x.id!==id);
   saveContentLocal(); renderPackages(); renderScreens();
   toast(usan.length?"Paquete borrado — sus contenidos quedaron sueltos":"Paquete borrado");
@@ -4552,7 +4607,7 @@ async function cargarLgTvs(){
   }catch(e){ /* sin conexión: se queda como estaba */ }
 }
 async function cambiarLg(id,accion,nombre,activo){
-  if(accion==="borrar"&&!confirm("¿Quitar «"+nombre+"» de la lista? Solo deja de avisarse; el televisor no se toca.")) return;
+  if(accion==="borrar"&&!await confirmar("¿Quitar «"+nombre+"» de la lista? Solo deja de avisarse; el televisor no se toca.")) return;
   try{
     const cuerpo=accion==="vigilar"?{id,activo:!!activo}:{id};
     const r=await fetch("/api/lg-tvs/"+accion,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cuerpo)});
@@ -4562,7 +4617,7 @@ async function cambiarLg(id,accion,nombre,activo){
   cargarLgTvs();
 }
 async function instalarActualizacion(version){
-  if(!confirm("Se instalará la versión "+version+".\n\n"+
+  if(!await confirmar("Se instalará la versión "+version+".\n\n"+
               "El servidor se reiniciará durante un minuto aproximadamente. Las pantallas "+
               "seguirán mostrando su contenido y se reconectarán solas.\n\n"+
               "Si estás en la aplicación de escritorio, su ventana se cerrará sola durante la "+
@@ -4630,7 +4685,7 @@ async function restaurarCopia(){
   const inp=document.getElementById("restore-file");
   const f=inp.files&&inp.files[0];
   if(!f){ toast("Elige primero el archivo de copia",true); return; }
-  if(!confirm("Restaurar «"+f.name+"».\n\n"+
+  if(!await confirmar("Restaurar «"+f.name+"».\n\n"+
               "Se sobrescriben las pantallas, playlists, paquetes y archivos de este equipo.\n"+
               "La contraseña y el token de la extensión NO se tocan.\n\n¿Continuar?")) return;
   toast("Restaurando…");
@@ -4769,7 +4824,7 @@ async function claimPairing(code, nombre, modo, cont){
   // Dos televisores con el mismo tablero es un uso legitimo, pero casi nunca es
   // lo que se pretende: mas vale avisar antes que dejar una pantalla huerfana.
   if(modo==="reenlazar" && (regScreens[nombre]||{}).connected){
-    if(!confirm("«"+nombre+"» está conectada ahora mismo.\n\n"+
+    if(!await confirmar("«"+nombre+"» está conectada ahora mismo.\n\n"+
                 "Si continúas quedarán dos dispositivos mostrando lo mismo.\n\n¿Seguir?")) return;
   }
   try{
@@ -5150,7 +5205,7 @@ async function saveSettings(){
   }
 }
 async function restartServer(){
-  if(!confirm("¿Reiniciar el servidor? Las pantallas se reconectarán solas en unos segundos.")) return;
+  if(!await confirmar("¿Reiniciar el servidor? Las pantallas se reconectarán solas en unos segundos.")) return;
   try{ await fetch("/api/restart",{method:"POST"}); }catch(e){}
   toast("Reiniciando servidor…");
   let tries=0;
@@ -5200,9 +5255,9 @@ function renderColorPresets(){
       sw.style.cssText=`width:22px;height:22px;border-radius:5px;border:1px solid rgba(255,255,255,.3);background:${p.c};cursor:pointer;padding:0`;
       sw.addEventListener("click",()=>applyColor(input,p.c));
       if(p.custom){
-        sw.addEventListener("contextmenu",e=>{
+        sw.addEventListener("contextmenu",async e=>{
           e.preventDefault();
-          if(confirm(`¿Borrar el color guardado ${p.c}?`)){ saveCustomColors(getCustomColors().filter(x=>x!==p.c)); renderColorPresets(); }
+          if(await confirmar(`¿Borrar el color guardado ${p.c}?`)){ saveCustomColors(getCustomColors().filter(x=>x!==p.c)); renderColorPresets(); }
         });
       }
       row.appendChild(sw);
