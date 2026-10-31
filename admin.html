@@ -1410,17 +1410,18 @@ JPY  Yen        162.5"></textarea>
         <input type="checkbox" id="plm-shuffle" style="cursor:pointer;width:16px;height:16px" onchange="cambioShuffle()">
         Orden aleatorio
       </label>
+      <!-- La prioridad ⭐ es de las cosas que más se usan: va a la vista, no en «Más ajustes». -->
+      <span id="plm-priority-wrap" style="display:none;align-items:center;gap:6px;font-size:12px">
+        <span style="color:var(--muted)">prioridad ⭐ cada</span>
+        <input class="finput" id="plm-priority-every" type="number" min="2" max="50" step="1"
+               value="4" style="width:56px" title="Cada cuántos pases sale un contenido marcado con ⭐">
+        <span style="color:var(--muted)">pases</span>
+      </span>
       <button type="button" class="btn btn-ghost btn-sm" id="plm-mas-btn" aria-expanded="false" aria-controls="plm-mas"
               style="margin-left:auto" onclick="mostrarMasAjustes(document.getElementById('plm-mas').style.display==='none')">Más ajustes <i class="fa-solid fa-chevron-down"></i></button>
     </div>
     <div id="plm-mas" style="display:none;margin-bottom:6px">
       <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:6px 0">
-        <span id="plm-priority-wrap" style="display:none;align-items:center;gap:6px;font-size:12px">
-          <span style="color:var(--muted)">prioridad ⭐ cada</span>
-          <input class="finput" id="plm-priority-every" type="number" min="2" max="50" step="1"
-                 value="4" style="width:56px" title="Cada cuántos pases sale un contenido marcado con ⭐">
-          <span style="color:var(--muted)">pases</span>
-        </span>
         <span style="display:flex;align-items:center;gap:6px;font-size:12px">
           <span style="color:var(--muted)">margen de seguridad</span>
           <input class="finput" id="plm-safe-margin" type="number" min="0" max="5" step="1"
