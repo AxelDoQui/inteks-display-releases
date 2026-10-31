@@ -707,8 +707,12 @@ function showStandby(){
   const standby=document.createElement("div");
   standby.id="standby-screen";
   standby.style.cssText="position:absolute;inset:0;background:#000;display:flex;align-items:center;justify-content:center;z-index:50";
-  if(screenConfig?.standby_image){
-    standby.innerHTML=`<img src="${screenConfig.standby_image}" style="width:100%;height:100%;object-fit:contain">`;
+  // Un festivo cerrado puede traer su propia imagen («Estamos cerrados»); si no,
+  // la de standby de la pantalla.
+  const fest=festivoDeHoy();
+  const imagen=(fest&&!fest.enabled&&fest.image)||(screenConfig&&screenConfig.standby_image)||"";
+  if(imagen){
+    standby.innerHTML=`<img src="${imagen}" style="width:100%;height:100%;object-fit:contain">`;
   }else{
     standby.innerHTML='<div style="text-align:center;color:rgba(255,255,255,.2);font-family:monospace"><div style="font-size:14px;letter-spacing:2px">PANTALLA APAGADA</div><div style="font-size:11px;margin-top:8px">🕐 Fuera de horario</div></div>';
   }

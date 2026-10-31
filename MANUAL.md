@@ -230,6 +230,8 @@ En **Horario** de cada pantalla: días de la semana con su franja, o modo 24/7.
 igual para cerrar en Navidad que para abrir un domingo de rebajas. Deja las
 horas vacías para todo el día.
 
+Si dejas una fecha como **cerrado**, puedes elegir una imagen de la librería (por ejemplo «Estamos cerrados») que sale en la pantalla solo ese día; sin imagen sale la de standby.
+
 Si configuras **solo festivos** y ningún día, el resto del año la pantalla sigue
 encendida.
 

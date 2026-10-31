@@ -1379,7 +1379,8 @@ JPY  Yen        162.5"></textarea>
         <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">
           Una fecha concreta manda sobre el horario del día de la semana. Deja las horas
           vacías para todo el día. Sirve igual para cerrar en Navidad que para abrir un
-          domingo de rebajas.
+          domingo de rebajas. Si la dejas en «cerrado», puedes elegir la imagen que sale
+          solo ese día (por ejemplo «Estamos cerrados»).
         </div>
         <div id="sched-festivos"></div>
       </div>
@@ -2030,11 +2031,26 @@ function renderFestivos(){
     el.innerHTML=
       `<input type="date" class="finput" style="font-size:11px" value="${f.date}" onchange="festivoCampo(${i},'date',this.value)">`+
       `<label style="font-size:11px;cursor:pointer;white-space:nowrap"><input type="checkbox" ${f.enabled?"checked":""} onchange="festivoCampo(${i},'enabled',this.checked)" style="cursor:pointer"> abierto</label>`+
-      `<input type="time" class="finput" style="font-size:11px" value="${f.start||""}" ${f.enabled?"":"disabled"} onchange="festivoCampo(${i},'start',this.value)" title="Vacío = todo el día">`+
-      `<input type="time" class="finput" style="font-size:11px" value="${f.end||""}" ${f.enabled?"":"disabled"} onchange="festivoCampo(${i},'end',this.value)" title="Vacío = todo el día">`+
+      (f.enabled
+        ? `<input type="time" class="finput" style="font-size:11px" value="${f.start||""}" onchange="festivoCampo(${i},'start',this.value)" title="Vacío = todo el día">`+
+          `<input type="time" class="finput" style="font-size:11px" value="${f.end||""}" onchange="festivoCampo(${i},'end',this.value)" title="Vacío = todo el día">`
+        : `<select class="finput" style="font-size:11px;grid-column:span 2" onchange="festivoCampo(${i},'image',this.value)" title="Lo que sale en la pantalla ese día">`+
+          opcionesImagenFestivo(f.image)+`</select>`)+
       `<button class="btn btn-danger btn-sm" onclick="quitarFestivo(${i})"><i class="fa-solid fa-xmark"></i></button>`;
     c.appendChild(el);
   });
+}
+
+// Imágenes de la librería para poner en un día cerrado («Estamos cerrados»).
+// Si la imagen elegida ya no está en la librería se conserva como opción, para
+// no perderla en silencio al guardar.
+function opcionesImagenFestivo(actual){
+  const esc=s=>String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+  const imgs=(content.items||[]).filter(it=>it&&it.type==="image"&&it.src);
+  let h='<option value="">Imagen de standby / negro</option>';
+  if(actual&&!imgs.some(it=>it.src===actual)) h+='<option value="'+esc(actual)+'" selected>(imagen que ya no está en la librería)</option>';
+  imgs.forEach(it=>{ h+='<option value="'+esc(it.src)+'"'+(it.src===actual?" selected":"")+'>'+esc(it.name||it.src)+'</option>'; });
+  return h;
 }
 
 function festivoCampo(i,campo,valor){
@@ -2089,7 +2105,7 @@ function saveSchedule(){
     .filter(f=>{ if(vistas.has(f.date)) return false; vistas.add(f.date); return true; })
     .map(f=>f.enabled
       ? {date:f.date, enabled:true, start:f.start||"", end:f.end||""}
-      : {date:f.date, enabled:false});
+      : (f.image ? {date:f.date, enabled:false, image:f.image} : {date:f.date, enabled:false}));
 
   const alwaysOn=document.getElementById("sched-always").checked;
   content.screens[currentScheduleScreen].always_on=alwaysOn;
