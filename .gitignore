@@ -55,3 +55,5 @@ Entregables/
 
 # Node portable y herramienta de LG que baja el instalador (casilla «lg»)
 lg-tools/
+lg_tvs.json
+lg_tvs.json.bak

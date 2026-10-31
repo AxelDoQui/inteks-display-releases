@@ -431,6 +431,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 <!-- Aviso de versión nueva: visible en cualquier pantalla del panel, no solo en Ajustes. -->
 <div id="aviso-version" role="status" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;margin-bottom:16px;border:1px solid var(--accent);border-radius:var(--r);background:rgba(255,127,0,.10);font-size:13px"></div>
 
+<!-- Aviso de que el Developer Mode de un televisor LG está a punto de caducar. -->
+<div id="aviso-lg" role="status" style="display:none;flex-direction:column;gap:8px;padding:10px 14px;margin-bottom:16px;border:1px solid var(--danger);border-radius:var(--r);background:rgba(240,80,80,.10);font-size:13px"></div>
+
 <!-- ── PANTALLAS -->
 <div class="page active" id="page-screens">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
@@ -1092,6 +1095,12 @@ JPY  Yen        162.5"></textarea>
       <button class="btn btn-accent" onclick="guardarAvisos()"><i class="fa-solid fa-floppy-disk"></i> Guardar avisos</button>
       <button class="btn btn-ghost" onclick="probarAvisos()"><i class="fa-solid fa-paper-plane"></i> Enviar mensaje de prueba</button>
     </div>
+  </div>
+
+  <div class="card" id="card-lg" style="display:none">
+    <div class="card-title"><i class="fa-solid fa-tv"></i> Televisores LG (mini-app)</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">El <em>Developer Mode</em> del televisor caduca a las ~1000 horas y la mini-app deja de abrirse. Para renovarlo, abre la app «Developer Mode» del TV y pulsa «Extend Session Time»; después pulsa «Ya lo renové» aquí.</p>
+    <div id="lg-lista"></div>
   </div>
 
   <div class="card">
@@ -4474,6 +4483,65 @@ async function avisoVersion(forzar){
     pintarAvisoVersion(await r.json());
   }catch(e){ /* sin conexión con el servidor: el aviso se queda como estaba */ }
 }
+// ── Televisores LG: cuánto les queda de Developer Mode ──────────────────────
+function textoRestante(h){
+  if(h<=0) return "caducado";
+  if(h<48) return "quedan "+h+" horas";
+  const d=Math.floor(h/24);
+  return "quedan "+d+" días";
+}
+function pintarLgTvs(tvs){
+  const card=document.getElementById("card-lg"), lista=document.getElementById("lg-lista");
+  const banner=document.getElementById("aviso-lg");
+  tvs=Array.isArray(tvs)?tvs:[];
+  if(card) card.style.display=tvs.length?"block":"none";
+  if(lista){
+    lista.innerHTML="";
+    tvs.forEach(t=>{
+      const fila=document.createElement("div");
+      fila.style.cssText="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--b)";
+      const txt=document.createElement("span");txt.style.flex="1";
+      txt.innerHTML='<strong>'+esc(t.nombre||t.ip)+'</strong> <span style="color:var(--muted)">('+esc(t.ip)+')</span> — '+
+        '<span style="color:'+(t.aviso?"var(--danger)":"var(--text)")+'">'+textoRestante(t.restante_h)+'</span>';
+      const ren=document.createElement("button");ren.className="btn btn-ghost btn-sm";ren.textContent="Ya lo renové";
+      ren.addEventListener("click",()=>cambiarLg(t.id,"renovado",t.nombre||t.ip));
+      const q=document.createElement("button");q.className="btn btn-ghost btn-sm";q.textContent="Quitar";
+      q.addEventListener("click",()=>cambiarLg(t.id,"borrar",t.nombre||t.ip));
+      fila.append(txt,ren,q);lista.appendChild(fila);
+    });
+  }
+  if(!banner) return;
+  const urgentes=tvs.filter(t=>t.aviso);
+  if(!urgentes.length){banner.style.display="none";banner.innerHTML="";return;}
+  banner.style.display="flex";
+  banner.innerHTML="";
+  urgentes.forEach(t=>{
+    const l=document.createElement("div");
+    l.innerHTML='<i class="fa-solid fa-triangle-exclamation" style="color:var(--danger)"></i> '+
+      'El modo desarrollador del televisor <strong>'+esc(t.nombre||t.ip)+'</strong> '+
+      (t.restante_h<=0?'<strong>ha caducado</strong>':'caduca pronto ('+textoRestante(t.restante_h)+')')+
+      '. Abre «Developer Mode» en el TV y pulsa «Extend Session Time»; luego pulsa ';
+    const b=document.createElement("button");b.className="btn btn-sm btn-ghost";b.textContent="Ya lo renové";
+    b.addEventListener("click",()=>cambiarLg(t.id,"renovado",t.nombre||t.ip));
+    l.appendChild(b);banner.appendChild(l);
+  });
+}
+async function cargarLgTvs(){
+  try{
+    const r=await fetch("/api/lg-tvs",{cache:"no-store"});
+    if(!r.ok) return;
+    pintarLgTvs((await r.json()).tvs);
+  }catch(e){ /* sin conexión: se queda como estaba */ }
+}
+async function cambiarLg(id,accion,nombre){
+  if(accion==="borrar"&&!confirm("¿Quitar «"+nombre+"» de la lista? Solo deja de avisarse; el televisor no se toca.")) return;
+  try{
+    const r=await fetch("/api/lg-tvs/"+accion,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
+    if(!r.ok){toast("No se pudo actualizar el televisor",true);return;}
+    toast(accion==="borrar"?"Televisor quitado":"Anotado: la cuenta atrás vuelve a empezar");
+  }catch(e){toast("No se pudo contactar con el servidor",true);return;}
+  cargarLgTvs();
+}
 async function instalarActualizacion(version){
   if(!confirm("Se instalará la versión "+version+".\n\n"+
               "El servidor se reiniciará durante un minuto aproximadamente. Las pantallas "+
@@ -5145,6 +5213,8 @@ connectSSE();
 cargarVersionServidor();
 avisoVersion();
 setInterval(avisoVersion,15*60*1000);
+cargarLgTvs();
+setInterval(cargarLgTvs,15*60*1000);
 loadAll();
 setInterval(async()=>{
   await loadScreens();

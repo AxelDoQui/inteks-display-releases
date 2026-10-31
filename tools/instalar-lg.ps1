@@ -105,6 +105,29 @@ try {
     ares-install --device $Nombre $ipk.FullName
     if ($LASTEXITCODE -ne 0) { Falla "falló la instalación en el TV." }
     ares-launch --device $Nombre $ID
+
+    # Apuntar cuándo empezó la sesión de Developer Mode de este TV (la hora del
+    # propio televisor, que se anota al activarlo o renovarlo): el panel avisa
+    # cuando va a caducar. Si falla, solo se pierde el aviso.
+    try {
+        $ErrorActionPreference = "Continue"
+        $nums = @(ares-novacom --device $Nombre --run "date +%s; stat -c %Y /var/luna/preferences/devmode_enabled" 2>&1 |
+            Where-Object { "$_" -match '^\d{9,}$' } | ForEach-Object { [double]"$_" })
+        $ErrorActionPreference = "Stop"
+        $datos = Join-Path $env:ProgramData "InTeks Display"
+        if ($nums.Count -ge 2 -and (Test-Path $datos)) {
+            $ahoraPc = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+            $inicio = [int64]($ahoraPc - ($nums[0] - $nums[1]))
+            $arch = Join-Path $datos "lg_tvs.json"
+            $tvs = @()
+            if (Test-Path $arch) { try { $tvs = @((Get-Content $arch -Raw -Encoding UTF8 | ConvertFrom-Json).tvs) | Where-Object { $_ -and $_.id -ne $TV } } catch { $tvs = @() } }
+            $tvs += [pscustomobject]@{ id = $TV; nombre = $Nombre; ip = $TV; inicio = $inicio }
+            $json = (@{ tvs = @($tvs) } | ConvertTo-Json -Depth 4)
+            [IO.File]::WriteAllText($arch, $json, (New-Object Text.UTF8Encoding($false)))
+            $horas = [int](1000 - ($ahoraPc - $inicio) / 3600)
+            Write-Host "Modo desarrollador del TV: quedan unas $horas horas. El panel avisará antes de que caduque." -ForegroundColor Cyan
+        }
+    } catch { $ErrorActionPreference = "Stop" }
     Write-Host ""
     Write-Host "Listo. La mini-app está instalada y abierta en el TV, apuntando a $url" -ForegroundColor Green
     Write-Host "Si sale un código de 4 cifras, enlázala en el panel (Pantallas -> Esperando para enlazar)."

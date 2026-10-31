@@ -648,6 +648,54 @@ def lanzar_instalador(ruta):
         subprocess.Popen(args, creationflags=DETACHED | NUEVO_GRUPO, close_fds=True)
     log(f"  [actualizar] instalador lanzado: {ruta}")
 
+# ── Televisores LG con la mini-app: cuánto les queda de modo desarrollador ──
+# El «Developer Mode» de un LG caduca a las ~1000 h de activarlo o renovarlo
+# («Extend Session Time») y entonces la mini-app deja de abrirse. instalar-lg.ps1
+# apunta aquí cada TV con el momento (hora del televisor) en que empezó la sesión;
+# el panel avisa unos días antes. El servidor no habla con el TV: calcula con esa
+# fecha, y si se renueva el modo desarrollador se pulsa «Ya lo renové».
+LG_TVS_FILE = os.path.join(DATA_DIR, "lg_tvs.json")
+LG_DEVMODE_SEGUNDOS = 1000 * 3600
+LG_AVISO_SEGUNDOS = 7 * 24 * 3600
+
+def lg_tvs_estado(ahora=None):
+    """Lista de TVs con lo que les queda. Nunca lanza: un archivo raro no puede
+    romper el panel."""
+    ahora = time.time() if ahora is None else ahora
+    try:
+        tvs = load_json(LG_TVS_FILE).get("tvs", [])
+    except Exception:
+        return []
+    out = []
+    for t in tvs if isinstance(tvs, list) else []:
+        if not isinstance(t, dict):
+            continue
+        try:
+            inicio = float(t.get("inicio"))
+        except (TypeError, ValueError):
+            continue
+        restante = max(0, int(inicio + LG_DEVMODE_SEGUNDOS - ahora))
+        out.append({"id": str(t.get("id", "")), "nombre": str(t.get("nombre", "")),
+                    "ip": str(t.get("ip", "")), "inicio": int(inicio),
+                    "restante_s": restante, "restante_h": restante // 3600,
+                    "aviso": restante <= LG_AVISO_SEGUNDOS})
+    return out
+
+def lg_tv_cambiar(tv_id, accion, ahora=None):
+    """«renovado» (reinicia la cuenta atrás) o «borrar». False si no existe."""
+    ahora = time.time() if ahora is None else ahora
+    datos = load_json(LG_TVS_FILE)
+    tvs = datos.get("tvs", []) if isinstance(datos.get("tvs", []), list) else []
+    for t in list(tvs):
+        if isinstance(t, dict) and str(t.get("id")) == str(tv_id):
+            if accion == "borrar":
+                tvs.remove(t)
+            else:
+                t["inicio"] = int(ahora)
+            save_json(LG_TVS_FILE, {"tvs": tvs})
+            return True
+    return False
+
 # ── Copia de seguridad ─────────────────────────────────────────────────────
 # Toda la configuración de una tienda vivía solo en el disco de ese PC. Si el
 # equipo moría, se perdía entera; y montar una segunda tienda obligaba a rehacer
@@ -2052,6 +2100,14 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(500); self.cors(); self.end_headers()
             return
 
+        # ── API: televisores LG con la mini-app y lo que les queda de modo desarrollador
+        if path == "/api/lg-tvs":
+            if not self.require_auth(): return
+            body = json.dumps({"tvs": lg_tvs_estado()}).encode()
+            self.send_response(200); self.send_header("Content-Type","application/json")
+            self.send_header("Cache-Control","no-store")
+            self.cors(); self.end_headers(); self.wfile.write(body); return
+
         # ── API: pantallas encendidas esperando a que se les ponga nombre
         if path == "/api/pair-pending":
             if not self.require_auth(): return
@@ -3077,6 +3133,19 @@ class Handler(BaseHTTPRequestHandler):
                     if not autostart_ok:
                         extra["autostart_msg"] = autostart_msg
                 ok(extra)
+            except Exception as e: err(e)
+            return
+
+        # ── TV LG: «ya renové el modo desarrollador» / quitar el televisor de la lista
+        if path in ("/api/lg-tvs/renovado", "/api/lg-tvs/borrar"):
+            try:
+                d = json.loads(body or "{}")
+                tv_id = str(d.get("id", "")).strip() if isinstance(d, dict) else ""
+                if not tv_id:
+                    jresp(400, {"ok": False, "error": "Falta el televisor"}); return
+                if not lg_tv_cambiar(tv_id, "borrar" if path.endswith("borrar") else "renovado"):
+                    jresp(404, {"ok": False, "error": "No existe ese televisor"}); return
+                ok()
             except Exception as e: err(e)
             return
 
