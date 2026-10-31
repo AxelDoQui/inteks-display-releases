@@ -450,6 +450,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     <div class="stat-card"><div class="stat-val" id="st-wall">0</div><div class="stat-key">videowall</div></div>
     <div class="stat-card"><div class="stat-val" id="st-items">0</div><div class="stat-key">archivos</div></div>
   </div>
+  <div id="screens-grupos" style="display:none;margin-bottom:12px"></div>
   <div class="screens-grid" id="screens-grid"><div class="empty-state">Abre player.html en una tablet para que aparezca aquí</div></div>
   <!-- Conectar pantallas: plegado, porque solo hace falta al añadir una. Se abre solo
        cuando hay una pantalla esperando código. -->
@@ -1705,8 +1706,11 @@ function renderScreens(){
   const ids=new Set([...Object.keys(regScreens),...Object.keys(content.screens||{})]);
   ids.delete("admin");
   if(!ids.size){grid.innerHTML='<div class="empty-state" style="grid-column:1/-1">Abre player.html en una tablet para que aparezca aquí</div>';return;}
+  renderBarraGrupos();
   grid.innerHTML="";
-  ids.forEach(sid=>{
+  const visibles=Array.from(ids).filter(coincideGrupo);
+  if(!visibles.length){grid.innerHTML='<div class="empty-state" style="grid-column:1/-1">No hay pantallas en este grupo</div>';return;}
+  visibles.forEach(sid=>{
     const reg=regScreens[sid]||{};
     const cfg=(content.screens||{})[sid]||{};
     const pl=cfg.playlist||[];
@@ -1735,6 +1739,7 @@ function renderScreens(){
             <span class="pill ${isOn?'pill-on':'pill-off'}">${isOn?'● online':'○ offline'}</span>
             ${isWall?'<span class="pill pill-wall">videowall</span>':'<span class="pill pill-ind">independiente</span>'}
             ${rot?`<span class="pill pill-vert"><i class="fa-solid fa-rotate"></i> ${rot}°</span>`:''}
+            ${cfg.group?`<span class="pill pill-ind" title="Grupo"><i class="fa-solid fa-layer-group"></i> ${esc(cfg.group)}</span>`:''}
           </div>
         </div>
       </div>
@@ -1753,6 +1758,7 @@ function renderScreens(){
           <button class="btn btn-ghost btn-sm" onclick="this.closest('.sc-body').querySelector('.sc-mas').classList.toggle('abierto')" title="Más acciones"><i class="fa-solid fa-ellipsis"></i> Más</button>
         </div>
         <div class="sc-mas">
+          <button class="btn btn-ghost btn-sm" onclick="asignarGrupo('${sid}')" title="Meter esta pantalla en un grupo (por ejemplo, una tienda)"><i class="fa-solid fa-layer-group"></i> Grupo</button>
           <button class="btn btn-ghost btn-sm" onclick="reiniciarReproductor('${sid}')" title="Recarga el reproductor de esa pantalla (por si se ha quedado atascado)"><i class="fa-solid fa-rotate-right"></i> Reiniciar reproductor</button>
           <button class="btn btn-ghost btn-sm" onclick="renombrarPantalla('${sid}')" title="Cambiar el nombre que se ve en el panel (el televisor sigue enlazado)"><i class="fa-solid fa-pen"></i> Renombrar</button>
           <button class="btn btn-ghost btn-sm" onclick="duplicarPantalla('${sid}')" title="Crear otra pantalla igual que esta"><i class="fa-solid fa-clone"></i> Duplicar</button>
@@ -1830,6 +1836,93 @@ function confirmNewScreen(){
 }
 // Cambia solo el nombre que se ve: el identificador (con el que el televisor está
 // enlazado y por el que lo conocen videowalls y enlaces) no se toca. Vacío = quitarlo.
+// ── Grupos de pantallas (acciones en bloque) ───────────────────────────────
+// Un grupo es solo una etiqueta (cfg.group): cada pantalla conserva su playlist.
+let grupoFiltro="";            // ""=todas · "__sin__"=sin grupo · nombre de un grupo
+function grupoDe(sid){ return String((((content.screens||{})[sid])||{}).group||"").trim(); }
+function nombresDeGrupos(){
+  const s=new Set(); Object.keys(content.screens||{}).forEach(k=>{const g=grupoDe(k); if(g) s.add(g);});
+  return Array.from(s).sort((a,b)=>a.localeCompare(b,"es"));
+}
+function pantallasDelGrupo(g){
+  return Object.keys(content.screens||{}).filter(k=>k!=="admin"&&grupoDe(k)===g);
+}
+function coincideGrupo(sid){
+  if(!grupoFiltro) return true;
+  const g=grupoDe(sid);
+  return grupoFiltro==="__sin__"?!g:g===grupoFiltro;
+}
+function renderBarraGrupos(){
+  const cont=document.getElementById("screens-grupos"); if(!cont) return;
+  const grupos=nombresDeGrupos();
+  if(!grupos.length){ cont.style.display="none"; cont.innerHTML=""; grupoFiltro=""; return; }
+  if(grupoFiltro&&grupoFiltro!=="__sin__"&&!grupos.includes(grupoFiltro)) grupoFiltro="";
+  const todas=Object.keys(content.screens||{}).filter(k=>k!=="admin");
+  const sin=todas.filter(k=>!grupoDe(k)).length;
+  cont.style.display="block"; cont.innerHTML="";
+  const fila=document.createElement("div"); fila.style.cssText="display:flex;gap:6px;flex-wrap:wrap;align-items:center";
+  const chip=(valor,texto)=>{
+    const b=document.createElement("button");
+    b.className="btn btn-sm "+(grupoFiltro===valor?"btn-accent":"btn-ghost");
+    b.textContent=texto; b.addEventListener("click",()=>{grupoFiltro=valor;renderScreens();});
+    fila.appendChild(b);
+  };
+  chip("","Todas ("+todas.length+")");
+  grupos.forEach(g=>chip(g,g+" ("+pantallasDelGrupo(g).length+")"));
+  if(sin) chip("__sin__","Sin grupo ("+sin+")");
+  cont.appendChild(fila);
+  if(grupoFiltro&&grupoFiltro!=="__sin__"){
+    const acc=document.createElement("div");
+    acc.style.cssText="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;padding:6px 10px;background:var(--s2);border:1px solid var(--accent);border-radius:var(--r);font-size:12px";
+    const tx=document.createElement("span"); tx.style.flex="1"; tx.textContent="Grupo «"+grupoFiltro+"»: acciones para todas sus pantallas"; acc.appendChild(tx);
+    const b1=document.createElement("button"); b1.className="btn btn-ghost btn-sm"; b1.innerHTML='<i class="fa-solid fa-copy"></i> Copiar una playlist al grupo…';
+    b1.addEventListener("click",()=>copiarPlaylistAGrupo(grupoFiltro));
+    const b2=document.createElement("button"); b2.className="btn btn-ghost btn-sm"; b2.innerHTML='<i class="fa-solid fa-rotate-right"></i> Reiniciar reproductores';
+    b2.addEventListener("click",()=>reiniciarGrupo(grupoFiltro));
+    acc.append(b1,b2); cont.appendChild(acc);
+  }
+}
+async function asignarGrupo(sid){
+  const cfg=(content.screens||{})[sid]; if(!cfg) return;
+  const existentes=nombresDeGrupos();
+  const texto="Grupo de esta pantalla (por ejemplo «Tienda Centro»). Déjalo vacío para quitarla de su grupo."+(existentes.length?" Grupos que ya existen: "+existentes.join(", ")+".":"");
+  const v=await preguntar(texto,grupoDe(sid),{titulo:"Grupo de la pantalla"});
+  if(v===null) return;
+  const g=v.trim().slice(0,40);
+  if(g) cfg.group=g; else delete cfg.group;
+  await saveScreensConfig(); renderScreens();
+  toast(g?"Ahora está en el grupo «"+g+"»":"Ya no está en ningún grupo");
+}
+async function reiniciarGrupo(g){
+  const ids=pantallasDelGrupo(g); if(!ids.length) return;
+  if(!await confirmar("¿Reiniciar el reproductor de las "+ids.length+" pantallas del grupo «"+g+"»? Se recargan y vuelven a empezar sus playlists en unos segundos.",{titulo:"Reiniciar el grupo",si:"Sí, reiniciar",peligro:false})) return;
+  let ok=0;
+  await Promise.all(ids.map(async id=>{
+    try{ const r=await fetch("/api/screen-reload",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); const d=await r.json().catch(()=>({})); if(r.ok&&d.entregado) ok++; }catch(e){}
+  }));
+  toast(ok+" de "+ids.length+" pantallas recibieron el reinicio",ok<ids.length);
+}
+async function copiarPlaylistAGrupo(g){
+  const destinos=pantallasDelGrupo(g).filter(k=>((content.screens||{})[k]||{}).mode!=="wall");
+  if(!destinos.length){ toast("Ese grupo no tiene pantallas a las que copiar",true); return; }
+  const nombre=k=>(((content.screens||{})[k]||{}).label)||k;
+  const origen=await elegir("¿De qué pantalla copio la playlist? Se copian su playlist, su transición y su orden aleatorio a las pantallas del grupo «"+g+"».",
+    Object.keys(content.screens||{}).filter(k=>k!=="admin").map(k=>[k,nombre(k)]),{titulo:"Copiar playlist al grupo",si:"Siguiente"});
+  if(!origen) return;
+  const fuente=(content.screens||{})[origen]; if(!fuente) return;
+  const afectadas=destinos.filter(k=>k!==origen);
+  if(!afectadas.length){ toast("La única pantalla del grupo es la de origen",true); return; }
+  if(!await confirmar("Se va a SUSTITUIR la playlist de "+afectadas.length+(afectadas.length===1?" pantalla":" pantallas")+" ("+afectadas.map(nombre).join(", ")+") por la de «"+nombre(origen)+"». ¿Continuar?",
+      {titulo:"Sustituir playlists",si:"Sí, sustituir",peligro:true})) return;
+  const base=clonarConfigPantalla(fuente);
+  afectadas.forEach(k=>{
+    const c=content.screens[k];
+    c.playlist=JSON.parse(JSON.stringify(base.playlist||[]));
+    ["transition","transition_ms","shuffle"].forEach(f=>{ if(base[f]!==undefined) c[f]=base[f]; else delete c[f]; });
+  });
+  await saveScreensConfig(); renderScreens();
+  toast("Playlist copiada a "+afectadas.length+(afectadas.length===1?" pantalla":" pantallas"));
+}
 async function reiniciarReproductor(sid){
   if(!await confirmar("¿Reiniciar el reproductor de «"+(((content.screens||{})[sid]||{}).label||sid)+"»? Se recarga su página y vuelve a empezar la playlist en unos segundos.",{titulo:"Reiniciar reproductor",si:"Sí, reiniciar",peligro:false})) return;
   try{
@@ -2256,7 +2349,11 @@ function _dialogoPanel(o){
     p.style.cssText="font-size:13px;line-height:1.5;color:var(--text);white-space:pre-line;margin-bottom:14px";
     caja.append(h,p);
     let campo=null;
-    if(o.entrada){
+    if(o.opciones){
+      campo=document.createElement("select");campo.className="finput";campo.style.marginBottom="14px";
+      o.opciones.forEach(x=>{const op=document.createElement("option");op.value=x[0];op.textContent=x[1];campo.appendChild(op);});
+      caja.appendChild(campo);
+    }else if(o.entrada){
       campo=document.createElement("input");campo.className="finput";campo.value=o.valor||"";
       campo.style.marginBottom="14px";campo.readOnly=!!o.soloLectura;caja.appendChild(campo);
     }
@@ -2270,8 +2367,8 @@ function _dialogoPanel(o){
       if(listo) return; listo=true;
       document.removeEventListener("keydown",tecla,true);fondo.remove();resolve(v);
     };
-    const aceptar=()=>cerrar(o.entrada?campo.value:true);
-    const cancelar=()=>cerrar(o.entrada?null:false);
+    const aceptar=()=>cerrar((o.entrada||o.opciones)?campo.value:true);
+    const cancelar=()=>cerrar((o.entrada||o.opciones)?null:false);
     function tecla(e){
       if(e.key==="Escape"){e.preventDefault();e.stopPropagation();o.sinCancelar?aceptar():cancelar();}
       else if(e.key==="Enter"&&document.activeElement!==no){e.preventDefault();e.stopPropagation();aceptar();}
@@ -2291,6 +2388,11 @@ function confirmar(texto,o){
     [/conectada ahora/i,"Pantalla en uso","Sí, seguir"]];
   const r=reglas.find(x=>x[0].test(texto))||[null,"Confirmar","Aceptar"];
   return _dialogoPanel({texto,titulo:o.titulo||r[1],si:o.si||r[2],peligro});
+}
+// elegir(texto, [[valor, texto], ...]) -> Promise<valor|null>
+function elegir(texto,opciones,o){
+  o=o||{};
+  return _dialogoPanel({texto,opciones,titulo:o.titulo||"Elegir",si:o.si||"Aceptar",peligro:false});
 }
 function preguntar(texto,valor,o){
   o=o||{};
@@ -2631,11 +2733,26 @@ function abrirMandar(ids,desdeBarra){
   const lista=dlg.querySelector(".mp-lista"), btn=dlg.querySelector(".mp-enviar");
   pants.forEach(([sid,s])=>{
     const l=document.createElement("label");
-    l.innerHTML=`<input type="checkbox" class="mp-chk"> <span>${esc((s&&s.name)||sid)}</span>`;
+    l.innerHTML=`<input type="checkbox" class="mp-chk"> <span>${esc(((content.screens||{})[sid]||{}).label||(s&&s.name)||sid)}</span>`;
     l.querySelector("input").dataset.sid=sid;
     lista.appendChild(l);
   });
   const marcadas=()=>Array.from(lista.querySelectorAll(".mp-chk")).filter(c=>c.checked).map(c=>c.dataset.sid);
+  // Atajos por grupo: marcan de golpe las pantallas de ese grupo.
+  const gr=nombresDeGrupos();
+  if(gr.length){
+    const fg=document.createElement("div");fg.style.cssText="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0";
+    gr.forEach(g=>{
+      const b=document.createElement("button");b.type="button";b.className="btn btn-ghost btn-sm";b.textContent="Grupo «"+g+"»";
+      b.addEventListener("click",()=>{
+        const ids=pantallasDelGrupo(g);
+        lista.querySelectorAll(".mp-chk").forEach(c=>{ if(ids.includes(c.dataset.sid)) c.checked=true; });
+        refrescar();
+      });
+      fg.appendChild(b);
+    });
+    lista.parentNode.insertBefore(fg,lista);
+  }
   const refrescar=()=>{btn.disabled=enviando||marcadas().length===0;};
   lista.onchange=refrescar;
   dlg.querySelector(".mp-todas").onclick=e=>{e.preventDefault();lista.querySelectorAll(".mp-chk").forEach(c=>c.checked=true);refrescar();};

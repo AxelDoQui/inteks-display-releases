@@ -10,6 +10,8 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ## 1.0.62 — sin publicar
 
+- **Grupos de pantallas.** En «Más → Grupo» se mete una pantalla en un grupo (por ejemplo «Tienda Centro»). Con grupos, el panel enseña botones para filtrar por grupo y, dentro de un grupo, «Copiar una playlist al grupo…» (sustituye la playlist de sus pantallas por la de otra, con aviso previo) y «Reiniciar reproductores». Al mandar archivos desde la Librería hay atajos «Grupo …» que marcan sus pantallas. Cada pantalla sigue con su propia playlist; el grupo es solo una etiqueta.
+
 - Pantallas: cada tarjeta enseña una **miniatura de lo que está mostrando ahora** (junto a «Ahora: …»). No es una captura real de la tele: es el contenido de la librería que la pantalla dice estar reproduciendo.
 - Pantallas: botón **«Reiniciar reproductor»** (en «Más») que recarga el reproductor de esa pantalla sin ir a tocarla. Solo funciona con pantallas que ya tengan el reproductor de esta versión.
 
