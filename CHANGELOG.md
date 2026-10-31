@@ -8,7 +8,7 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
-## 1.0.63 — sin publicar
+## 1.0.63 — 2026-10-31
 
 - **Festivos con su propia imagen.** En Horario → Festivos, una fecha marcada como cerrada deja elegir una imagen de la librería (por ejemplo «Estamos cerrados») que sale en la pantalla solo ese día. Sin imagen elegida sale la imagen de standby de la pantalla, o negro, como antes.
 
