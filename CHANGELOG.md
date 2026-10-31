@@ -8,7 +8,7 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
-## 1.0.57 — sin publicar
+## 1.0.57 — 2026-10-31
 
 - Televisores LG: casilla «Mantenerla abierta» por televisor (Ajustes → Televisores LG). Una tarea del PC («InTeks Display LG», cada 5 minutos) abre la mini-app si el TV está encendido y no la tiene abierta: tras un corte de luz o si alguien la cerró. Apagada por defecto, para no molestar en un TV de uso normal.
 
