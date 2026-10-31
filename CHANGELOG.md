@@ -8,7 +8,7 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
-## 1.0.53 — sin publicar
+## 1.0.53 — 2026-10-31
 
 - Televisores LG: el navegador del LG cierra la página cada ~2 minutos, así que ahora hay una mini-app para webOS (carpeta `webos\`) que abre el reproductor desde el entorno de apps del TV. `instalar-lg.ps1` la instala pidiendo solo la IP del TV, su passphrase (app «Developer Mode») y la IP del servidor.
 - Instalador de Windows: nueva casilla opcional «Herramientas para instalar la pantalla en un televisor LG». Descarga un Node.js portable (comprobando su firma) y la herramienta de LG dentro de la carpeta de la app, sin tocar ningún Node del equipo, y añade «Instalar la pantalla en un TV LG» al menú Inicio. Desmarcada por defecto: usa unos 200 MB.
