@@ -8,7 +8,7 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
-## 1.0.61 — sin publicar
+## 1.0.61 — 2026-10-31
 
 - Librería y Paquetes: se pueden marcar varios y borrarlos de una vez. En la Librería, la barra de selección tiene «Seleccionar todo» (lo que se ve con el filtro actual) y «Borrar»; en Paquetes, cada paquete tiene su casilla y una barra con lo mismo. Una sola pregunta, que avisa de cuántos están en uso, y una sola petición al servidor (`/api/delete` acepta `ids`). Al borrar archivos también se quitan de los paquetes en formato nuevo.
 
