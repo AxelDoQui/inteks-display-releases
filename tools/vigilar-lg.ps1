@@ -27,6 +27,14 @@ function Anota($t) {
     } catch { }
 }
 
+# Si la mini-app se instaló desde el panel, la clave del TV está en esta carpeta y no
+# en el perfil de quien ejecuta la tarea (que es SYSTEM).
+$casa = Join-Path $datos "lg-home"
+if (Test-Path $casa) {
+    $env:USERPROFILE = $casa
+    $env:HOME = $casa
+}
+
 # En el proyecto este script vive en tools\; instalado, junto a lg-tools\.
 $raiz = if (Test-Path (Join-Path $PSScriptRoot "lg-tools")) { $PSScriptRoot } else { Split-Path -Parent $PSScriptRoot }
 $herr = Join-Path $raiz "lg-tools"

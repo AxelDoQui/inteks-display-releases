@@ -398,14 +398,16 @@ vez:
    **«Key Server»**. Apunta la **IP del TV** y la **Passphrase**. El modo
    desarrollador dura unas **999 horas**: pasado ese tiempo hay que pulsar
    «Extend Session Time» en esa misma app.
-2. En el instalador de InTeks Display, marca **«Herramientas para instalar la
-   pantalla en un televisor LG»** (trae Node.js y la herramienta de LG).
-3. Abre **«Instalar la pantalla en un TV LG»** (menú Inicio) y contesta: IP del
-   TV, passphrase e IP del PC servidor. Con «Key Server» encendido: se apaga
-   solo al rato.
+2. En el panel de InTeks Display, **Ajustes → Televisores LG → «Instalar en un
+   televisor LG»**. Pide la IP del TV, la passphrase y la dirección de este
+   servidor (ya viene puesta). La primera vez descarga las herramientas de LG
+   (unos 60 MB; tarda unos minutos) y el panel va enseñando cómo avanza. Con
+   «Key Server» encendido: se apaga solo al rato.
+3. Si el cuadro dice que algo falló, el motivo sale en rojo; corrige el dato
+   y vuelve a intentarlo.
 4. En el TV sale el código de siempre: enlázalo desde el panel.
-5. Si es un televisor **dedicado** a la cartelería, en el panel (Ajustes →
-   *Televisores LG*) marca **«Mantenerla abierta»**: una tarea del PC
+5. Si es un televisor **dedicado** a la cartelería, marca en ese cuadro (o después, en Ajustes →
+   *Televisores LG*) **«Mantenerla abierta»**: una tarea del PC
    («InTeks Display LG», cada 5 minutos) abre la mini-app si el TV está
    encendido y no la tiene abierta, por ejemplo tras un corte de luz. Déjala
    sin marcar en un TV que uses para otras cosas, o te la volvería a abrir.

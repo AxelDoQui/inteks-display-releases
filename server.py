@@ -713,6 +713,96 @@ def lg_tv_cambiar(tv_id, accion, ahora=None, activo=None):
             return True
     return False
 
+# ── Instalar la mini-app en un LG desde el panel ────────────────────────────
+# El panel pide la IP del TV, su passphrase y la dirección de este servidor, y el
+# servidor lanza tools\instalar-lg.ps1 (el mismo que usaba el acceso del menú Inicio).
+# El servidor corre como SYSTEM, así que el script recibe -Casa: la clave del TV y los
+# datos de la herramienta de LG quedan en lg-home\ dentro de los datos, y la tarea que
+# mantiene la mini-app abierta (vigilar-lg.ps1) los busca allí. La passphrase viaja
+# por variable de entorno, no por la línea de comandos. Solo una instalación a la vez.
+LG_CASA = os.path.join(DATA_DIR, "lg-home")
+LG_INSTALAR_MAX_S = 15 * 60
+_lg_inst = {"estado": "libre", "lineas": [], "tv": ""}     # libre | instalando | ok | error
+_lg_inst_lock = threading.Lock()
+
+def lg_script_instalar():
+    """Ruta de instalar-lg.ps1 si esta instalación puede usarlo, o None."""
+    ruta = os.environ.get("SIGNALOS_LG_SCRIPT")
+    if ruta:
+        return ruta if os.path.isfile(ruta) else None
+    if not os.path.isdir(os.path.join(APP_DIR, "webos")):
+        return None
+    for sub in ("", "tools"):
+        p = os.path.join(APP_DIR, sub, "instalar-lg.ps1")
+        if os.path.isfile(p):
+            return p
+    return None
+
+def lg_validar(ip, passphrase, servidor):
+    """Texto del problema, o None si los tres datos valen. Se comprueba aquí porque
+    acaban en una línea de comandos y en un JSON de la herramienta de LG."""
+    m = re.fullmatch(r"(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})", ip or "")
+    if not m or any(int(x) > 255 for x in m.groups()):
+        return "La IP del televisor no es válida (algo como 192.168.0.108)"
+    if not re.fullmatch(r"[A-Za-z0-9]{4,32}", passphrase or ""):
+        return "La passphrase solo lleva letras y números (la que sale en «Developer Mode»)"
+    if not re.fullmatch(r"(https?://)?[A-Za-z0-9.\-]+(:\d{1,5})?/?", servidor or ""):
+        return "La dirección del servidor no es válida (algo como 192.168.0.90)"
+    return None
+
+def lg_instalar_estado():
+    with _lg_inst_lock:
+        return {"estado": _lg_inst["estado"], "lineas": list(_lg_inst["lineas"]), "tv": _lg_inst["tv"]}
+
+def lg_instalar_iniciar(ip, passphrase, servidor, vigilar):
+    """Lanza la instalación en segundo plano. (True, "") o (False, motivo)."""
+    err = lg_validar(ip, passphrase, servidor)
+    if err:
+        return False, err
+    script = lg_script_instalar()
+    if not script:
+        return False, "Esta instalación no trae la mini-app para LG. Reinstala InTeks Display con la última versión."
+    if sys.platform != "win32":
+        return False, "La instalación en un LG solo existe en Windows"
+    with _lg_inst_lock:
+        if _lg_inst["estado"] == "instalando":
+            return False, "Ya hay una instalación en marcha"
+        _lg_inst.update(estado="instalando", lineas=[], tv=ip)
+    args = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script,
+            "-TV", ip, "-Servidor", servidor, "-Casa", LG_CASA]
+    if vigilar:
+        args.append("-Vigilar")
+    entorno = dict(os.environ, INTEKS_LG_PASS=passphrase)
+
+    def anota(linea):
+        linea = linea.replace(passphrase, "***").strip()[:300]
+        if linea:
+            with _lg_inst_lock:
+                _lg_inst["lineas"] = (_lg_inst["lineas"] + [linea])[-200:]
+
+    def correr():
+        codigo = 1
+        try:
+            proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=entorno,
+                                    stdin=subprocess.DEVNULL, creationflags=0x08000000)   # sin ventana
+            def vigila():
+                try: proc.wait(timeout=LG_INSTALAR_MAX_S)
+                except subprocess.TimeoutExpired:
+                    anota("ERROR: la instalación tardó demasiado y se canceló."); proc.kill()
+            threading.Thread(target=vigila, daemon=True).start()
+            for bruto in proc.stdout:
+                for linea in re.split(r"[\r\n]+", bruto.decode("utf-8", "replace")):
+                    anota(linea)
+            codigo = proc.wait()
+        except Exception as e:
+            anota(f"ERROR: no se pudo lanzar la instalación ({e})")
+        with _lg_inst_lock:
+            _lg_inst["estado"] = "ok" if codigo == 0 else "error"
+        log(f"  [lg] instalación en {ip}: {'ok' if codigo == 0 else 'falló'}")
+
+    threading.Thread(target=correr, daemon=True).start()
+    return True, ""
+
 # ── Copia de seguridad ─────────────────────────────────────────────────────
 # Toda la configuración de una tienda vivía solo en el disco de ese PC. Si el
 # equipo moría, se perdía entera; y montar una segunda tienda obligaba a rehacer
@@ -2125,6 +2215,21 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control","no-store")
             self.cors(); self.end_headers(); self.wfile.write(body); return
 
+        # ── API: estado de la instalación de la mini-app en un LG (la pide el panel)
+        if path == "/api/lg-instalar":
+            if not self.require_auth(): return
+            host = (self.headers.get("Host") or "").strip()
+            nombre, _, puerto = host.partition(":")
+            if not nombre or nombre in ("localhost", "127.0.0.1", "[::1]") or nombre.endswith(".localhost"):
+                nombre = get_ip()
+            sugerido = "http://" + nombre + (":" + puerto if puerto and puerto != "80" else "") + "/"
+            d = lg_instalar_estado()
+            d.update(disponible=lg_script_instalar() is not None, servidor_sugerido=sugerido)
+            body = json.dumps(d).encode()
+            self.send_response(200); self.send_header("Content-Type","application/json")
+            self.send_header("Cache-Control","no-store")
+            self.cors(); self.end_headers(); self.wfile.write(body); return
+
         # ── API: pantallas encendidas esperando a que se les ponga nombre
         if path == "/api/pair-pending":
             if not self.require_auth(): return
@@ -3187,6 +3292,19 @@ class Handler(BaseHTTPRequestHandler):
                     jresp(400, {"ok": False, "error": "Falta si se activa o se apaga"}); return
                 if not lg_tv_cambiar(tv_id, accion, activo=d.get("activo")):
                     jresp(404, {"ok": False, "error": "No existe ese televisor"}); return
+                ok()
+            except Exception as e: err(e)
+            return
+
+        # ── Instalar la mini-app en un televisor LG (lo lanza el panel)
+        if path == "/api/lg-instalar":
+            try:
+                d = json.loads(body or "{}")
+                if not isinstance(d, dict): d = {}
+                ok_, motivo = lg_instalar_iniciar(str(d.get("ip", "")).strip(), str(d.get("passphrase", "")).strip(),
+                                                  str(d.get("servidor", "")).strip(), d.get("vigilar") is True)
+                if not ok_:
+                    jresp(409 if "en marcha" in motivo else 400, {"ok": False, "error": motivo}); return
                 ok()
             except Exception as e: err(e)
             return

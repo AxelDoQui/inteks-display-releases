@@ -1110,9 +1110,11 @@ JPY  Yen        162.5"></textarea>
     </div>
   </div>
 
-  <div class="card" id="card-lg" style="display:none">
+  <div class="card" id="card-lg">
     <div class="card-title"><i class="fa-solid fa-tv"></i> Televisores LG (mini-app)</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">El <em>Developer Mode</em> del televisor caduca a las ~1000 horas y la mini-app deja de abrirse. Para renovarlo, abre la app «Developer Mode» del TV y pulsa «Extend Session Time»; después pulsa «Ya lo renové» aquí.</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">El navegador de los LG cierra la página cada ~2 minutos; la mini-app no. Se instala aquí mismo, sin tocar nada más en este PC.</p>
+    <button class="btn btn-accent" onclick="abrirInstalarLg()"><i class="fa-solid fa-download"></i> Instalar en un televisor LG</button>
+    <p id="lg-nota" style="font-size:12px;color:var(--muted);margin:12px 0 10px;display:none">El <em>Developer Mode</em> del televisor caduca a las ~1000 horas y la mini-app deja de abrirse. Para renovarlo, abre la app «Developer Mode» del TV y pulsa «Extend Session Time»; después pulsa «Ya lo renové» aquí.</p>
     <div id="lg-lista"></div>
   </div>
 
@@ -1394,6 +1396,45 @@ JPY  Yen        162.5"></textarea>
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="closeScheduleModal()">Cancelar</button>
       <button class="btn btn-a2" onclick="saveSchedule()"><i class="fa-solid fa-floppy-disk"></i> Guardar horario</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL INSTALAR LA MINI-APP EN UN LG -->
+<div class="modal-bd" id="lg-modal">
+  <div class="modal" style="width:520px;max-width:94vw">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <h3>INSTALAR EN UN TELEVISOR LG</h3>
+      <button class="btn btn-ghost btn-sm" id="lg-cerrar" onclick="cerrarInstalarLg()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="lg-form">
+      <ol style="font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 12px 18px;padding:0">
+        <li>En el televisor, instala <strong>«Developer Mode»</strong> (LG Content Store) e inicia sesión con tu cuenta gratuita de desarrollador de LG.</li>
+        <li>Dentro de esa app activa <strong>«Dev Mode Status»</strong> y <strong>«Key Server»</strong>. Ahí salen la <strong>IP</strong> y la <strong>Passphrase</strong> que se piden abajo.</li>
+        <li>El televisor y este PC tienen que estar en la misma red.</li>
+      </ol>
+      <label style="font-size:11px;color:var(--muted)">IP del televisor</label>
+      <input class="finput" id="lg-ip" placeholder="192.168.0.108" autocomplete="off" style="margin-bottom:10px">
+      <label style="font-size:11px;color:var(--muted)">Passphrase</label>
+      <input class="finput" id="lg-pass" placeholder="6DC7B4" autocomplete="off" style="margin-bottom:10px">
+      <label style="font-size:11px;color:var(--muted)">Dirección de este servidor (la que verá el televisor)</label>
+      <input class="finput" id="lg-srv" autocomplete="off" style="margin-bottom:10px">
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--muted);margin-bottom:14px;cursor:pointer">
+        <input type="checkbox" id="lg-vig" style="margin-top:2px;cursor:pointer">
+        <span>Mantenerla abierta: este PC la abre sola si se cierra o tras un corte de luz (solo para un televisor dedicado a la cartelería)</span>
+      </label>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="cerrarInstalarLg()">Cancelar</button>
+        <button class="btn btn-accent" id="lg-go" onclick="instalarLg()"><i class="fa-solid fa-download"></i> Instalar</button>
+      </div>
+    </div>
+    <div id="lg-progreso" style="display:none">
+      <div id="lg-estado" style="font-size:13px;margin-bottom:8px"></div>
+      <pre id="lg-log" style="font-size:11px;line-height:1.45;background:var(--s2);border:1px solid var(--b);border-radius:var(--r);padding:10px;max-height:240px;overflow:auto;white-space:pre-wrap;margin:0 0 12px"></pre>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-ghost" id="lg-otra" style="display:none" onclick="volverFormLg()">Volver</button>
+        <button class="btn btn-accent" id="lg-fin" style="display:none" onclick="cerrarInstalarLg()">Cerrar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -4874,7 +4915,8 @@ function pintarLgTvs(tvs){
   const card=document.getElementById("card-lg"), lista=document.getElementById("lg-lista");
   const banner=document.getElementById("aviso-lg");
   tvs=Array.isArray(tvs)?tvs:[];
-  if(card) card.style.display=tvs.length?"block":"none";
+  const nota=document.getElementById("lg-nota");
+  if(nota) nota.style.display=tvs.length?"block":"none";
   if(lista){
     lista.innerHTML="";
     tvs.forEach(t=>{
@@ -4910,6 +4952,82 @@ function pintarLgTvs(tvs){
     b.addEventListener("click",()=>cambiarLg(t.id,"renovado",t.nombre||t.ip));
     l.appendChild(b);banner.appendChild(l);
   });
+}
+// ── Instalar la mini-app en un LG desde el panel ────────────────────────────
+// El servidor lanza instalar-lg.ps1; aquí solo se piden los tres datos y se enseña
+// lo que va diciendo. Si se cierra el panel a medias, la instalación sigue en el
+// servidor y al volver a abrir el cuadro se retoma.
+let lgTimer=null;
+function _lgMostrar(que){
+  document.getElementById("lg-form").style.display=que==="form"?"block":"none";
+  document.getElementById("lg-progreso").style.display=que==="form"?"none":"block";
+}
+async function abrirInstalarLg(){
+  document.getElementById("lg-modal").classList.add("show");
+  let e=null;
+  try{ const r=await fetch("/api/lg-instalar",{cache:"no-store"}); if(r.ok) e=await r.json(); }catch(x){}
+  if(!e){ toast("No se pudo contactar con el servidor",true); cerrarInstalarLg(); return; }
+  if(!e.disponible){
+    _lgMostrar("progreso");
+    document.getElementById("lg-estado").innerHTML='<span style="color:var(--danger)">Esta instalación no trae la mini-app para LG. Instala la última versión de InTeks Display (el instalador la incluye).</span>';
+    document.getElementById("lg-log").style.display="none";
+    document.getElementById("lg-fin").style.display="";document.getElementById("lg-otra").style.display="none";
+    return;
+  }
+  document.getElementById("lg-log").style.display="";
+  if(!document.getElementById("lg-srv").value) document.getElementById("lg-srv").value=e.servidor_sugerido||"";
+  if(e.estado==="instalando"){ _lgMostrar("progreso"); _lgPintar(e); _lgSeguir(); }
+  else _lgMostrar("form");
+}
+function cerrarInstalarLg(){
+  clearTimeout(lgTimer);lgTimer=null;
+  document.getElementById("lg-modal").classList.remove("show");
+  document.getElementById("lg-pass").value="";
+}
+function volverFormLg(){ _lgMostrar("form"); }
+function _lgPintar(e){
+  const est=document.getElementById("lg-estado"), log=document.getElementById("lg-log");
+  const lineas=e.lineas||[];
+  log.textContent=lineas.join("\n");log.scrollTop=log.scrollHeight;
+  const fin=document.getElementById("lg-fin"), otra=document.getElementById("lg-otra");
+  document.getElementById("lg-cerrar").style.display=e.estado==="instalando"?"none":"";
+  if(e.estado==="instalando"){
+    est.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Instalando en '+esc(e.tv||"el televisor")+'… La primera vez puede tardar unos minutos (descarga las herramientas de LG).';
+    fin.style.display="none";otra.style.display="none";
+  }else if(e.estado==="ok"){
+    est.innerHTML='<span style="color:var(--ok,#3ecf8e)"><i class="fa-solid fa-circle-check"></i> Listo. La mini-app está instalada y abierta en el televisor.</span><br><span style="font-size:12px;color:var(--muted)">Si en el TV sale un código de 4 cifras, escríbelo en Pantallas → «Esperando para enlazar».</span>';
+    fin.style.display="";otra.style.display="none";
+  }else{
+    const err=[...lineas].reverse().find(l=>/^ERROR/i.test(l))||"La instalación no terminó bien.";
+    est.innerHTML='<span style="color:var(--danger)"><i class="fa-solid fa-circle-xmark"></i> '+esc(err.replace(/^ERROR:\s*/i,""))+'</span>';
+    fin.style.display="";otra.style.display="";
+  }
+}
+function _lgSeguir(){
+  clearTimeout(lgTimer);
+  lgTimer=setTimeout(async()=>{
+    let e=null;
+    try{ const r=await fetch("/api/lg-instalar",{cache:"no-store"}); if(r.ok) e=await r.json(); }catch(x){}
+    if(!document.getElementById("lg-modal").classList.contains("show")) return;
+    if(e){ _lgPintar(e); if(e.estado!=="instalando"){ cargarLgTvs(); return; } }
+    _lgSeguir();
+  },1500);
+}
+async function instalarLg(){
+  const ip=document.getElementById("lg-ip").value.trim(), pass=document.getElementById("lg-pass").value.trim(),
+        srv=document.getElementById("lg-srv").value.trim(), vig=document.getElementById("lg-vig").checked;
+  if(!ip||!pass||!srv){ toast("Faltan datos: IP, passphrase y dirección del servidor",true); return; }
+  const btn=document.getElementById("lg-go");btn.disabled=true;
+  try{
+    const r=await fetch("/api/lg-instalar",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ip,passphrase:pass,servidor:srv,vigilar:vig})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){ toast(d.error||"No se pudo empezar la instalación",true); return; }
+  }catch(x){ toast("No se pudo contactar con el servidor",true); return; }
+  finally{ btn.disabled=false; }
+  _lgMostrar("progreso");
+  _lgPintar({estado:"instalando",tv:ip,lineas:[]});
+  _lgSeguir();
 }
 async function cargarLgTvs(){
   try{

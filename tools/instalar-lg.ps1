@@ -10,6 +10,10 @@
 # misma red. Las herramientas (Node.js y la de LG) vienen con la app si se marcó
 # «Herramientas para televisores LG» al instalar; si no, hace falta Node.js.
 #
+# Lo normal es instalarla desde el panel (Ajustes → Televisores LG → «Instalar en un
+# televisor LG»): el servidor lanza este script con -Casa, para que la clave del TV
+# quede en una carpeta suya y no en el perfil de quien lo ejecute.
+#
 # Uso:
 #   powershell -File tools\instalar-lg.ps1 -TV 192.168.0.108 -Passphrase 6DC7B4 -Servidor 192.168.0.90
 #   -Servidor es la IP del PC con InTeks Display (o su dirección completa, http://...).
@@ -19,7 +23,8 @@ param(
     [string]$Passphrase,
     [string]$Servidor,
     [string]$Nombre = "tienda-lg",
-    [switch]$Vigilar
+    [switch]$Vigilar,
+    [string]$Casa
 )
 $ErrorActionPreference = "Stop"
 # En el proyecto este script vive en tools\; instalado, junto a webos\ y lg-tools\.
@@ -29,8 +34,24 @@ $ID = "com.inteks.display"
 
 function Falla($txt) { Write-Host "ERROR: $txt" -ForegroundColor Red; exit 1 }
 
+# La passphrase puede llegar por variable de entorno (el servidor la usa así para no
+# dejarla a la vista en la lista de procesos).
+if (-not $Passphrase -and $env:INTEKS_LG_PASS) { $Passphrase = $env:INTEKS_LG_PASS }
+$sinPreguntas = [bool]$Casa
+
+# Con -Casa las herramientas de LG guardan sus datos y la clave del TV allí, no en el
+# perfil del usuario que ejecuta esto (desde el panel, el servidor corre como SYSTEM).
+if ($Casa) {
+    [Console]::OutputEncoding = New-Object Text.UTF8Encoding($false)
+    New-Item -ItemType Directory -Force -Path $Casa | Out-Null
+    $env:USERPROFILE = $Casa
+    $env:HOME = $Casa
+    $env:HOMEDRIVE = Split-Path -Qualifier $Casa
+    $env:HOMEPATH = $Casa.Substring($env:HOMEDRIVE.Length)
+}
+
 if (-not $TV) { $TV = Read-Host "IP del televisor (sale en la app Developer Mode del TV)" }
-$preguntar = -not $Passphrase
+$preguntar = (-not $Passphrase) -and (-not $sinPreguntas)
 if (-not $Passphrase) { $Passphrase = Read-Host "Passphrase (la misma pantalla de Developer Mode)" }
 if (-not $Servidor) { $Servidor = Read-Host "IP del PC con InTeks Display (el servidor)" }
 if (-not $TV -or -not $Passphrase -or -not $Servidor) { Falla "faltan datos." }
@@ -87,7 +108,7 @@ try {
     else { ares-setup-device --add $Nombre --info $info | Out-Null }
     # «Key Server» del TV se apaga solo pasado un rato: la clave se baja con él
     # encendido. Si ya se bajó antes para este TV, vale la que hay.
-    $clave = Join-Path $HOME ".ssh\${Nombre}_webos"
+    $clave = Join-Path $env:USERPROFILE ".ssh\${Nombre}_webos"
     $ErrorActionPreference = "Continue"
     $Passphrase | ares-novacom --device $Nombre --getkey 2>&1 | Out-Null
     $ErrorActionPreference = "Stop"
@@ -149,10 +170,19 @@ try {
         $vig = Join-Path $raiz "vigilar-lg.ps1"
         if (-not (Test-Path $vig)) { $vig = Join-Path $PSScriptRoot "vigilar-lg.ps1" }
         $accion = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$vig`""
-        $disp = @((New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"),
-                  (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)))
         $aj = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 3) -MultipleInstances IgnoreNew
-        Register-ScheduledTask -TaskName "InTeks Display LG" -Action $accion -Trigger $disp -Settings $aj -Force | Out-Null
+        if ($Casa) {
+            # Instalado desde el panel: la tarea corre como SYSTEM, igual que el servidor,
+            # y usa la misma carpeta de claves (vigilar-lg.ps1 la busca sola).
+            $disp = @((New-ScheduledTaskTrigger -AtStartup),
+                      (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)))
+            $quien = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+            Register-ScheduledTask -TaskName "InTeks Display LG" -Action $accion -Trigger $disp -Settings $aj -Principal $quien -Force | Out-Null
+        } else {
+            $disp = @((New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"),
+                      (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)))
+            Register-ScheduledTask -TaskName "InTeks Display LG" -Action $accion -Trigger $disp -Settings $aj -Force | Out-Null
+        }
         Write-Host "Tarea «InTeks Display LG» creada: cada 5 minutos mira los televisores con «Mantenerla abierta» marcado en el panel." -ForegroundColor Cyan
     } catch { Write-Host "Aviso: no pude crear la tarea que mantiene la mini-app abierta ($($_.Exception.Message))." -ForegroundColor Yellow }
     Write-Host ""

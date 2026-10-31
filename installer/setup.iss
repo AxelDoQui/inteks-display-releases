@@ -39,7 +39,7 @@ Name: "startupicon"; Description: "Iniciar InTeks Display automáticamente al en
 ; cada ~2 min, así que se le instala una mini-app (webos\). Esta casilla deja en la
 ; app un Node.js portable y la herramienta de LG para hacerlo. Descarga de internet
 ; (unos 200 MB en disco) y no toca ningún Node que el equipo ya tenga.
-Name: "lg"; Description: "Herramientas para instalar la pantalla en un televisor LG (descarga unos 60 MB de internet y ocupa unos 200 MB; solo si vas a usar un LG)"; GroupDescription: "Televisores LG:"; Flags: unchecked
+Name: "lg"; Description: "Descargar ya las herramientas para televisores LG (unos 60 MB de internet, ocupan unos 200 MB). Si no las marcas, el panel las descarga la primera vez que instales la mini-app en un LG"; GroupDescription: "Televisores LG:"; Flags: unchecked
 
 [InstallDelete]
 ; Restos de cuando el producto se llamaba SignalOS Pro. La clave Run apuntaba a
@@ -122,10 +122,10 @@ Source: "instalar-extension.html"; DestDir: "{app}"; Flags: ignoreversion
 Source: "registrar-tarea.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "registrar-pantalla.ps1"; DestDir: "{app}"; Flags: ignoreversion
 ; Mini-app para televisores LG y lo que la instala. Solo con la casilla «lg».
-Source: "..\webos\*"; DestDir: "{app}\webos"; Flags: ignoreversion recursesubdirs createallsubdirs; Tasks: lg
-Source: "..\tools\instalar-lg.ps1"; DestDir: "{app}"; Flags: ignoreversion; Tasks: lg
-Source: "instalar-herramientas-lg.ps1"; DestDir: "{app}"; Flags: ignoreversion; Tasks: lg
-Source: "..\tools\vigilar-lg.ps1"; DestDir: "{app}"; Flags: ignoreversion; Tasks: lg
+Source: "..\webos\*"; DestDir: "{app}\webos"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\tools\instalar-lg.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "instalar-herramientas-lg.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\tools\vigilar-lg.ps1"; DestDir: "{app}"; Flags: ignoreversion
 ; Este NO se instala: se extrae a la carpeta temporal y se ejecuta antes de
 ; copiar nada. Ver [Code] / PrepareToInstall.
 Source: "parar-servidor.ps1"; Flags: dontcopy
@@ -144,8 +144,7 @@ Source: "parar-servidor.ps1"; Flags: dontcopy
 Name: "{group}\InTeks Display"; Filename: "{app}\InTeksDisplay.exe"; WorkingDir: "{app}"
 Name: "{group}\Instalar extension de divisas"; Filename: "{app}\instalar-extension.html"; WorkingDir: "{app}"; IconFilename: "{app}\assets\icon.ico"
 Name: "{group}\Desinstalar"; Filename: "{uninstallexe}"
-; Pregunta IP del TV, passphrase e IP del servidor y deja la mini-app en el LG.
-Name: "{group}\Instalar la pantalla en un TV LG"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -NoExit -File ""{app}\instalar-lg.ps1"""; WorkingDir: "{app}"; IconFilename: "{app}\assets\icon.ico"; Tasks: lg
+; (La mini-app para LG se instala desde el panel: Ajustes → Televisores LG.)
 Name: "{commondesktop}\InTeks Display"; Filename: "{app}\InTeksDisplay.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 ; Al iniciar sesión, la pantalla completa. La app espera sola a que el servidor
 ; esté listo (lo despierta con la tarea programada), así que no hace falta retraso.
@@ -204,7 +203,7 @@ Filename: "powershell.exe"; \
   Flags: runhidden waituntilterminated; RunOnceId: "QuitarTareaInTeks Display"
 Filename: "powershell.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\vigilar-lg.ps1"" -Quitar"; \
-  Flags: runhidden waituntilterminated; RunOnceId: "QuitarTareaInTeksLG"; Tasks: lg
+  Flags: runhidden waituntilterminated; RunOnceId: "QuitarTareaInTeksLG"
 Filename: "powershell.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\registrar-pantalla.ps1"" -Quitar"; \
   Flags: runhidden waituntilterminated; RunOnceId: "QuitarTareaPantalla"
