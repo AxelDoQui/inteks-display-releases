@@ -8,7 +8,7 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
-## 1.0.58 — sin publicar
+## 1.0.58 — 2026-10-31
 
 - Pantallas: botón «Renombrar» (en «Más»). Cambia solo el nombre que se ve en el panel; el televisor sigue enlazado, porque su identificador interno no cambia (sale entre paréntesis junto al nombre). El nombre nuevo también sale en los títulos de Playlist y Horario, y «Duplicar» no lo copia.
 
