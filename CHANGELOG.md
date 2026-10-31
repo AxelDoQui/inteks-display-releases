@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.57 — sin publicar
+
+- Televisores LG: casilla «Mantenerla abierta» por televisor (Ajustes → Televisores LG). Una tarea del PC («InTeks Display LG», cada 5 minutos) abre la mini-app si el TV está encendido y no la tiene abierta: tras un corte de luz o si alguien la cerró. Apagada por defecto, para no molestar en un TV de uso normal.
+
 ## 1.0.56 — 2026-10-31
 
 - Televisores LG con la mini-app: el panel avisa antes de que caduque su modo desarrollador (Developer Mode, ~1000 horas). Sale un aviso rojo arriba cuando quedan 7 días o menos, y en Ajustes hay una tarjeta «Televisores LG» con lo que le queda a cada uno, «Ya lo renové» (reinicia la cuenta atrás tras pulsar «Extend Session Time» en el TV) y «Quitar». `instalar-lg.ps1` apunta cada TV al instalarle la mini-app, con la hora del propio televisor.
