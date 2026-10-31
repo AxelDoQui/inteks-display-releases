@@ -3085,10 +3085,14 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/delete":
             try:
                 d = json.loads(body)
-                item_id = d["id"]
+                # Uno ("id") o varios ("ids"): una selección entera se borra en una
+                # sola operación, con una sola pasada por el contenido.
+                if isinstance(d.get("ids"), list):
+                    ids = {str(x) for x in d["ids"]}
+                else:
+                    ids = {str(d["id"])}
                 with contenido_en_edicion() as content:
-                    item = next((i for i in content.get("items",[]) if i["id"]==item_id), None)
-                    if item:
+                    for item in [i for i in content.get("items",[]) if i["id"] in ids]:
                         # Sólo los archivos subidos tienen 'src'; los módulos (fx, weather, qr...) no
                         # Los archivos viven en UPLOAD_DIR (DATA_DIR), no en el cwd.
                         if item.get("src"):
@@ -3096,14 +3100,17 @@ class Handler(BaseHTTPRequestHandler):
                             if os.path.realpath(fp).startswith(os.path.realpath(UPLOAD_DIR) + os.sep):
                                 try: os.remove(fp)
                                 except OSError: pass
-                    content["items"] = [i for i in content.get("items",[]) if i["id"]!=item_id]
+                    content["items"] = [i for i in content.get("items",[]) if i["id"] not in ids]
                     # Eliminar de todas las playlists de pantallas
                     for sid, scr in content.get("screens",{}).items():
-                        scr["playlist"] = [p for p in scr.get("playlist",[]) if p.get("id")!=item_id]
+                        scr["playlist"] = [p for p in scr.get("playlist",[]) if p.get("id") not in ids]
                     # Y de los paquetes: un paquete con un id que ya no existe
                     # se reproduciría saltándose huecos.
                     for pkg in content.get("packages", []):
-                        pkg["itemIds"] = [i for i in pkg.get("itemIds", []) if i != item_id]
+                        pkg["itemIds"] = [i for i in pkg.get("itemIds", []) if i not in ids]
+                        if isinstance(pkg.get("items"), list):
+                            pkg["items"] = [x for x in pkg["items"]
+                                            if not (isinstance(x, dict) and x.get("id") in ids)]
                 notify_all()
                 ok()
             except Exception as e: err(e)

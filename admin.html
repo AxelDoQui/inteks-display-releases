@@ -523,6 +523,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     <button class="btn btn-ghost btn-sm" id="lib-sel-carpeta"><i class="fa-solid fa-folder"></i> Poner en carpeta…</button>
     <button class="btn btn-ghost btn-sm" id="lib-sel-etiqueta"><i class="fa-solid fa-tag"></i> Añadir etiqueta…</button>
     <button class="btn btn-accent btn-sm" id="lib-sel-mandar"><i class="fa-solid fa-paper-plane"></i> Mandar a pantallas</button>
+    <button class="btn btn-ghost btn-sm" id="lib-sel-todo">Seleccionar todo</button>
+    <button class="btn btn-danger btn-sm" id="lib-sel-borrar"><i class="fa-solid fa-trash"></i> Borrar</button>
     <button class="btn btn-ghost btn-sm" id="lib-sel-quitar">Quitar selección</button></div>
   <div class="lib-grid" id="lib-grid"><div class="empty-state" style="grid-column:1/-1">Sin archivos</div></div>
 </div>
@@ -2129,6 +2131,26 @@ async function deleteItem(id,e){
   if(idAbierto===id)cerrarFicha();
   await loadAll();toast("Eliminado");
 }
+// Borra de golpe lo marcado en la Librería. Una sola pregunta, una sola petición.
+async function borrarSeleccion(){
+  const ids=Array.from(libSel); if(!ids.length) return;
+  await loadLibInfo();
+  const enUso=ids.map(id=>{
+    const it=(content.items||[]).find(i=>i.id===id);
+    return ((libInfo[id]||{}).uses||[]).length?"«"+(it?it.name:id)+"»":null;
+  }).filter(Boolean);
+  let msg="¿Borrar "+ids.length+(ids.length===1?" archivo":" archivos")+"?";
+  if(enUso.length){
+    msg+="\n\n"+enUso.length+(enUso.length===1?" está en uso: ":" están en uso: ")+enUso.slice(0,5).join(", ")+(enUso.length>5?"…":"")+
+         ". Se quitarán también de las pantallas y paquetes donde estén.";
+  }
+  if(!await confirmar(msg,{titulo:"Borrar "+ids.length+(ids.length===1?" archivo":" archivos"),si:"Sí, borrar "+ids.length,peligro:true})) return;
+  const r=await fetch("/api/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ids})});
+  if(!r.ok){toast("No se pudo borrar",true);return;}
+  if(idAbierto&&ids.includes(idAbierto))cerrarFicha();
+  libSel.clear();
+  await loadAll();toast(ids.length===1?"Eliminado":ids.length+" eliminados");
+}
 // ── Librería: filtrar y ordenar
 function normalizarTexto(s){
   return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
@@ -2619,6 +2641,9 @@ document.addEventListener("DOMContentLoaded",()=>{
   const m=document.getElementById("lib-sel-mandar"),q=document.getElementById("lib-sel-quitar");
   if(m)m.onclick=()=>abrirMandar(Array.from(libSel),true);
   if(q)q.onclick=()=>{libSel.clear();renderLibrary();};
+  const td=document.getElementById("lib-sel-todo"),bb=document.getElementById("lib-sel-borrar");
+  if(td)td.onclick=()=>{filtrarOrdenar(content.items||[],libInfo,libFiltro).forEach(i=>libSel.add(i.id));renderLibrary();};
+  if(bb)bb.onclick=()=>borrarSeleccion();
   const c=document.getElementById("lib-sel-carpeta"),e=document.getElementById("lib-sel-etiqueta");
   if(c)c.onclick=()=>abrirDialogoCarpeta(Array.from(libSel));
   if(e)e.onclick=()=>abrirDialogoEtiqueta(Array.from(libSel));
@@ -2727,33 +2752,59 @@ function cancelPkgEdit(){
   document.getElementById("pkg-cancel-btn").style.display="none";
   renderPkgPicker(); renderPkgSelected();
 }
-async function deletePackage(id){
-  const p=(content.packages||[]).find(x=>x.id===id);
-  const usan=Object.entries(content.screens||{})
+// Pantallas que llevan este paquete, para avisar antes de borrarlo.
+function pantallasConPaquete(id){
+  return Object.entries(content.screens||{})
     .filter(([,cfg])=>((cfg||{}).playlist||[]).some(x=>x.type==="package"&&x.pkg_id===id))
     .map(([sid])=>sid);
+}
+// Quita un paquete sin preguntar ni guardar: quien llama lo hace una vez para todos.
+function quitarPaquete(id){
+  const p=(content.packages||[]).find(x=>x.id===id);
+  // Desagrupar antes de borrar. Si solo quitaramos el paquete, la referencia
+  // quedaria huerfana y esas pantallas perderian ese bloque de contenido.
+  pantallasConPaquete(id).forEach(sid=>{
+    const pl=content.screens[sid].playlist;
+    for(let i=pl.length-1;i>=0;i--){
+      if(pl[i].type==="package" && pl[i].pkg_id===id){
+        const copias=pkgItems(p||{}).map(sel=>{
+          const it=(content.items||[]).find(x=>x.id===sel.id);
+          return it?{...it,duration:sel.duration||it.duration||8}:null;
+        }).filter(Boolean);
+        pl.splice(i,1,...copias);
+      }
+    }
+  });
+  content.packages=(content.packages||[]).filter(x=>x.id!==id);
+  pkgSel.delete(id);
+}
+let pkgSel=new Set();
+async function deletePackage(id){
+  const p=(content.packages||[]).find(x=>x.id===id);
+  const usan=pantallasConPaquete(id);
   if(usan.length){
     if(!await confirmar(`«${p?p.name:id}» está en ${usan.length} pantalla(s): ${usan.join(", ")}.\n\n`+
                 "Sus contenidos se quedarán sueltos en esas playlists: no se pierde nada, "+
                 "pero dejarán de actualizarse juntos.\n\n¿Continuar?")) return;
-    // Desagrupar antes de borrar. Si solo quitaramos el paquete, la referencia
-    // quedaria huerfana y esas pantallas perderian ese bloque de contenido.
-    usan.forEach(sid=>{
-      const pl=content.screens[sid].playlist;
-      for(let i=pl.length-1;i>=0;i--){
-        if(pl[i].type==="package" && pl[i].pkg_id===id){
-          const copias=pkgItems(p||{}).map(sel=>{
-            const it=(content.items||[]).find(x=>x.id===sel.id);
-            return it?{...it,duration:sel.duration||it.duration||8}:null;
-          }).filter(Boolean);
-          pl.splice(i,1,...copias);
-        }
-      }
-    });
   }else if(!await confirmar("¿Borrar este paquete? (no borra los contenidos, solo el grupo)")) return;
-  content.packages=(content.packages||[]).filter(x=>x.id!==id);
+  quitarPaquete(id);
   saveContentLocal(); renderPackages(); renderScreens();
   toast(usan.length?"Paquete borrado — sus contenidos quedaron sueltos":"Paquete borrado");
+}
+// Borra de golpe los paquetes marcados. Una sola pregunta y un solo guardado.
+async function borrarPaquetesSeleccion(){
+  const ids=Array.from(pkgSel).filter(id=>(content.packages||[]).some(p=>p.id===id));
+  if(!ids.length) return;
+  const enUso=ids.filter(id=>pantallasConPaquete(id).length);
+  let msg="¿Borrar "+ids.length+(ids.length===1?" paquete?":" paquetes?")+" (no borra los contenidos, solo los grupos)";
+  if(enUso.length){
+    msg+="\n\n"+enUso.length+(enUso.length===1?" está en uso":" están en uso")+" en alguna pantalla: sus contenidos se quedarán sueltos en esas playlists y dejarán de actualizarse juntos.";
+  }
+  if(!await confirmar(msg,{titulo:"Borrar "+ids.length+(ids.length===1?" paquete":" paquetes"),si:"Sí, borrar "+ids.length,peligro:true})) return;
+  ids.forEach(quitarPaquete);
+  pkgSel.clear();
+  saveContentLocal(); renderPackages(); renderScreens();
+  toast(ids.length===1?"Paquete borrado":ids.length+" paquetes borrados");
 }
 function renderPackages(){
   const c=document.getElementById("pkg-list");
@@ -2762,11 +2813,24 @@ function renderPackages(){
   const cnt=document.getElementById("pkg-count"); if(cnt) cnt.textContent=pkgs.length;
   if(!pkgs.length){ c.innerHTML='<div class="empty-state">Aún no hay paquetes</div>'; return; }
   c.innerHTML="";
+  pkgSel.forEach(id=>{ if(!pkgs.some(p=>p.id===id)) pkgSel.delete(id); });
+  const barra=document.createElement("div");
+  barra.style.cssText="display:"+(pkgSel.size?"flex":"none")+";align-items:center;gap:8px;margin-bottom:10px;padding:6px 10px;background:var(--s2);border:1px solid var(--accent);border-radius:var(--r);flex-wrap:wrap;font-size:12px";
+  const nTxt=document.createElement("span");nTxt.style.flex="1";nTxt.textContent=pkgSel.size+(pkgSel.size===1?" seleccionado":" seleccionados");
+  const bTodo=document.createElement("button");bTodo.className="btn btn-ghost btn-sm";bTodo.textContent="Seleccionar todo";
+  bTodo.addEventListener("click",()=>{pkgs.forEach(p=>pkgSel.add(p.id));renderPackages();});
+  const bBorrar=document.createElement("button");bBorrar.className="btn btn-danger btn-sm";bBorrar.innerHTML='<i class="fa-solid fa-trash"></i> Borrar';
+  bBorrar.addEventListener("click",borrarPaquetesSeleccion);
+  const bQuitar=document.createElement("button");bQuitar.className="btn btn-ghost btn-sm";bQuitar.textContent="Quitar selección";
+  bQuitar.addEventListener("click",()=>{pkgSel.clear();renderPackages();});
+  barra.append(nTxt,bTodo,bBorrar,bQuitar);c.appendChild(barra);
   pkgs.forEach(p=>{
     const n=pkgItems(p).filter(x=>(content.items||[]).some(i=>i.id===x.id)).length;
     const el=document.createElement("div");
     el.style.cssText="background:var(--s1);border:1px solid var(--b);border-radius:var(--r);padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px";
-    el.innerHTML=`<i class="fa-solid fa-boxes-stacked" style="font-size:18px;color:var(--muted);width:22px;text-align:center"></i><div style="flex:1"><div style="font-size:13px;font-weight:500">${p.name}</div><div style="font-size:11px;color:var(--muted)">${n} contenido(s)</div></div><button class="btn btn-a2 btn-sm" onclick="editPackage('${p.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button><button class="btn btn-danger btn-sm" onclick="deletePackage('${p.id}')"><i class="fa-solid fa-xmark"></i></button>`;
+    el.innerHTML=`<input type="checkbox" class="pkg-chk" title="Seleccionar"><i class="fa-solid fa-boxes-stacked" style="font-size:18px;color:var(--muted);width:22px;text-align:center"></i><div style="flex:1"><div style="font-size:13px;font-weight:500">${p.name}</div><div style="font-size:11px;color:var(--muted)">${n} contenido(s)</div></div><button class="btn btn-a2 btn-sm" onclick="editPackage('${p.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button><button class="btn btn-danger btn-sm" onclick="deletePackage('${p.id}')"><i class="fa-solid fa-xmark"></i></button>`;
+    const chk=el.querySelector(".pkg-chk");chk.checked=pkgSel.has(p.id);
+    chk.addEventListener("change",()=>{ if(chk.checked)pkgSel.add(p.id);else pkgSel.delete(p.id); renderPackages(); });
     c.appendChild(el);
   });
 }
