@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>InTeks Display</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;color:#fff;font-family:sans-serif}
+  body{display:flex;align-items:center;justify-content:center;text-align:center}
+  #m{font-size:28px;opacity:.8}
+</style>
+</head>
+<body>
+<div id="m">Conectando con InTeks Display…</div>
+<script>
+// Dirección del servidor InTeks Display de la tienda (el PC). Se cambia aquí y
+// se vuelve a empaquetar; el reproductor se empareja solo, como en cualquier pantalla.
+var SERVIDOR = "http://192.168.0.90/";
+
+function intentar() {
+  var parar = false;
+  var t = setTimeout(function () { parar = true; reintentar(); }, 4000);
+  fetch(SERVIDOR + "api/auth-status", { mode: "no-cors", cache: "no-store" })
+    .then(function () { if (!parar) { clearTimeout(t); location.replace(SERVIDOR); } })
+    .catch(function () { if (!parar) { clearTimeout(t); reintentar(); } });
+}
+function reintentar() {
+  document.getElementById("m").textContent = "Esperando al servidor " + SERVIDOR + "…";
+  setTimeout(intentar, 3000);
+}
+intentar();
+</script>
+</body>
+</html>

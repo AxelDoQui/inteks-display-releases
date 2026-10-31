@@ -1,0 +1,13 @@
+{
+  "id": "com.inteks.display",
+  "version": "1.0.0",
+  "vendor": "InTeks",
+  "type": "web",
+  "main": "index.html",
+  "title": "InTeks Display",
+  "icon": "icon80.png",
+  "largeIcon": "icon130.png",
+  "bgColor": "#000000",
+  "disallowScrollingInFirstScene": true,
+  "uiRevision": 2
+}
