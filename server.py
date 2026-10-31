@@ -515,7 +515,7 @@ def url_actualizaciones():
     if v.lower() == "off":
         return ""
     return v or UPDATE_URL_DEFECTO
-UPDATE_TTL = 3600                  # no molestar al servidor de versiones cada rato
+UPDATE_TTL = 600                   # no molestar al servidor de versiones cada rato (10 min)
 
 def comparar_versiones(a, b):
     """-1 si a<b, 0 si iguales, 1 si a>b.

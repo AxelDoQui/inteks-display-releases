@@ -428,6 +428,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 
 <div class="main">
 
+<!-- Aviso de versión nueva: visible en cualquier pantalla del panel, no solo en Ajustes. -->
+<div id="aviso-version" role="status" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;margin-bottom:16px;border:1px solid var(--accent);border-radius:var(--r);background:rgba(255,127,0,.10);font-size:13px"></div>
+
 <!-- ── PANTALLAS -->
 <div class="page active" id="page-screens">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
@@ -4393,6 +4396,7 @@ async function comprobarActualizacion(forzar){
     const r=await fetch("/api/update-check"+(forzar?"?force=1":""));
     if(!r.ok){ el.innerHTML=""; return; }
     const d=await r.json();
+    pintarAvisoVersion(d);          // el aviso de arriba se pone al día con lo que se acaba de comprobar
     if(!d.enabled){
       // Apagado: no se dice nada en la vista normal, pero al pulsar el boton
       // hay que explicar por que no pasa nada.
@@ -4424,11 +4428,52 @@ async function comprobarActualizacion(forzar){
 // él mismo consulta, no de una que mande esta página), comprueba su huella y lo
 // lanza; el instalador para el servidor y lo vuelve a arrancar. Mientras tanto
 // las pantallas siguen con lo que ya tienen en caché.
+// El estado de la actualización se enseña a la vez en Ajustes y en el aviso de arriba.
+function ponerEstadoUpdate(html){
+  const s=document.getElementById("set-update");
+  if(s) s.innerHTML=html;
+  const t=document.getElementById("aviso-version-txt");
+  if(t){
+    t.innerHTML=html;
+    const b=document.getElementById("aviso-version-btns");
+    if(b) b.style.display="none";
+  }
+}
+// Aviso de versión nueva en todo el panel. Consulta al servidor (que guarda el
+// resultado unos minutos) al abrir y cada 15 minutos; nunca instala nada solo.
+function pintarAvisoVersion(d){
+  const b=document.getElementById("aviso-version");
+  if(!b) return;
+  if(!d||!d.enabled||d.error||!d.update_available){b.style.display="none";b.innerHTML="";return;}
+  b.style.display="flex";
+  b.innerHTML='<span id="aviso-version-txt"><i class="fa-solid fa-circle-arrow-up" style="color:var(--accent)"></i> '+
+    'Hay una versión nueva de InTeks Display: <strong>'+esc(d.latest)+'</strong> (tienes la '+esc(d.current)+').</span>'+
+    '<span id="aviso-version-btns" style="display:flex;gap:8px;align-items:center"></span>';
+  const bt=document.getElementById("aviso-version-btns");
+  if(d.installer_url&&d.sha256){
+    const a=document.createElement("button");a.className="btn btn-accent btn-sm";a.id="aviso-version-act";
+    a.textContent="Actualizar ahora";
+    a.addEventListener("click",()=>instalarActualizacion(d.latest));
+    bt.appendChild(a);
+  }
+  if(d.url&&/^https:\/\//.test(d.url)){
+    const l=document.createElement("a");l.href=d.url;l.target="_blank";l.rel="noopener";
+    l.style.color="var(--accent)";l.textContent="Ver cambios";
+    bt.appendChild(l);
+  }
+}
+async function avisoVersion(forzar){
+  try{
+    const r=await fetch("/api/update-check"+(forzar?"?force=1":""),{cache:"no-store"});
+    if(!r.ok) return;
+    pintarAvisoVersion(await r.json());
+  }catch(e){ /* sin conexión con el servidor: el aviso se queda como estaba */ }
+}
 async function instalarActualizacion(version){
   if(!confirm("Se instalará la versión "+version+".\n\n"+
               "El servidor se reiniciará durante un minuto aproximadamente. Las pantallas "+
               "seguirán mostrando su contenido y se reconectarán solas.\n\n¿Actualizar ahora?")) return;
-  const el=document.getElementById("set-update");
+  const el={set innerHTML(v){ponerEstadoUpdate(v);}};
   el.innerHTML='<span style="color:var(--muted)">descargando e instalando… no cierres esta ventana</span>';
   try{
     const r=await fetch("/api/update-install",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
@@ -5093,6 +5138,8 @@ loadPairInfo();
 loadPairPending();
 connectSSE();
 cargarVersionServidor();
+avisoVersion();
+setInterval(avisoVersion,15*60*1000);
 loadAll();
 setInterval(async()=>{
   await loadScreens();
