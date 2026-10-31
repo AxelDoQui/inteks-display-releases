@@ -8,7 +8,7 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
-## 1.0.55 — sin publicar
+## 1.0.55 — 2026-10-31
 
 - El aviso de versión nueva sale arriba en cualquier pantalla del panel, con «Actualizar ahora» y «Ver cambios», y no solo dentro de Ajustes. Se comprueba al abrir el panel y cada 15 minutos, y el servidor guarda la respuesta 10 minutos (antes una hora, por eso a veces no salía una versión recién publicada). El estado de la instalación se ve también en ese aviso.
 
