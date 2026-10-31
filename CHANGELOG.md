@@ -8,7 +8,7 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
-## 1.0.62 — sin publicar
+## 1.0.62 — 2026-10-31
 
 - **Librería: «Subir un PDF».** Cada página del PDF pasa a ser una imagen (JPG, lado largo 1920 px) dentro de una carpeta con el nombre del PDF. También se puede arrastrar o elegir un PDF en el selector normal de archivos. Se convierte en el navegador del panel con pdf.js incluido en la app, así que no necesita internet. Si el PDF tiene más de 40 páginas pregunta antes. Un PDF con fuentes no incrustadas puede verse con otra letra.
 
