@@ -677,12 +677,14 @@ def lg_tvs_estado(ahora=None):
         restante = max(0, int(inicio + LG_DEVMODE_SEGUNDOS - ahora))
         out.append({"id": str(t.get("id", "")), "nombre": str(t.get("nombre", "")),
                     "ip": str(t.get("ip", "")), "inicio": int(inicio),
+                    "vigilar": t.get("vigilar") is True,
                     "restante_s": restante, "restante_h": restante // 3600,
                     "aviso": restante <= LG_AVISO_SEGUNDOS})
     return out
 
-def lg_tv_cambiar(tv_id, accion, ahora=None):
-    """«renovado» (reinicia la cuenta atrás) o «borrar». False si no existe."""
+def lg_tv_cambiar(tv_id, accion, ahora=None, activo=None):
+    """«renovado» (reinicia la cuenta atrás), «borrar» o «vigilar» (activo True/False:
+    si vigilar-lg.ps1 debe abrir la mini-app cuando no esté abierta). False si no existe."""
     ahora = time.time() if ahora is None else ahora
     datos = load_json(LG_TVS_FILE)
     tvs = datos.get("tvs", []) if isinstance(datos.get("tvs", []), list) else []
@@ -690,6 +692,8 @@ def lg_tv_cambiar(tv_id, accion, ahora=None):
         if isinstance(t, dict) and str(t.get("id")) == str(tv_id):
             if accion == "borrar":
                 tvs.remove(t)
+            elif accion == "vigilar":
+                t["vigilar"] = bool(activo)
             else:
                 t["inicio"] = int(ahora)
             save_json(LG_TVS_FILE, {"tvs": tvs})
@@ -3137,13 +3141,16 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         # ── TV LG: «ya renové el modo desarrollador» / quitar el televisor de la lista
-        if path in ("/api/lg-tvs/renovado", "/api/lg-tvs/borrar"):
+        if path in ("/api/lg-tvs/renovado", "/api/lg-tvs/borrar", "/api/lg-tvs/vigilar"):
             try:
                 d = json.loads(body or "{}")
                 tv_id = str(d.get("id", "")).strip() if isinstance(d, dict) else ""
                 if not tv_id:
                     jresp(400, {"ok": False, "error": "Falta el televisor"}); return
-                if not lg_tv_cambiar(tv_id, "borrar" if path.endswith("borrar") else "renovado"):
+                accion = path.rsplit("/", 1)[1]
+                if accion == "vigilar" and not isinstance(d.get("activo"), bool):
+                    jresp(400, {"ok": False, "error": "Falta si se activa o se apaga"}); return
+                if not lg_tv_cambiar(tv_id, accion, activo=d.get("activo")):
                     jresp(404, {"ok": False, "error": "No existe ese televisor"}); return
                 ok()
             except Exception as e: err(e)

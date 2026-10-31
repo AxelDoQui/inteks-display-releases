@@ -4507,7 +4507,12 @@ function pintarLgTvs(tvs){
       ren.addEventListener("click",()=>cambiarLg(t.id,"renovado",t.nombre||t.ip));
       const q=document.createElement("button");q.className="btn btn-ghost btn-sm";q.textContent="Quitar";
       q.addEventListener("click",()=>cambiarLg(t.id,"borrar",t.nombre||t.ip));
-      fila.append(txt,ren,q);lista.appendChild(fila);
+      const vig=document.createElement("label");
+      vig.style.cssText="display:flex;align-items:center;gap:6px;width:100%;font-size:12px;color:var(--muted)";
+      const cb=document.createElement("input");cb.type="checkbox";cb.checked=t.vigilar===true;
+      cb.addEventListener("change",()=>cambiarLg(t.id,"vigilar",t.nombre||t.ip,cb.checked));
+      vig.append(cb,document.createTextNode("Mantenerla abierta: este PC la abre sola si se cierra o tras un corte de luz (déjalo apagado en un televisor que uses para otras cosas)"));
+      fila.append(txt,ren,q,vig);lista.appendChild(fila);
     });
   }
   if(!banner) return;
@@ -4533,12 +4538,13 @@ async function cargarLgTvs(){
     pintarLgTvs((await r.json()).tvs);
   }catch(e){ /* sin conexión: se queda como estaba */ }
 }
-async function cambiarLg(id,accion,nombre){
+async function cambiarLg(id,accion,nombre,activo){
   if(accion==="borrar"&&!confirm("¿Quitar «"+nombre+"» de la lista? Solo deja de avisarse; el televisor no se toca.")) return;
   try{
-    const r=await fetch("/api/lg-tvs/"+accion,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
-    if(!r.ok){toast("No se pudo actualizar el televisor",true);return;}
-    toast(accion==="borrar"?"Televisor quitado":"Anotado: la cuenta atrás vuelve a empezar");
+    const cuerpo=accion==="vigilar"?{id,activo:!!activo}:{id};
+    const r=await fetch("/api/lg-tvs/"+accion,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cuerpo)});
+    if(!r.ok){toast("No se pudo actualizar el televisor",true);cargarLgTvs();return;}
+    toast(accion==="borrar"?"Televisor quitado":accion==="vigilar"?(activo?"Se mantendrá abierta en "+nombre:"Ya no se vigila "+nombre):"Anotado: la cuenta atrás vuelve a empezar");
   }catch(e){toast("No se pudo contactar con el servidor",true);return;}
   cargarLgTvs();
 }

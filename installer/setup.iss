@@ -125,6 +125,7 @@ Source: "registrar-pantalla.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\webos\*"; DestDir: "{app}\webos"; Flags: ignoreversion recursesubdirs createallsubdirs; Tasks: lg
 Source: "..\tools\instalar-lg.ps1"; DestDir: "{app}"; Flags: ignoreversion; Tasks: lg
 Source: "instalar-herramientas-lg.ps1"; DestDir: "{app}"; Flags: ignoreversion; Tasks: lg
+Source: "..\tools\vigilar-lg.ps1"; DestDir: "{app}"; Flags: ignoreversion; Tasks: lg
 ; Este NO se instala: se extrae a la carpeta temporal y se ejecuta antes de
 ; copiar nada. Ver [Code] / PrepareToInstall.
 Source: "parar-servidor.ps1"; Flags: dontcopy
@@ -201,6 +202,9 @@ Type: filesandordirs; Name: "{app}\lg-tools"
 Filename: "powershell.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\registrar-tarea.ps1"" -Quitar"; \
   Flags: runhidden waituntilterminated; RunOnceId: "QuitarTareaInTeks Display"
+Filename: "powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\vigilar-lg.ps1"" -Quitar"; \
+  Flags: runhidden waituntilterminated; RunOnceId: "QuitarTareaInTeksLG"; Tasks: lg
 Filename: "powershell.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\registrar-pantalla.ps1"" -Quitar"; \
   Flags: runhidden waituntilterminated; RunOnceId: "QuitarTareaPantalla"

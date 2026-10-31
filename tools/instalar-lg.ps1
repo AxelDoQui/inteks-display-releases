@@ -18,7 +18,8 @@ param(
     [string]$TV,
     [string]$Passphrase,
     [string]$Servidor,
-    [string]$Nombre = "tienda-lg"
+    [string]$Nombre = "tienda-lg",
+    [switch]$Vigilar
 )
 $ErrorActionPreference = "Stop"
 # En el proyecto este script vive en tools\; instalado, junto a webos\ y lg-tools\.
@@ -29,6 +30,7 @@ $ID = "com.inteks.display"
 function Falla($txt) { Write-Host "ERROR: $txt" -ForegroundColor Red; exit 1 }
 
 if (-not $TV) { $TV = Read-Host "IP del televisor (sale en la app Developer Mode del TV)" }
+$preguntar = -not $Passphrase
 if (-not $Passphrase) { $Passphrase = Read-Host "Passphrase (la misma pantalla de Developer Mode)" }
 if (-not $Servidor) { $Servidor = Read-Host "IP del PC con InTeks Display (el servidor)" }
 if (-not $TV -or -not $Passphrase -or -not $Servidor) { Falla "faltan datos." }
@@ -106,6 +108,13 @@ try {
     if ($LASTEXITCODE -ne 0) { Falla "falló la instalación en el TV." }
     ares-launch --device $Nombre $ID
 
+    # ¿Que este PC la vuelva a abrir si se cierra o tras un corte de luz? Solo
+    # para un televisor dedicado a la cartelería: en uno de uso normal molestaría.
+    if (-not $Vigilar -and $preguntar) {
+        $r = Read-Host "¿Que este PC mantenga la mini-app abierta (la abre sola si se cierra o tras un corte de luz)? Solo para un TV dedicado. (S/N)"
+        $Vigilar = $r -match '^\s*[sSyY]'
+    }
+
     # Apuntar cuándo empezó la sesión de Developer Mode de este TV (la hora del
     # propio televisor, que se anota al activarlo o renovarlo): el panel avisa
     # cuando va a caducar. Si falla, solo se pierde el aviso.
@@ -121,13 +130,31 @@ try {
             $arch = Join-Path $datos "lg_tvs.json"
             $tvs = @()
             if (Test-Path $arch) { try { $tvs = @((Get-Content $arch -Raw -Encoding UTF8 | ConvertFrom-Json).tvs) | Where-Object { $_ -and $_.id -ne $TV } } catch { $tvs = @() } }
-            $tvs += [pscustomobject]@{ id = $TV; nombre = $Nombre; ip = $TV; inicio = $inicio }
+            # Si ya estaba apuntado, se respeta su casilla «Mantenerla abierta» del panel.
+            $antes = $null
+            if (Test-Path $arch) { try { $antes = @((Get-Content $arch -Raw -Encoding UTF8 | ConvertFrom-Json).tvs) | Where-Object { $_ -and $_.id -eq $TV } | Select-Object -First 1 } catch { } }
+            $vig = [bool]$Vigilar -or ($antes -and $antes.vigilar -eq $true)
+            $tvs += [pscustomobject]@{ id = $TV; nombre = $Nombre; ip = $TV; inicio = $inicio; vigilar = $vig }
             $json = (@{ tvs = @($tvs) } | ConvertTo-Json -Depth 4)
             [IO.File]::WriteAllText($arch, $json, (New-Object Text.UTF8Encoding($false)))
             $horas = [int](1000 - ($ahoraPc - $inicio) / 3600)
             Write-Host "Modo desarrollador del TV: quedan unas $horas horas. El panel avisará antes de que caduque." -ForegroundColor Cyan
         }
     } catch { $ErrorActionPreference = "Stop" }
+
+    # La tarea que ejecuta el vigilante cada 5 minutos, con la cuenta de quien instala
+    # (la clave del TV vive en su perfil). Se crea siempre: sin televisores marcados
+    # no hace nada, y así la casilla del panel basta para activarlo después.
+    try {
+        $vig = Join-Path $raiz "vigilar-lg.ps1"
+        if (-not (Test-Path $vig)) { $vig = Join-Path $PSScriptRoot "vigilar-lg.ps1" }
+        $accion = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$vig`""
+        $disp = @((New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"),
+                  (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)))
+        $aj = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 3) -MultipleInstances IgnoreNew
+        Register-ScheduledTask -TaskName "InTeks Display LG" -Action $accion -Trigger $disp -Settings $aj -Force | Out-Null
+        Write-Host "Tarea «InTeks Display LG» creada: cada 5 minutos mira los televisores con «Mantenerla abierta» marcado en el panel." -ForegroundColor Cyan
+    } catch { Write-Host "Aviso: no pude crear la tarea que mantiene la mini-app abierta ($($_.Exception.Message))." -ForegroundColor Yellow }
     Write-Host ""
     Write-Host "Listo. La mini-app está instalada y abierta en el TV, apuntando a $url" -ForegroundColor Green
     Write-Host "Si sale un código de 4 cifras, enlázala en el panel (Pantallas -> Esperando para enlazar)."
