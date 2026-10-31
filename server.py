@@ -484,6 +484,19 @@ def notify_all():
         all_ids = list(sse_clients.keys())
     for sid in all_ids: notify_screen(sid)
 
+def notify_reload(screen_id):
+    """Pide a la pantalla que recargue su reproductor (botón «Reiniciar reproductor»).
+    Devuelve a cuántas conexiones se le escribió el aviso."""
+    n = 0
+    with sse_lock:
+        for wfile in list(sse_clients.get(screen_id, [])):
+            try:
+                wfile.write(f"data: reload:{screen_id}\n\n".encode())
+                wfile.flush()
+                n += 1
+            except Exception: pass
+    return n
+
 def notify_deleted(screen_id):
     """Avisa a la pantalla (vía SSE) de que fue eliminada para que se desconecte."""
     with sse_lock:
@@ -2820,6 +2833,21 @@ class Handler(BaseHTTPRequestHandler):
                     + (": su dispositivo volvera a pedir codigo" if entregados
                        else ": estaba apagada, se le dira al encender"))
                 ok({"screen": sid})
+            except Exception as e: err(e)
+            return
+
+        # ── Reiniciar el reproductor de una pantalla (recarga su página)
+        if path == "/api/screen-reload":
+            try:
+                d = json.loads(body or "{}")
+                sid = str(d.get("id", "")).strip()
+                if not sid:
+                    jresp(400, {"ok": False, "error": "Falta la pantalla"}); return
+                if sid not in load_json(SCREENS_FILE) and sid not in load_json(CONTENT_FILE).get("screens", {}):
+                    jresp(404, {"ok": False, "error": "Esa pantalla no existe"}); return
+                entregados = notify_reload(sid)
+                log(f"  [reproductor] reinicio pedido para '{sid}' ({entregados} conexión/es)")
+                ok({"screen": sid, "entregado": entregados > 0})
             except Exception as e: err(e)
             return
 

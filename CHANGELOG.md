@@ -10,6 +10,9 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ## 1.0.62 — sin publicar
 
+- Pantallas: cada tarjeta enseña una **miniatura de lo que está mostrando ahora** (junto a «Ahora: …»). No es una captura real de la tele: es el contenido de la librería que la pantalla dice estar reproduciendo.
+- Pantallas: botón **«Reiniciar reproductor»** (en «Más») que recarga el reproductor de esa pantalla sin ir a tocarla. Solo funciona con pantallas que ya tengan el reproductor de esta versión.
+
 - Cambios de divisas: el logo se puede poner **Normal, Grande o Muy grande**, y hay una casilla «Usar el logo en lugar del título» para que ocupe el sitio del título, a la izquierda de la cabecera. Se ve en la vista previa del editor y en la pantalla. Los módulos que ya existían se quedan como estaban (logo normal junto al título).
 
 ## 1.0.61 — 2026-10-31

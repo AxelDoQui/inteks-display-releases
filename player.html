@@ -805,6 +805,8 @@ function connectSSE(){
     // página la hacía depender de que el servidor estuviese vivo en ese preciso
     // instante; si no lo estaba, la pantalla moría y no volvía sola.
     // loadPlaylist() ya actualiza rotación, horario, configuración y slides.
+    // «reload» = botón «Reiniciar reproductor» del panel: recarga la página entera.
+    if(e.data.indexOf("reload")===0){ location.reload(); return; }
     if(e.data.indexOf("update")===0){
       clearTimeout(reloadTimer);
       reloadTimer=setTimeout(loadPlaylist, 500);   // agrupa ráfagas de cambios
