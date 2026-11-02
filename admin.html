@@ -1747,7 +1747,16 @@ function etiquetaApk(apk){
   const t=String(e.texto).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   return `<div class="sc-apk" style="font-size:11px;margin-bottom:6px;color:${e.aviso?'#f0a050':'var(--muted)'}"><i class="fa-brands fa-android"></i> ${t}</div>`;
 }
-function textoAhora(reg){
+// Aviso rojo cuando una pantalla no consigue reproducir un vídeo (se queda en negro o se
+// atasca). Lo manda el propio reproductor y se quita solo cuando el vídeo vuelve a verse.
+function avisoVideo(reg){
+  const f=reg&&reg.video_fallo;
+  if(!f||!f.name) return "";
+  const e=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  return `<div class="sc-video-fallo" style="font-size:11px;margin-bottom:6px;color:#ff6b6b" title="${e(f.motivo)}"><i class="fa-solid fa-triangle-exclamation"></i> No se ve el vídeo «${e(f.name)}» en esta pantalla (${e(f.motivo)}). Se salta solo. Prueba a subirlo en MP4 H.264 o a quitarlo.</div>`;
+}
+function textoAhora(reg){ return avisoVideo(reg)+textoAhoraBase(reg); }
+function textoAhoraBase(reg){
   const n=reg&&reg.now;
   if(!n||!reg.connected||!n.name||(Date.now()/1000-(n.at||0))>300) return "";
   const t=String(n.name).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));

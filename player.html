@@ -484,6 +484,17 @@ function sobrantes(mapa, usados){
 const MEDIOS_DB="inteks_medios", MEDIOS_STORE="archivos";
 let mediosLocales={};              // src -> blob: URL
 
+// Vídeos que en ESTE televisor no arrancan desde la copia local (blob:) y se ven mejor
+// por red (el servidor ya sirve Range, así que hay streaming y búsqueda). Algunos
+// navegadores de TV (webOS) se quedan en negro con vídeos de IndexedDB: se prueba la
+// copia, y si no arranca se pasa a la red y se recuerda para no volver a intentarlo.
+var videosEnRed={};
+try{ videosEnRed=JSON.parse(localStorage.getItem("inteks_video_red")||"{}")||{}; }catch(e){ videosEnRed={}; }
+function recordarVideoEnRed(src){
+  videosEnRed[src]=1;
+  try{ localStorage.setItem("inteks_video_red",JSON.stringify(videosEnRed)); }catch(e){}
+}
+
 function abrirDB(){
   return new Promise(function(res){
     try{
@@ -543,6 +554,7 @@ async function sincronizarMedios(){
   let nuevos=0;
   for(const src of usados){
     if(mediosLocales[src]) continue;
+    if(videosEnRed[src]) continue;   // este TV no los reproduce desde copia: no se guardan
     let blob=await idbLeer(db,src);
     if(!blob){
       try{
@@ -1090,7 +1102,7 @@ function materializarVentana(){
     if(dentro[i]){
       // La URL se resuelve AHORA y no al construir: si mientras tanto ha
       // llegado la copia local, se usa esa sin rehacer todas las diapositivas.
-      const url=urlDeMedio(m.dataset.medio,mediosLocales);
+      const url=(m.tagName==="VIDEO"&&videosEnRed[m.dataset.medio])?m.dataset.medio:urlDeMedio(m.dataset.medio,mediosLocales);
       if(m.getAttribute("src")!==url){
         m.setAttribute("src",url);
         if(m.tagName==="VIDEO"){ m.preload="auto"; }   // que se adelante, ya le toca
@@ -1134,6 +1146,57 @@ function reportarAhora(item){
     fetch("/api/screen-now",{method:"POST",headers:{"Content-Type":"application/json"},keepalive:true,
       body:JSON.stringify(datos)}).catch(()=>{});
   }catch(e){}
+}
+
+// Avisa al servidor de que un vídeo no se pudo ver en esta pantalla (o de que ya se ve),
+// para que el panel lo enseñe. Como reportarAhora, es un extra que nunca debe romper nada.
+function reportarVideo(cuerpo){
+  try{
+    if(typeof PREVIEW!=="undefined"&&PREVIEW) return;
+    cuerpo.screen=SCREEN_ID;
+    fetch("/api/screen-now",{method:"POST",headers:{"Content-Type":"application/json"},keepalive:true,
+      body:JSON.stringify(cuerpo)}).catch(()=>{});
+  }catch(e){}
+}
+var vigilanteVideo=null;
+function vigilarVideo(v,item,alTerminar){
+  if(vigilanteVideo){ vigilanteVideo(); vigilanteVideo=null; }
+  var hecho=false, ultimo=-1, quietos=0, avisadoOk=false, arrancado=false, src=String(item.src||"");
+  var nombre=String(item.name||item.title||src.split("/").pop()||"vídeo");
+  function limpiar(){
+    clearInterval(iv); v.removeEventListener("error",alError); v.removeEventListener("ended",fin);
+    if(vigilanteVideo===limpiar) vigilanteVideo=null;
+  }
+  function fin(){ if(hecho) return; hecho=true; limpiar(); alTerminar(); }
+  function fallo(motivo){
+    if(hecho) return;
+    // Estaba con la copia local: se prueba por red y se recuerda para este televisor.
+    if(src && v.getAttribute("src")!==src && mediosLocales[src]){
+      recordarVideoEnRed(src);
+      v.setAttribute("src",src);
+      try{ v.load(); }catch(e){}
+      quietos=0; ultimo=-1;
+      v.play().catch(()=>{ v.muted=true; v.play().catch(()=>{}); });
+      return;
+    }
+    reportarVideo({video_fallo:{id:String(item.id||""),name:nombre,motivo:String(motivo||"")}});
+    fin();
+  }
+  function alError(){ fallo("error del reproductor"+(v.error?" ("+v.error.code+")":"")); }
+  v.addEventListener("error",alError);
+  v.addEventListener("ended",fin);
+  var iv=setInterval(function(){
+    if(hecho) return;
+    var t=v.currentTime||0;
+    if(t>ultimo+0.05){
+      ultimo=t; quietos=0;
+      if(t>0.05) arrancado=true;
+      if(!avisadoOk && t>1.5){ avisadoOk=true; reportarVideo({video_ok:String(item.id||"")}); }
+    }else if(++quietos>=10){
+      fallo(arrancado?"se queda parado":"no llega a arrancar");
+    }
+  },1000);
+  vigilanteVideo=limpiar;
 }
 
 function showSlide(idx){
@@ -1187,10 +1250,11 @@ function showSlide(idx){
   clearTimeout(timer);
   if(isVideo){
     const v=slide.querySelector("video");
-    v.currentTime=0; v.play().catch(()=>{});
-    // El vídeo MANDA: avanzamos cuando TERMINA, no por un tiempo fijo
-    v.addEventListener("ended",()=>next(),{once:true});
-    v.addEventListener("error",()=>next(),{once:true});  // si el vídeo falla, no bloquear la rotación
+    v.currentTime=0; v.play().catch(()=>{ v.muted=true; v.play().catch(()=>{}); });
+    // El vídeo MANDA: avanzamos cuando TERMINA, no por un tiempo fijo. Y si no arranca o
+    // se atasca (pantalla negra en algunos TV), el vigilante prueba por red y, si tampoco,
+    // salta al siguiente y lo cuenta al servidor para que el panel lo enseñe.
+    vigilarVideo(v,playlist[parseInt(slide.dataset.i,10)]||{},()=>next());
     // La barra de progreso sigue la duración real del vídeo
     const startBar=()=>startProgress((isFinite(v.duration)&&v.duration>0)?v.duration*1000:ms);
     if(isFinite(v.duration)&&v.duration>0) startBar();

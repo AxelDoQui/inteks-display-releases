@@ -952,6 +952,8 @@ POST_PUBLICOS = {"/api/login", "/api/set-password", "/api/logout",
                  "/api/screen-now"}
 # Lo que cada pantalla está mostrando ahora (solo memoria, se pierde al reiniciar).
 ahora_pantalla = {}
+# Vídeos que una pantalla no consigue reproducir: {pantalla: {id, name, motivo, at}}.
+fallos_video = {}
 MAX_BODY_PUBLICO = 64 * 1024
 
 # Intentos de login fallidos por dirección: 5 y se bloquea un minuto. Por
@@ -2417,6 +2419,8 @@ class Handler(BaseHTTPRequestHandler):
             for sid, p in pantallas.items():
                 if isinstance(p, dict) and sid in ahora_pantalla:
                     p["now"] = ahora_pantalla[sid]
+                if isinstance(p, dict) and sid in fallos_video:
+                    p["video_fallo"] = fallos_video[sid]
             body = json.dumps(pantallas).encode()
             self.send_response(200); self.send_header("Content-Type","application/json")
             self.cors(); self.end_headers(); self.wfile.write(body); return
@@ -2829,6 +2833,22 @@ class Handler(BaseHTTPRequestHandler):
                 sid = str(d.get("screen", "") or "")
                 if sid not in load_json(SCREENS_FILE):
                     jresp(404, {"ok": False, "error": "Pantalla desconocida"}); return
+                # Vídeo que esta pantalla no consigue reproducir (o que ya se ve bien).
+                # Va aparte de «ahora» porque ese se sobrescribe en cada diapositiva y el
+                # aviso tiene que seguir en el panel hasta que el vídeo funcione.
+                vf = d.get("video_fallo")
+                if isinstance(vf, dict):
+                    fallos_video[sid] = {"id": str(vf.get("id", "") or "")[:200],
+                                         "name": str(vf.get("name", "") or "")[:80],
+                                         "motivo": str(vf.get("motivo", "") or "")[:80],
+                                         "at": time.time()}
+                    log(f"  [video] {sid}: no reproduce «{fallos_video[sid]['name']}» ({fallos_video[sid]['motivo']})")
+                    jresp(200, {"ok": True}); return
+                vok = d.get("video_ok")
+                if vok is not None:
+                    if sid in fallos_video and fallos_video[sid]["id"] == str(vok)[:200]:
+                        del fallos_video[sid]
+                    jresp(200, {"ok": True}); return
                 ahora_pantalla[sid] = {
                     "id": str(d.get("id", "") or "")[:200],
                     "name": str(d.get("name", "") or "")[:80],

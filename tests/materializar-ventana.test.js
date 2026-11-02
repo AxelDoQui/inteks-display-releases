@@ -60,6 +60,7 @@ function cargar(tipos, posOrden, locales) {
     posOrden,
     playlist: tipos.map(() => ({})),
     mediosLocales: locales || {},
+    videosEnRed: {},
     urlDeMedio: (s, l) => (l && l[s]) || s,
     parseInt,
     medios,
