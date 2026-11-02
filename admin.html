@@ -1118,6 +1118,25 @@ JPY  Yen        162.5"></textarea>
     <div id="lg-lista"></div>
   </div>
 
+  <div class="card" id="card-acceso">
+    <div class="card-title"><i class="fa-solid fa-globe"></i> Acceso remoto</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Abre este panel desde cualquier sitio, en una dirección propia (por ejemplo tienda1.inteksdisplay.com). En tu cuenta de InTeks añade este PC y copia el PIN de 6 cifras que te da; escríbelo aquí.</p>
+    <p id="acc-sin-pass" style="display:none;font-size:12px;color:var(--danger,#ff5d5d);margin-bottom:10px">Antes crea la contraseña del administrador (más abajo, en «Seguridad y acceso»): sin ella, el panel quedaría abierto a internet.</p>
+    <p id="acc-no-disp" style="display:none;font-size:12px;color:var(--muted);margin-bottom:10px">Esta instalación no trae el componente de conexión. Reinstala InTeks Display con la última versión.</p>
+    <div id="acc-form" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input class="finput" id="acc-pin" maxlength="6" inputmode="numeric" autocomplete="off" placeholder="PIN de 6 cifras" style="width:160px">
+      <button class="btn btn-accent" id="acc-go" onclick="accesoActivar()"><i class="fa-solid fa-link"></i> Enlazar este PC</button>
+    </div>
+    <div id="acc-pasos" style="font-size:12px;color:var(--muted);margin-top:10px"></div>
+    <div id="acc-activo" style="display:none;margin-top:10px">
+      <div style="font-size:13px"><i class="fa-solid fa-circle-check" style="color:#2ecc71"></i> Accesible en <strong id="acc-url"></strong> <span id="acc-aviso" style="font-size:12px;color:var(--muted)"></span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <button class="btn btn-ghost" onclick="accesoCopiar()"><i class="fa-solid fa-copy"></i> Copiar dirección</button>
+        <button class="btn btn-ghost" onclick="accesoDesactivar()"><i class="fa-solid fa-link-slash"></i> Desactivar</button>
+      </div>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-title">Opciones avanzadas</div>
     <div style="margin-bottom:12px">
@@ -5052,6 +5071,53 @@ async function instalarLg(){
   _lgPintar({estado:"instalando",tv:ip,lineas:[]});
   _lgSeguir();
 }
+// ── Acceso remoto (cuenta de InTeks). Todo lo que viene del servidor va con textContent.
+let _accTimer=null, _accUrl="";
+function accesoPintar(d){
+  const $=(i)=>document.getElementById(i);
+  const ocupado=d.estado==="activando";
+  $("acc-sin-pass").style.display=d.password?"none":"block";
+  $("acc-no-disp").style.display=d.disponible?"none":"block";
+  $("acc-form").style.display=(d.activo||!d.disponible)?"none":"flex";
+  $("acc-go").disabled=ocupado||!d.password;
+  $("acc-pin").disabled=ocupado||!d.password;
+  $("acc-pasos").textContent=ocupado?d.pasos.join(" · "):(d.estado==="error"?"No se pudo: "+d.error:"");
+  $("acc-activo").style.display=d.activo?"block":"none";
+  if(d.activo){
+    _accUrl="https://"+d.hostname;
+    $("acc-url").textContent=d.hostname;
+    $("acc-aviso").textContent=d.servicio?"":"· la conexión no está en marcha en este PC";
+  }
+  if(ocupado&&!_accTimer) _accTimer=setInterval(accesoCargar,1500);
+  if(!ocupado&&_accTimer){ clearInterval(_accTimer); _accTimer=null; }
+}
+async function accesoCargar(){
+  try{
+    const r=await fetch("/api/acceso-remoto",{cache:"no-store"});
+    if(r.ok) accesoPintar(await r.json());
+  }catch(e){ /* sin conexión: se queda como estaba */ }
+}
+async function accesoActivar(){
+  const pin=document.getElementById("acc-pin").value.trim();
+  if(!/^\d{6}$/.test(pin)){ toast("El PIN son 6 cifras",true); return; }
+  try{
+    const r=await fetch("/api/acceso-remoto/activar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pin})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){ toast(d.error||"No se pudo empezar",true); return; }
+    document.getElementById("acc-pin").value="";
+  }catch(x){ toast("No se pudo contactar con el servidor",true); return; }
+  accesoCargar();
+}
+async function accesoDesactivar(){
+  if(!await confirmar("Se quitará el acceso remoto de este PC. La dirección dejará de funcionar hasta que vuelvas a enlazarlo con un PIN nuevo.")) return;
+  try{ await fetch("/api/acceso-remoto/desactivar",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}); }
+  catch(x){ toast("No se pudo contactar con el servidor",true); return; }
+  toast("Acceso remoto desactivado");
+  accesoCargar();
+}
+function accesoCopiar(){
+  if(navigator.clipboard&&_accUrl) navigator.clipboard.writeText(_accUrl).then(()=>toast("Dirección copiada"),()=>toast("No se pudo copiar",true));
+}
 async function cargarLgTvs(){
   try{
     const r=await fetch("/api/lg-tvs",{cache:"no-store"});
@@ -5536,6 +5602,7 @@ async function loadSettings(){
     const r=await fetch("/api/admin-info");
     if(r.ok){ const d=await r.json(); document.getElementById("set-apitoken").value=d.api_token||"—"; }
   }catch(e){}
+  accesoCargar();
 }
 
 async function changePassword(){
