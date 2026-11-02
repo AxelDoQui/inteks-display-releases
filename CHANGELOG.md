@@ -8,7 +8,7 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
-## 1.0.65 — sin publicar
+## 1.0.65 — 2026-11-02
 
 - **Festivos: «solo esta imagen» y el modo 24/7.** Cada fecha especial tiene ahora un selector claro: «pantalla apagada», «funciona normal (con otro horario)» o «solo esta imagen» (ese día no sale nada más de la playlist). Antes, una pantalla en modo 24/7 ignoraba por completo los festivos, y por eso seguía reproduciendo todo; ahora un festivo manda sobre el 24/7, y la sección de festivos se ve también con 24/7 marcado.
 
