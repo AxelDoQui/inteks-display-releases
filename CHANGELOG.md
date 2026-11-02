@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.69 — 2026-11-02
+
+- **Los vídeos suenan.** Antes se reproducían siempre en silencio. Ahora suenan, y en la playlist de cada pantalla hay una casilla «Sonido en los vídeos» (activada por defecto) para apagarlo donde moleste. Si la tele no deja arrancar con sonido, el vídeo sigue mudo en vez de pararse.
+
 ## 1.0.68 — 2026-11-02
 
 - **Vídeos en la tele LG: ya no se quedan en negro.** El reproductor vigila cada vídeo; si no arranca o se congela, prueba sin sonido, luego directo desde el servidor, y si aun así falla pasa al siguiente contenido. El panel enseña un aviso rojo en esa pantalla con el motivo.
