@@ -5,6 +5,11 @@
   #error Falta vendor\python. Ejecuta primero: powershell -ExecutionPolicy Bypass -File tools\descargar-python.ps1
 #endif
 
+; cloudflared (acceso remoto) tampoco va en git. Mismo criterio: abortar aqui.
+#if !FileExists(AddBackslash(SourcePath) + "..\vendor\cloudflared\cloudflared.exe")
+  #error Falta vendor\cloudflared. Ejecuta primero: powershell -ExecutionPolicy Bypass -File tools\descargar-cloudflared.ps1
+#endif
+
 [Setup]
 AppName=InTeks Display
 AppVersion=1.0.66
@@ -127,6 +132,8 @@ Source: "..\tools\instalar-lg.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "instalar-herramientas-lg.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\tools\vigilar-lg.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "reabrir-ventanas.ps1"; DestDir: "{app}"; Flags: ignoreversion
+; Conector del acceso remoto (el panel lo instala como servicio al enlazar un PIN).
+Source: "..\vendor\cloudflared\cloudflared.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; Este NO se instala: se extrae a la carpeta temporal y se ejecuta antes de
 ; copiar nada. Ver [Code] / PrepareToInstall.
 Source: "parar-servidor.ps1"; Flags: dontcopy

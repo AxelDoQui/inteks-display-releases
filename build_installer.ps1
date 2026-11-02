@@ -20,6 +20,10 @@ Write-Host "Compilador: $ISCC" -ForegroundColor DarkGray
 $setupPath = Join-Path $PSScriptRoot "installer\setup.iss"
 $distPath = Join-Path $PSScriptRoot "dist\installer"
 
+# Conector del acceso remoto (idempotente: no baja nada si ya esta y coincide)
+& (Join-Path $PSScriptRoot "tools\descargar-cloudflared.ps1")
+if ($LASTEXITCODE -ne 0) { exit 1 }
+
 # Crear carpeta dist
 New-Item -ItemType Directory -Path $distPath -Force | Out-Null
 

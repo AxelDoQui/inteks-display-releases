@@ -9,6 +9,10 @@
 
 ---
 
+> **Nota (1.0.67):** esta guía es el método manual. Desde la 1.0.67 el panel trae
+> **Ajustes → Acceso remoto**, que enlaza cada PC con un PIN de tu cuenta sin tocar Cloudflare.
+> Esta guía sigue valiendo para entenderlo o para montarlo a mano.
+
 ## 0. Resumen de cómo queda
 
 ```

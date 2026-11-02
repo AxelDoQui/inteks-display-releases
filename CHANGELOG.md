@@ -8,6 +8,11 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.67 — 2026-11-02
+
+- **Acceso remoto desde tu cuenta de InTeks.** En Ajustes hay una tarjeta nueva, «Acceso remoto»: sacas un PIN de 6 cifras en tu cuenta (eliges la dirección, por ejemplo `tienda1.inteksdisplay.com`), lo escribes en el panel de ese PC y queda enlazado. Sin comandos ni configuración a mano. Cada PC tiene su propia dirección. Hace falta tener la contraseña del administrador creada.
+- **El límite de intentos de login mira la IP real** cuando se entra por el túnel; antes, todo internet contaba como una sola dirección.
+
 ## 1.0.66 — 2026-11-02
 
 - **La miniatura dice la verdad con la pantalla apagada o en «solo esta imagen».** Antes seguía enseñando la playlist (las diapositivas giran por detrás del standby). Ahora la tarjeta muestra la imagen que se ve de verdad, o una luna si la pantalla está apagada, con el texto «Solo una imagen (fecha especial)» o «Pantalla apagada (fuera de horario)».

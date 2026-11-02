@@ -222,6 +222,22 @@ lo que pasaba antes.
 
 ---
 
+## Acceso remoto (desde fuera de la tienda)
+
+Para abrir el panel de un PC desde cualquier sitio, en una dirección propia:
+
+1. En tu cuenta de InTeks, **añade el PC** con el nombre que quieras que lleve la dirección
+   (`tienda1` → `tienda1.inteksdisplay.com`). Te da un **PIN de 6 cifras**, válido unos minutos.
+2. En el panel de ese PC: **Ajustes → Acceso remoto**, escribe el PIN y pulsa **Enlazar este PC**.
+3. Cuando salga «Accesible en …», ya se puede abrir esa dirección desde cualquier sitio. Pide
+   un código que llega por correo y después la contraseña del panel.
+
+Hace falta tener creada la **contraseña del administrador** (Seguridad y acceso); sin ella
+el botón no se activa. Para quitarlo, **Desactivar** en la misma tarjeta (o quitar el PC en la
+cuenta). Si cambias de PC, saca un PIN nuevo: el PIN solo vale una vez.
+
+---
+
 ## Horarios
 
 En **Horario** de cada pantalla: días de la semana con su franja, o modo 24/7.
