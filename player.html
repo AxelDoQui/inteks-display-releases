@@ -713,12 +713,15 @@ function showStandby(){
   // la de standby de la pantalla.
   const fest=festivoDeHoy();
   const imagen=(fest&&!fest.enabled&&fest.image)||(screenConfig&&screenConfig.standby_image)||"";
+  standby.dataset.img=imagen;
+  standby.dataset.nombre=(fest&&!fest.enabled&&fest.image)?"Solo una imagen (fecha especial)":"Pantalla apagada (fuera de horario)";
   if(imagen){
     standby.innerHTML=`<img src="${imagen}" style="width:100%;height:100%;object-fit:contain">`;
   }else{
     standby.innerHTML='<div style="text-align:center;color:rgba(255,255,255,.2);font-family:monospace"><div style="font-size:14px;letter-spacing:2px">PANTALLA APAGADA</div><div style="font-size:11px;margin-top:8px">🕐 Fuera de horario</div></div>';
   }
   player.appendChild(standby);
+  reportarAhora(null);
 }
 
 function hideStandby(){
@@ -1115,9 +1118,18 @@ let limpiezaSalida=null;
 // Es un extra: si falla (sin red, vista previa), la reproducción no se entera.
 function reportarAhora(item){
   try{
-    if(!item||(typeof PREVIEW!=="undefined"&&PREVIEW)) return;
-    const nombre=item.name||item.title||(item.src?decodeURIComponent(String(item.src).split("/").pop().split("?")[0]):"")||item.type||"";
-    const datos={screen:SCREEN_ID,id:String(item.id||""),name:String(nombre),type:String(item.type||"image")};
+    if(typeof PREVIEW!=="undefined"&&PREVIEW) return;
+    // Con la pantalla apagada o en un festivo de «solo esta imagen», lo que se ve es
+    // el standby aunque las diapositivas sigan girando por detrás: eso es lo que se cuenta.
+    const sb=document.getElementById("standby-screen");
+    if(!item&&!sb) return;
+    let datos;
+    if(sb){
+      datos={screen:SCREEN_ID,id:"",name:sb.dataset.nombre||"Pantalla apagada",type:"standby",img:sb.dataset.img||""};
+    }else{
+      const nombre=item.name||item.title||(item.src?decodeURIComponent(String(item.src).split("/").pop().split("?")[0]):"")||item.type||"";
+      datos={screen:SCREEN_ID,id:String(item.id||""),name:String(nombre),type:String(item.type||"image")};
+    }
     try{ if(window.InTeksApp&&typeof window.InTeksApp.version==="function") datos.apk=String(window.InTeksApp.version()||""); }catch(e){}
     fetch("/api/screen-now",{method:"POST",headers:{"Content-Type":"application/json"},keepalive:true,
       body:JSON.stringify(datos)}).catch(()=>{});

@@ -1732,7 +1732,7 @@ function textoAhora(reg){
   const n=reg&&reg.now;
   if(!n||!reg.connected||!n.name||(Date.now()/1000-(n.at||0))>300) return "";
   const t=String(n.name).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  return `<div class="sc-now" style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--a2);margin-bottom:6px;min-width:0" title="${t}">${miniaturaAhora(n)}<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0"><i class="fa-solid fa-play"></i> Ahora: ${t}</span></div>`+etiquetaApk(n.apk);
+  return `<div class="sc-now" style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--a2);margin-bottom:6px;min-width:0" title="${t}">${miniaturaAhora(n)}<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0"><i class="fa-solid ${n.type==="standby"?"fa-moon":"fa-play"}"></i> ${n.type==="standby"?"":"Ahora: "}${t}</span></div>`+etiquetaApk(n.apk);
 }
 // Miniatura de lo que la pantalla dice que está mostrando. No es una captura real
 // de la tele: es el contenido de la librería con el id que informa el reproductor.
@@ -1741,7 +1741,8 @@ function miniaturaAhora(n){
   const caja='width:64px;height:36px;border-radius:4px;overflow:hidden;flex:0 0 64px;background:#111;display:flex;align-items:center;justify-content:center;border:1px solid var(--b)';
   const tipo=it?it.type:n.type;
   let dentro;
-  if(it&&tipo==="image"&&it.src) dentro=`<img src="${esc(it.src)}" alt="" style="width:100%;height:100%;object-fit:cover">`;
+  if(n.type==="standby") dentro=n.img?`<img src="${esc(n.img)}" alt="" style="width:100%;height:100%;object-fit:cover">`:'<i class="fa-solid fa-moon" style="font-size:14px;color:var(--muted)"></i>';
+  else if(it&&tipo==="image"&&it.src) dentro=`<img src="${esc(it.src)}" alt="" style="width:100%;height:100%;object-fit:cover">`;
   else if(it&&tipo==="video"&&it.src) dentro=`<video src="${esc(it.src)}#t=0.1" muted preload="metadata" style="width:100%;height:100%;object-fit:cover"></video>`;
   else if(it&&tipo==="text") dentro=`<div style="width:100%;height:100%;background:${esc(it.bg||'#111')};color:${esc(it.color||'#fff')};display:flex;align-items:center;justify-content:center;font-size:6px;text-align:center;padding:2px;overflow:hidden">${esc(it.title||it.name||"")}</div>`;
   else dentro=`<i class="fa-solid ${typeIcon(tipo)}" style="font-size:14px;color:var(--muted)"></i>`;
@@ -5072,8 +5073,8 @@ async function instalarActualizacion(version){
   if(!await confirmar("Se instalará la versión "+version+".\n\n"+
               "El servidor se reiniciará durante un minuto aproximadamente. Las pantallas "+
               "seguirán mostrando su contenido y se reconectarán solas.\n\n"+
-              "Si estás en la aplicación de escritorio, su ventana se cerrará sola durante la "+
-              "instalación: ábrela de nuevo pasado un minuto.\n\n¿Actualizar ahora?")) return;
+              "Si estás en la aplicación de escritorio, su ventana se cerrará durante la "+
+              "instalación y se volverá a abrir sola al terminar.\n\n¿Actualizar ahora?")) return;
   const el={set innerHTML(v){ponerEstadoUpdate(v);}};
   // No hay porcentaje real: el servidor baja el instalador de golpe. Se enseña una
   // barra en movimiento y los segundos que lleva, para que se vea que sigue vivo.

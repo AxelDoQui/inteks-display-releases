@@ -59,10 +59,22 @@ Get-Process python, pythonw -ErrorAction SilentlyContinue | ForEach-Object {
 # («DeleteFile falló; código 5»), aborta, deshace lo hecho y deja el servidor
 # parado. Pasó el 2026-10-31. Se cierran las de esta instalación; el panel se
 # vuelve a abrir con su acceso directo.
+# Se apunta cuáles había (pantalla completa o ventana del panel) para que
+# reabrir-ventanas.ps1 las vuelva a abrir cuando termine la instalación.
+$reabrir = @()
 Get-Process InTeksDisplay -ErrorAction SilentlyContinue | ForEach-Object {
     if ($AppDir -and $_.Path -and $_.Path.StartsWith($AppDir, [StringComparison]::OrdinalIgnoreCase)) {
+        $cl = (Get-CimInstance Win32_Process -Filter "ProcessId=$($_.Id)" -ErrorAction SilentlyContinue).CommandLine
+        $reabrir += $(if ($cl -and $cl -like "*--pantalla*") { "--pantalla" } else { "-" })
         try { Stop-Process -Id $_.Id -Force -ErrorAction Stop; $muertos++ } catch {}
     }
+}
+if ($reabrir.Count) {
+    try {
+        $carpeta = Join-Path $env:ProgramData "InTeks Display"
+        New-Item -ItemType Directory -Force -Path $carpeta | Out-Null
+        Set-Content -Path (Join-Path $carpeta "reabrir.txt") -Value $reabrir -Encoding UTF8
+    } catch {}
 }
 
 # Windows no suelta los handles en el mismo instante en que muere el proceso.

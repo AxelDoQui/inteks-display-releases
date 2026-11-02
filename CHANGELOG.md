@@ -8,6 +8,11 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.66 — sin publicar
+
+- **La miniatura dice la verdad con la pantalla apagada o en «solo esta imagen».** Antes seguía enseñando la playlist (las diapositivas giran por detrás del standby). Ahora la tarjeta muestra la imagen que se ve de verdad, o una luna si la pantalla está apagada, con el texto «Solo una imagen (fecha especial)» o «Pantalla apagada (fuera de horario)».
+- **Tras «Actualizar ahora» se vuelven a abrir solas** la ventana del panel y la pantalla completa que estuvieran abiertas (el instalador las cierra para poder sustituir el programa). Se abren en la sesión del usuario que tiene el PC en uso.
+
 ## 1.0.65 — 2026-11-02
 
 - **Festivos: «solo esta imagen» y el modo 24/7.** Cada fecha especial tiene ahora un selector claro: «pantalla apagada», «funciona normal (con otro horario)» o «solo esta imagen» (ese día no sale nada más de la playlist). Antes, una pantalla en modo 24/7 ignoraba por completo los festivos, y por eso seguía reproduciendo todo; ahora un festivo manda sobre el 24/7, y la sección de festivos se ve también con 24/7 marcado.

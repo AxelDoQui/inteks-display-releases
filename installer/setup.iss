@@ -126,6 +126,7 @@ Source: "..\webos\*"; DestDir: "{app}\webos"; Flags: ignoreversion recursesubdir
 Source: "..\tools\instalar-lg.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "instalar-herramientas-lg.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\tools\vigilar-lg.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "reabrir-ventanas.ps1"; DestDir: "{app}"; Flags: ignoreversion
 ; Este NO se instala: se extrae a la carpeta temporal y se ejecuta antes de
 ; copiar nada. Ver [Code] / PrepareToInstall.
 Source: "parar-servidor.ps1"; Flags: dontcopy
@@ -190,6 +191,10 @@ Filename: "powershell.exe"; \
   Flags: runhidden waituntilterminated; Tasks: lg
 
 Filename: "{app}\InTeksDisplay.exe"; Description: "Abrir el panel de administracion"; Flags: nowait postinstall skipifsilent
+; Tras una actualizacion silenciosa (la del boton «Actualizar ahora»), vuelve a abrir
+; las ventanas que se cerraron para poder sustituir el .exe, en la sesion del usuario.
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\reabrir-ventanas.ps1"" -AppDir ""{app}"""; \
+  Flags: runhidden nowait; Check: WizardSilent
 
 [UninstallDelete]
 ; Lo descargado por la casilla «lg»: no lo conoce el desinstalador.

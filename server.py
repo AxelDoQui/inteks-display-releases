@@ -2685,6 +2685,10 @@ class Handler(BaseHTTPRequestHandler):
                     "type": str(d.get("type", "") or "")[:20],
                     "at": time.time(),
                 }
+                # Con la pantalla apagada o en una fecha especial: la imagen que se ve.
+                img = str(d.get("img", "") or "")[:300]
+                if img:
+                    ahora_pantalla[sid]["img"] = img
                 # Versión del APK de la caja (solo la manda el reproductor dentro del APK).
                 apk = str(d.get("apk", "") or "")[:20]
                 if apk:
