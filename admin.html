@@ -1365,14 +1365,16 @@ JPY  Yen        162.5"></textarea>
       <input type="checkbox" id="sched-always" onchange="toggleAlwaysOn()" style="cursor:pointer;width:16px;height:16px">
       <div>
         <div style="font-size:13px;font-weight:500">⏰ Funcionamiento 24/7</div>
-        <div style="font-size:11px;color:var(--muted)">Siempre encendida — ignora el horario por días</div>
+        <div style="font-size:11px;color:var(--muted)">Siempre encendida — ignora el horario por días (salvo las fechas especiales de abajo)</div>
       </div>
     </label>
 
     <div id="schedule-days-wrap">
       <div style="font-size:11px;color:var(--muted);margin-bottom:8px">HORARIO POR DÍAS</div>
       <div id="schedule-editor" style="display:grid;gap:10px;margin-bottom:14px"></div>
+    </div>
 
+    <div>
       <div style="border-top:1px solid var(--b);padding-top:12px;margin-bottom:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px">
           <div style="font-size:11px;color:var(--muted)">FESTIVOS Y DÍAS ESPECIALES</div>
@@ -1381,8 +1383,9 @@ JPY  Yen        162.5"></textarea>
         <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">
           Una fecha concreta manda sobre el horario del día de la semana. Deja las horas
           vacías para todo el día. Sirve igual para cerrar en Navidad que para abrir un
-          domingo de rebajas. Si la dejas en «cerrado», puedes elegir la imagen que sale
-          solo ese día (por ejemplo «Estamos cerrados»).
+          domingo de rebajas. Elige qué hace la pantalla ese día: apagada, normal con
+          otro horario, o «solo esta imagen» (por ejemplo «Estamos cerrados»): ese día no sale
+          nada más de la playlist.
         </div>
         <div id="sched-festivos"></div>
       </div>
@@ -2066,17 +2069,21 @@ function renderFestivos(){
   festivosEdit.forEach((f,i)=>{
     const pasado=f.date<hoy;
     const el=document.createElement("div");
-    el.style.cssText="display:grid;grid-template-columns:150px 90px 1fr 1fr auto;gap:8px;"+
+    el.style.cssText="display:grid;grid-template-columns:150px 210px 1fr 1fr auto;gap:8px;"+
       "align-items:center;background:var(--s2);border:1px solid var(--b);border-radius:var(--r);"+
       "padding:8px 10px;margin-bottom:6px"+(pasado?";opacity:.45":"");
     el.innerHTML=
       `<input type="date" class="finput" style="font-size:11px" value="${f.date}" onchange="festivoCampo(${i},'date',this.value)">`+
-      `<label style="font-size:11px;cursor:pointer;white-space:nowrap"><input type="checkbox" ${f.enabled?"checked":""} onchange="festivoCampo(${i},'enabled',this.checked)" style="cursor:pointer"> abierto</label>`+
+      `<select class="finput" style="font-size:11px" onchange="festivoModo(${i},this.value)" title="Qué hace la pantalla ese día">`+
+        [["apagada","Ese día: pantalla apagada"],["abierta","Ese día: funciona normal (con otro horario)"],["imagen","Ese día: solo esta imagen"]]
+          .map(o=>`<option value="${o[0]}"${o[0]===modoFestivo(f)?" selected":""}>${o[1]}</option>`).join("")+`</select>`+
       (f.enabled
         ? `<input type="time" class="finput" style="font-size:11px" value="${f.start||""}" onchange="festivoCampo(${i},'start',this.value)" title="Vacío = todo el día">`+
           `<input type="time" class="finput" style="font-size:11px" value="${f.end||""}" onchange="festivoCampo(${i},'end',this.value)" title="Vacío = todo el día">`
-        : `<select class="finput" style="font-size:11px;grid-column:span 2" onchange="festivoCampo(${i},'image',this.value)" title="Lo que sale en la pantalla ese día">`+
-          opcionesImagenFestivo(f.image)+`</select>`)+
+        : modoFestivo(f)==="imagen"
+          ? `<select class="finput" style="font-size:11px;grid-column:span 2" onchange="festivoCampo(${i},'image',this.value)" title="Lo único que sale en la pantalla ese día">`+
+            opcionesImagenFestivo(f.image)+`</select>`
+          : `<span style="grid-column:span 2;font-size:11px;color:var(--muted)">Sale la imagen de standby de la pantalla, o negro</span>`)+
       `<button class="btn btn-danger btn-sm" onclick="quitarFestivo(${i})"><i class="fa-solid fa-xmark"></i></button>`;
     c.appendChild(el);
   });
@@ -2088,12 +2095,25 @@ function renderFestivos(){
 function opcionesImagenFestivo(actual){
   const esc=s=>String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
   const imgs=(content.items||[]).filter(it=>it&&it.type==="image"&&it.src);
-  let h='<option value="">Imagen de standby / negro</option>';
+  let h='<option value="">— elige una imagen —</option>';
   if(actual&&!imgs.some(it=>it.src===actual)) h+='<option value="'+esc(actual)+'" selected>(imagen que ya no está en la librería)</option>';
   imgs.forEach(it=>{ h+='<option value="'+esc(it.src)+'"'+(it.src===actual?" selected":"")+'>'+esc(it.name||it.src)+'</option>'; });
   return h;
 }
 
+// Qué hace la pantalla en un festivo: «abierta» (con sus horas), «imagen» (solo una
+// imagen, el resto de la playlist no sale) o «apagada» (standby o negro).
+function modoFestivo(f){
+  if(f.enabled) return "abierta";
+  return (f.modo==="imagen"||f.image)?"imagen":"apagada";
+}
+function festivoModo(i,modo){
+  const f=festivosEdit[i]; if(!f) return;
+  f.enabled=modo==="abierta";
+  f.modo=modo;
+  if(modo!=="imagen") f.image="";
+  renderFestivos();
+}
 function festivoCampo(i,campo,valor){
   if(!festivosEdit[i]) return;
   festivosEdit[i][campo]=valor;
@@ -2105,7 +2125,7 @@ function anadirFestivo(){
   if(festivosEdit.some(f=>f.date===hoy)){
     toast("Ya hay un festivo en esa fecha — cambia la fecha del nuevo",true);
   }
-  festivosEdit.push({date:hoy, enabled:false});
+  festivosEdit.push({date:hoy, enabled:false, modo:"apagada"});
   renderFestivos();
 }
 
@@ -2140,6 +2160,8 @@ function saveSchedule(){
 
   // Los festivos van dentro del horario, no aparte: asi viajan juntos en la
   // copia de seguridad y en la configuracion de cada pantalla.
+  const sinImagen=festivosEdit.find(f=>f&&f.date&&!f.enabled&&modoFestivo(f)==="imagen"&&!f.image);
+  if(sinImagen){ toast("El "+sinImagen.date+" está en «solo esta imagen» pero no has elegido la imagen",true); return; }
   const vistas=new Set();
   schedule.holidays=festivosEdit
     .filter(f=>f&&f.date)

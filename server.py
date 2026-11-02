@@ -1159,18 +1159,19 @@ def pantalla_activa(cfg, ahora):
     Si esta función y la de JavaScript se separan, uno de los dos tests peta.
     """
     cfg = cfg or {}
-    if cfg.get("always_on"):
-        return True
     horario = cfg.get("schedule") or {}
-    if not horario:
-        return True
-
     hoy = time.strftime("%Y-%m-%d", ahora)
     dia_cfg = None
     for f in horario.get("holidays") or []:
         if isinstance(f, dict) and f.get("date") == hoy:
             dia_cfg = f
             break
+
+    # 24/7: siempre encendida, salvo en una fecha especial puesta a propósito.
+    if cfg.get("always_on") and dia_cfg is None:
+        return True
+    if not horario:
+        return True
 
     if dia_cfg is None:
         dias = [k for k in horario.keys() if k != "holidays"]

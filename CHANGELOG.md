@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.65 — sin publicar
+
+- **Festivos: «solo esta imagen» y el modo 24/7.** Cada fecha especial tiene ahora un selector claro: «pantalla apagada», «funciona normal (con otro horario)» o «solo esta imagen» (ese día no sale nada más de la playlist). Antes, una pantalla en modo 24/7 ignoraba por completo los festivos, y por eso seguía reproduciendo todo; ahora un festivo manda sobre el 24/7, y la sección de festivos se ve también con 24/7 marcado.
+
 ## 1.0.64 — 2026-10-31
 
 - **La mini-app del LG se instala desde el panel.** Ajustes → Televisores LG → «Instalar en un televisor LG»: se escribe la IP del TV y su passphrase (la dirección del servidor ya viene puesta), y el panel instala, enseña cómo va y dice el motivo si algo falla. Ya no hace falta abrir ninguna carpeta ni ejecutar nada a mano. La primera vez descarga las herramientas de LG por su cuenta, así que la casilla del instalador pasa a ser opcional («Descargar ya las herramientas…»). El acceso «Instalar la pantalla en un TV LG» del menú Inicio desaparece. La clave del televisor se guarda en la carpeta de datos de la app y la tarea «Mantenerla abierta» corre con la cuenta del sistema, como el servidor.

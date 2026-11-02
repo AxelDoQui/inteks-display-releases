@@ -173,8 +173,13 @@ test("con SOLO festivos configurados, el resto de días sigue encendido", () => 
   assert.strictEqual(isActiveAt(NAVIDAD, { schedule: s }), false, "y el festivo sigue apagando");
 });
 
-test("always_on manda incluso sobre un festivo cerrado", () => {
+test("un festivo cerrado manda sobre el modo 24/7", () => {
   const s = { ...diurno, holidays: [{ date: "2026-12-25", enabled: false }] };
+  assert.strictEqual(isActiveAt(NAVIDAD, { schedule: s, config: { always_on: true } }), false);
+});
+
+test("en modo 24/7, los demás días siguen encendidos aunque haya un festivo", () => {
+  const s = { ...diurno, holidays: [{ date: "2026-12-24", enabled: false }] };
   assert.strictEqual(isActiveAt(NAVIDAD, { schedule: s, config: { always_on: true } }), true);
 });
 
