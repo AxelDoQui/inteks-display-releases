@@ -6,28 +6,100 @@
 <style>
   html,body{margin:0;height:100%;background:#000;color:#fff;font-family:sans-serif}
   body{display:flex;align-items:center;justify-content:center;text-align:center}
-  #m{font-size:28px;opacity:.8}
+  #m{font-size:28px;opacity:.85;padding:0 40px}
+  #d{font-size:18px;opacity:.5;margin-top:14px}
 </style>
 </head>
 <body>
-<div id="m">Conectando con InTeks Display…</div>
+<div><div id="m">Conectando con InTeks Display…</div><div id="d"></div></div>
 <script>
-// Dirección del servidor InTeks Display de la tienda (el PC). Se cambia aquí y
-// se vuelve a empaquetar; el reproductor se empareja solo, como en cualquier pantalla.
+// Dirección del servidor InTeks Display de la tienda (el PC) con la que se instaló la
+// mini-app. Es solo el punto de partida: si el router le cambia la IP al PC, la mini-app
+// recuerda la última que funcionó y, si ninguna responde, BUSCA sola el servidor en la
+// misma red (probando las 254 direcciones). No hace falta reinstalarla ni tocar nada.
 var SERVIDOR = "http://192.168.0.90/";
 
-function intentar() {
-  var parar = false;
-  var t = setTimeout(function () { parar = true; reintentar(); }, 4000);
-  fetch(SERVIDOR + "api/auth-status", { mode: "no-cors", cache: "no-store" })
-    .then(function () { if (!parar) { clearTimeout(t); location.replace(SERVIDOR); } })
-    .catch(function () { if (!parar) { clearTimeout(t); reintentar(); } });
+var CLAVE = "inteks_servidor";
+var msg = document.getElementById("m"), det = document.getElementById("d");
+
+function norm(u) { u = String(u || "").replace(/\s+/g, ""); if (!u) return ""; if (!/^https?:\/\//.test(u)) u = "http://" + u; return u.replace(/\/*$/, "/"); }
+function guardado() { try { return norm(localStorage.getItem(CLAVE)); } catch (e) { return ""; } }
+function recordar(u) { try { localStorage.setItem(CLAVE, u); } catch (e) {} }
+
+// ¿Hay un servidor InTeks Display en esta URL? Se comprueba la respuesta de verdad
+// (no basta con que algo conteste: el router también contesta en el puerto 80).
+function probar(base, ms, cb) {
+  var x = new XMLHttpRequest(), hecho = false;
+  function fin(ok) { if (hecho) return; hecho = true; try { x.abort(); } catch (e) {} cb(ok); }
+  try {
+    x.open("GET", base + "api/auth-status?_=" + new Date().getTime(), true);
+    x.timeout = ms;
+    x.onload = function () { var ok = false; try { var j = JSON.parse(x.responseText); ok = typeof j.has_password !== "undefined"; } catch (e) {} fin(ok); };
+    x.onerror = x.ontimeout = function () { fin(false); };
+    x.send();
+  } catch (e) { fin(false); }
 }
-function reintentar() {
-  document.getElementById("m").textContent = "Esperando al servidor " + SERVIDOR + "…";
-  setTimeout(intentar, 3000);
+
+function abrir(base) { recordar(base); msg.textContent = "Abriendo InTeks Display…"; location.replace(base); }
+
+// Direcciones de la misma red que las que conocemos: x.y.z.1 … x.y.z.254
+function candidatas(bases) {
+  var vistos = {}, lista = [];
+  for (var i = 0; i < bases.length; i++) {
+    var m = /^http:\/\/(\d+\.\d+\.\d+)\.\d+(:\d+)?\//.exec(bases[i]);
+    if (!m) continue;
+    var red = m[1] + ".", puerto = m[2] || "";
+    if (vistos[red + puerto]) continue; vistos[red + puerto] = 1;
+    for (var n = 1; n <= 254; n++) lista.push("http://" + red + n + puerto + "/");
+  }
+  return lista;
 }
-intentar();
+
+// Prueba la lista en tandas de 24 a la vez; en cuanto una responde, la abre.
+function buscar(lista, hecho) {
+  var pos = 0, vivas = 0, encontrado = false, total = lista.length;
+  function siguiente() {
+    while (!encontrado && vivas < 24 && pos < total) {
+      (function (u) {
+        pos++; vivas++;
+        probar(u, 1200, function (ok) {
+          vivas--;
+          if (encontrado) return;
+          if (ok) { encontrado = true; hecho(u); return; }
+          det.textContent = "Buscando el servidor… " + Math.min(100, Math.round(pos * 100 / total)) + " %";
+          siguiente();
+        });
+      })(lista[pos]);
+    }
+    if (!encontrado && pos >= total && vivas === 0) hecho("");
+  }
+  siguiente();
+}
+
+function arrancar() {
+  var conocidas = [], g = guardado(), s = norm(SERVIDOR);
+  if (g) conocidas.push(g);
+  if (s && s !== g) conocidas.push(s);
+  var i = 0;
+  (function probarConocida() {
+    if (i >= conocidas.length) return buscarEnRed();
+    var u = conocidas[i++];
+    msg.textContent = "Conectando con " + u + "…";
+    probar(u, 3000, function (ok) { if (ok) abrir(u); else probarConocida(); });
+  })();
+
+  function buscarEnRed() {
+    msg.textContent = "No encuentro el servidor en la dirección guardada";
+    det.textContent = "Buscándolo en la red…";
+    buscar(candidatas(conocidas), function (u) {
+      if (u) return abrir(u);
+      msg.textContent = "No encuentro el servidor InTeks Display en la red";
+      det.textContent = "Comprueba que el PC está encendido y en la misma red. Reintento en 15 s…";
+      setTimeout(arrancar, 15000);
+    });
+  }
+}
+arrancar();
 </script>
 </body>
 </html>

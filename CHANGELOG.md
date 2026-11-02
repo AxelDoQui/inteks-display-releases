@@ -8,6 +8,11 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.68 — 2026-11-02
+
+- **Vídeos en la tele LG: ya no se quedan en negro.** El reproductor vigila cada vídeo; si no arranca o se congela, prueba sin sonido, luego directo desde el servidor, y si aun así falla pasa al siguiente contenido. El panel enseña un aviso rojo en esa pantalla con el motivo.
+- **La mini-app de la LG encuentra sola el servidor.** Antes se quedaba en «Esperando al servidor…» si el router le cambiaba la IP al PC. Ahora recuerda la última dirección buena y, si no responde, la busca en toda la red. Para que la tele reciba este cambio hay que reinstalar la mini-app una vez desde el panel («Instalar en un televisor LG»).
+
 ## 1.0.67 — 2026-11-02
 
 - **Acceso remoto desde tu cuenta de InTeks.** En Ajustes hay una tarjeta nueva, «Acceso remoto»: sacas un PIN de 6 cifras en tu cuenta (eliges la dirección, por ejemplo `tienda1.inteksdisplay.com`), lo escribes en el panel de ese PC y queda enlazado. Sin comandos ni configuración a mano. Cada PC tiene su propia dirección. Hace falta tener la contraseña del administrador creada.
