@@ -3450,6 +3450,10 @@ function renderPlList(sid){
       // La estrella solo cambia algo con orden aleatorio: en orden fijo la
       // posicion ya la decide el usuario arrastrando, y marcarla no haria nada.
       // Se oculta si no aplica, salvo que el contenido ya la tenga: así se puede quitar.
+      if(item.type==="video")
+        fila.appendChild(boton(item.silencio?"btn-accent":"btn-ghost",
+          item.silencio?'<i class="fa-solid fa-volume-xmark"></i>':'<i class="fa-solid fa-volume-high"></i>',
+          item.silencio?"Este vídeo va sin sonido (pulsa para que suene)":"Este vídeo suena (pulsa para silenciarlo)",()=>toggleSilencio(sid,i)));
       if(document.getElementById("plm-shuffle").checked||item.priority)
         fila.appendChild(boton(item.priority?"btn-accent":"btn-ghost",'<i class="fa-solid fa-star"></i>',
           "Prioridad: con orden aleatorio, sale cada X pases en vez de quedar al azar",()=>togglePriority(sid,i)));
@@ -3617,6 +3621,12 @@ function addToPl(sid,item){
 }
 function rmFromPl(sid,idx){const q=content.screens[sid].playlist;const [x]=q.splice(idx,1);plAbiertos.delete(x);renderPlList(sid);}
 function updDur(sid,idx,v){if(content.screens[sid]?.playlist[idx]){content.screens[sid].playlist[idx].duration=parseFloat(v)||8;actualizarResumenPl(sid);}}
+function toggleSilencio(sid,idx){
+  const it=content.screens[sid]?.playlist[idx];
+  if(!it) return;
+  if(it.silencio) delete it.silencio; else it.silencio=true;
+  renderPlList(sid);
+}
 function togglePriority(sid,idx){
   const it=content.screens[sid]?.playlist[idx];
   if(!it) return;

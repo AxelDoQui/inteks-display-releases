@@ -6,7 +6,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const src = fs.readFileSync(path.join(__dirname, "..", "player.html"), "utf8");
-const linea = src.split("\n").find(l => l.startsWith("function sonidoVideos"));
+const linea = src.match(/^function sonidoVideos.*$/m)[0];
 
 function con(cfg) {
   const ctx = { screenConfig: cfg };
@@ -26,4 +26,13 @@ test("calla solo si la pantalla lo apaga", () => {
 test("el panel guarda y lee la casilla", () => {
   const a = fs.readFileSync(path.join(__dirname, "..", "admin.html"), "utf8");
   assert.ok(a.includes('id="plm-sonido"') && a.includes("video_sonido=document.getElementById(\"plm-sonido\")"));
+});
+
+test("un vídeo silenciado calla aunque la pantalla deje sonar", () => {
+  const ctx = { screenConfig: {} };
+  vm.createContext(ctx);
+  vm.runInContext(linea, ctx);
+  assert.strictEqual(ctx.sonidoVideos({ silencio: true }), false);
+  assert.strictEqual(ctx.sonidoVideos({}), true);
+  assert.ok(fs.readFileSync(path.join(__dirname, "..", "admin.html"), "utf8").includes("toggleSilencio"));
 });
