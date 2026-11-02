@@ -11,7 +11,7 @@ import unicodedata
 import hmac, hashlib, secrets, shutil, io, zipfile, contextlib, subprocess, re
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, unquote
-import urllib.request
+import urllib.request, urllib.error
 
 # ── Programa y datos van SEPARADOS ─────────────────────────────────────────
 # Instalado en C:\Program Files, Windows prohíbe escribir junto al ejecutable:
@@ -802,6 +802,120 @@ def lg_instalar_iniciar(ip, passphrase, servidor, vigilar):
 
     threading.Thread(target=correr, daemon=True).start()
     return True, ""
+
+# ── Acceso remoto: enlazar este PC con la cuenta de InTeks y dejarlo accesible desde
+# internet en su propia dirección (tienda1.inteksdisplay.com).
+# El usuario saca un PIN en su cuenta y lo escribe en el panel. Aquí se canjea con el
+# Worker de la cuenta, que crea el túnel y la dirección y devuelve SOLO el token de ese
+# túnel; con él se instala cloudflared como servicio de Windows. El token no se guarda
+# ni se muestra en ningún sitio: lo guarda el propio servicio.
+ACCESO_FILE = os.path.join(DATA_DIR, "acceso-remoto.json")
+CUENTA_URL = os.environ.get("SIGNALOS_CUENTA_URL", "https://cuenta.inteksdisplay.com").rstrip("/")
+_acc = {"estado": "libre", "pasos": [], "error": ""}     # libre | activando | ok | error
+_acc_lock = threading.Lock()
+
+def acceso_cloudflared():
+    """Ruta de cloudflared.exe si esta instalación lo trae, o None."""
+    ruta = os.environ.get("SIGNALOS_CLOUDFLARED")
+    if ruta:
+        return ruta if os.path.isfile(ruta) else None
+    p = os.path.join(APP_DIR, "cloudflared.exe")
+    return p if os.path.isfile(p) else None
+
+def acceso_servicio_activo():
+    if os.environ.get("SIGNALOS_CLOUDFLARED"):
+        return True                                       # en las pruebas no hay servicio real
+    try:
+        r = subprocess.run(["sc.exe", "query", "cloudflared"], capture_output=True, text=True,
+                           timeout=15, creationflags=0x08000000)
+        return "RUNNING" in r.stdout
+    except Exception:
+        return False
+
+def acceso_estado():
+    f = load_json(ACCESO_FILE)
+    f = f if isinstance(f, dict) else {}
+    with _acc_lock:
+        e = {"estado": _acc["estado"], "pasos": list(_acc["pasos"]), "error": _acc["error"]}
+    e.update(disponible=acceso_cloudflared() is not None, password=admin_has_password(),
+             activo=bool(f.get("hostname")), hostname=f.get("hostname", ""),
+             servicio=acceso_servicio_activo() if f.get("hostname") else False)
+    return e
+
+def _acceso_cf(exe, *args, timeout=120):
+    return subprocess.run([exe, *args], capture_output=True, text=True, timeout=timeout,
+                          stdin=subprocess.DEVNULL, creationflags=0x08000000)
+
+def acceso_activar(pin, puerto):
+    """Lanza la activación en segundo plano. (True, "") o (False, motivo)."""
+    if not re.fullmatch(r"\d{6}", pin or ""):
+        return False, "El PIN son 6 cifras"
+    if not admin_has_password():
+        return False, "Antes de activarlo, crea la contraseña del administrador (Seguridad y acceso): si no, el panel quedaría abierto a internet"
+    exe = acceso_cloudflared()
+    if not exe:
+        return False, "Esta instalación no trae cloudflared. Reinstala InTeks Display con la última versión."
+    if sys.platform != "win32" and not os.environ.get("SIGNALOS_CLOUDFLARED"):
+        return False, "El acceso remoto solo existe en Windows"
+    with _acc_lock:
+        if _acc["estado"] == "activando":
+            return False, "Ya hay una activación en marcha"
+        _acc.update(estado="activando", pasos=[], error="")
+
+    def paso(t):
+        with _acc_lock:
+            _acc["pasos"] = (_acc["pasos"] + [t])[-20:]
+
+    def correr():
+        token = ""
+        try:
+            paso("Comprobando el PIN con tu cuenta…")
+            req = urllib.request.Request(CUENTA_URL + "/api/enlazar",
+                data=json.dumps({"pin": pin, "puerto": puerto}).encode(),
+                headers={"Content-Type": "application/json", "User-Agent": "InTeksDisplay"}, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    d = json.load(r)
+            except urllib.error.HTTPError as e:
+                try: d = json.loads(e.read() or b"{}")
+                except ValueError: d = {}
+                raise ValueError(d.get("error") or ("La cuenta respondió " + str(e.code)))
+            token, host = str(d.get("token", "")), str(d.get("hostname", ""))
+            if not re.fullmatch(r"[A-Za-z0-9_\-=.]{20,2000}", token) or not re.fullmatch(r"[a-z0-9.\-]{3,120}", host):
+                token = ""                                # no se usa ni se imprime
+                raise ValueError("La cuenta devolvió una respuesta que no se puede usar")
+            paso("Instalando el servicio de conexión…")
+            try: _acceso_cf(exe, "service", "uninstall", timeout=60)      # por si había otro túnel
+            except Exception: pass
+            r = _acceso_cf(exe, "service", "install", token)
+            if r.returncode != 0:
+                raise ValueError("No se pudo instalar el servicio (hacen falta permisos de administrador)")
+            paso("Comprobando que arranca…")
+            for _ in range(20):
+                if acceso_servicio_activo(): break
+                time.sleep(1)
+            else:
+                raise ValueError("El servicio se instaló pero no arrancó")
+            save_json(ACCESO_FILE, {"hostname": host, "activado_en": time.time()})
+            paso("Listo: " + host)
+            with _acc_lock: _acc["estado"] = "ok"
+            log(f"  [acceso] activado en {host}")
+        except Exception as e:
+            msg = str(e).replace(token, "***") if token else str(e)
+            with _acc_lock: _acc.update(estado="error", error=msg[:300])
+            log(f"  [acceso] no se pudo activar: {msg[:200]}")
+
+    threading.Thread(target=correr, daemon=True).start()
+    return True, ""
+
+def acceso_desactivar():
+    exe = acceso_cloudflared()
+    if exe:
+        try: _acceso_cf(exe, "service", "uninstall", timeout=60)
+        except Exception: pass
+    try: os.remove(ACCESO_FILE)
+    except OSError: pass
+    with _acc_lock: _acc.update(estado="libre", pasos=[], error="")
 
 # ── Copia de seguridad ─────────────────────────────────────────────────────
 # Toda la configuración de una tienda vivía solo en el disco de ese PC. Si el
@@ -2097,6 +2211,18 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps({"error":"no autorizado","auth_required":True}).encode())
         return False
 
+    def ip_cliente(self):
+        """IP desde la que viene de verdad la petición. Las que llegan por el túnel de
+        Cloudflare salen de 127.0.0.1 (cloudflared corre aquí): sin esto, todo internet
+        compartiría el mismo contador de intentos de login y uno solo bloquearía al resto.
+        La cabecera solo se cree si la conexión es local; desde otro equipo se ignora."""
+        directa = self.client_address[0]
+        if directa in ("127.0.0.1", "::1"):
+            real = (self.headers.get("CF-Connecting-IP") or "").strip()
+            if real and len(real) <= 45 and re.fullmatch(r"[0-9a-fA-F:.]+", real):
+                return real
+        return directa
+
     def _set_session_cookie(self, token, max_age=SESSION_TTL):
         self.send_header("Set-Cookie",
             f"{SESSION_COOKIE}={token}; HttpOnly; Path=/; SameSite=Lax; Max-Age={max_age}")
@@ -2227,6 +2353,14 @@ class Handler(BaseHTTPRequestHandler):
             d = lg_instalar_estado()
             d.update(disponible=lg_script_instalar() is not None, servidor_sugerido=sugerido)
             body = json.dumps(d).encode()
+            self.send_response(200); self.send_header("Content-Type","application/json")
+            self.send_header("Cache-Control","no-store")
+            self.cors(); self.end_headers(); self.wfile.write(body); return
+
+        # ── API: estado del acceso remoto (lo pide la tarjeta del panel)
+        if path == "/api/acceso-remoto":
+            if not self.require_auth(): return
+            body = json.dumps(acceso_estado()).encode()
             self.send_response(200); self.send_header("Content-Type","application/json")
             self.send_header("Cache-Control","no-store")
             self.cors(); self.end_headers(); self.wfile.write(body); return
@@ -2599,7 +2733,7 @@ class Handler(BaseHTTPRequestHandler):
                 d = json.loads(body or "{}")
                 if not admin_has_password():
                     jresp(409, {"ok": False, "error": "no_password", "setup_required": True}); return
-                ip = self.client_address[0]
+                ip = self.ip_cliente()
                 espera = login_bloqueado(ip)
                 if espera:
                     self.send_response(429); self.send_header("Content-Type","application/json")
@@ -3310,6 +3444,24 @@ class Handler(BaseHTTPRequestHandler):
                                                   str(d.get("servidor", "")).strip(), d.get("vigilar") is True)
                 if not ok_:
                     jresp(409 if "en marcha" in motivo else 400, {"ok": False, "error": motivo}); return
+                ok()
+            except Exception as e: err(e)
+            return
+
+        # ── Acceso remoto: canjear el PIN de la cuenta e instalar la conexión
+        if path == "/api/acceso-remoto/activar":
+            try:
+                d = json.loads(body or "{}")
+                if not isinstance(d, dict): d = {}
+                ok_, motivo = acceso_activar(str(d.get("pin", "")).strip(), PORT)
+                if not ok_:
+                    jresp(409 if "en marcha" in motivo else 400, {"ok": False, "error": motivo}); return
+                ok()
+            except Exception as e: err(e)
+            return
+        if path == "/api/acceso-remoto/desactivar":
+            try:
+                acceso_desactivar()
                 ok()
             except Exception as e: err(e)
             return

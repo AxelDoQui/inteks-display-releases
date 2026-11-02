@@ -57,3 +57,6 @@ Entregables/
 lg-tools/
 lg_tvs.json
 lg_tvs.json.bak
+
+# Acceso remoto: dirección enlazada de este PC
+acceso-remoto.json
