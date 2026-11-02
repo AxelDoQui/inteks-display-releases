@@ -1,10 +1,11 @@
 name = "inteks-cuenta"
 main = "src/index.js"
+routes = [{ pattern = "cuenta.inteksdisplay.com", custom_domain = true }]
 compatibility_date = "2026-10-01"
 
 [[kv_namespaces]]
 binding = "PCS"
-id = "PON_AQUI_EL_ID_DE_KV"
+id = "c77817c9b45946c3b1017cc6b3591d6f"
 
 [vars]
 DOMINIO = "inteksdisplay.com"
