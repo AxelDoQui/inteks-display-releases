@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.70 — 2026-11-02
+
+- **Silenciar un vídeo concreto.** En la playlist, cada vídeo tiene un botón de altavoz: pulsado, ese vídeo va sin sonido aunque la pantalla deje sonar los demás.
+
 ## 1.0.69 — 2026-11-02
 
 - **Los vídeos suenan.** Antes se reproducían siempre en silencio. Ahora suenan, y en la playlist de cada pantalla hay una casilla «Sonido en los vídeos» (activada por defecto) para apagarlo donde moleste. Si la tele no deja arrancar con sonido, el vídeo sigue mudo en vez de pararse.
