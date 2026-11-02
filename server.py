@@ -832,6 +832,17 @@ def acceso_servicio_activo():
     except Exception:
         return False
 
+def acceso_servicio_existe():
+    """True si Windows aún tiene registrado el servicio cloudflared (en marcha, parándose o no)."""
+    if os.environ.get("SIGNALOS_CLOUDFLARED"):
+        return False                                      # en las pruebas no hay servicio real
+    try:
+        r = subprocess.run(["sc.exe", "query", "cloudflared"], capture_output=True, text=True,
+                           timeout=15, creationflags=0x08000000)
+        return r.returncode != 1060
+    except Exception:
+        return False
+
 def acceso_estado():
     f = load_json(ACCESO_FILE)
     f = f if isinstance(f, dict) else {}
@@ -887,6 +898,11 @@ def acceso_activar(pin, puerto):
             paso("Instalando el servicio de conexión…")
             try: _acceso_cf(exe, "service", "uninstall", timeout=60)      # por si había otro túnel
             except Exception: pass
+            # cloudflared tarda en detenerse (espera a cerrar conexiones): hasta que Windows
+            # no lo da por borrado, instalar el nuevo falla.
+            for _ in range(60):
+                if not acceso_servicio_existe(): break
+                time.sleep(1)
             r = _acceso_cf(exe, "service", "install", token)
             if r.returncode != 0:
                 raise ValueError("No se pudo instalar el servicio (hacen falta permisos de administrador)")
