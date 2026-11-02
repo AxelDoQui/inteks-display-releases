@@ -1038,7 +1038,7 @@ function rebuildSlides(){
       // El src NO se pone aquí: lo pone materializarVentana() cuando esta
       // diapositiva se acerca. Con preload="auto" en todas, cincuenta vídeos
       // se ponían a bufferear a la vez y la caja se quedaba sin memoria.
-      v.dataset.medio=item.src;v.muted=true;v.playsInline=true;v.preload="none";
+      v.dataset.medio=item.src;v.muted=!sonidoVideos();v.playsInline=true;v.preload="none";
       slide.appendChild(v);
     } else if(item.type==="url"){
       const fr=document.createElement("iframe");
@@ -1158,6 +1158,8 @@ function reportarVideo(cuerpo){
       body:JSON.stringify(cuerpo)}).catch(()=>{});
   }catch(e){}
 }
+// Los vídeos suenan salvo que la pantalla lo apague en su playlist («Sonido en los vídeos»).
+function sonidoVideos(){ return !(screenConfig&&screenConfig.video_sonido===false); }
 var vigilanteVideo=null;
 function vigilarVideo(v,item,alTerminar){
   if(vigilanteVideo){ vigilanteVideo(); vigilanteVideo=null; }
@@ -1250,7 +1252,8 @@ function showSlide(idx){
   clearTimeout(timer);
   if(isVideo){
     const v=slide.querySelector("video");
-    v.currentTime=0; v.play().catch(()=>{ v.muted=true; v.play().catch(()=>{}); });
+    v.muted=!sonidoVideos();
+    v.currentTime=0; v.play().catch(()=>{ v.muted=true; v.play().catch(()=>{}); });   // sin permiso para sonar: sigue mudo
     // El vídeo MANDA: avanzamos cuando TERMINA, no por un tiempo fijo. Y si no arranca o
     // se atasca (pantalla negra en algunos TV), el vigilante prueba por red y, si tampoco,
     // salta al siguiente y lo cuenta al servidor para que el panel lo enseñe.

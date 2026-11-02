@@ -1504,6 +1504,10 @@ JPY  Yen        162.5"></textarea>
         <input type="checkbox" id="plm-shuffle" style="cursor:pointer;width:16px;height:16px" onchange="cambioShuffle()">
         Orden aleatorio
       </label>
+      <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;margin-left:6px" title="Si está activo, los vídeos suenan en esta pantalla">
+        <input type="checkbox" id="plm-sonido" style="cursor:pointer;width:16px;height:16px">
+        Sonido en los vídeos
+      </label>
       <!-- La prioridad ⭐ es de las cosas que más se usan: va a la vista, no en «Más ajustes». -->
       <span id="plm-priority-wrap" style="display:none;align-items:center;gap:6px;font-size:12px">
         <span style="color:var(--muted)">prioridad ⭐ cada</span>
@@ -3288,6 +3292,7 @@ function openPlModal(sid){
   document.getElementById("plm-trans-ms").value=
     (cfg.transition_ms===undefined||cfg.transition_ms===null)?1000:cfg.transition_ms;
   document.getElementById("plm-shuffle").checked=!!cfg.shuffle;
+  document.getElementById("plm-sonido").checked=cfg.video_sonido!==false;   // por defecto suena
   document.getElementById("plm-priority-every").value=cfg.priority_every||4;
   document.getElementById("plm-safe-margin").value=cfg.safe_margin||0;
   cambioTransicion();
@@ -3627,6 +3632,7 @@ async function savePlModal(){
     content.screens[editingScreen].transition=t;
     content.screens[editingScreen].transition_ms=
       isNaN(ms)?1000:Math.max(0,Math.min(2000,ms));
+    content.screens[editingScreen].video_sonido=document.getElementById("plm-sonido").checked;
     content.screens[editingScreen].shuffle=
       document.getElementById("plm-shuffle").checked;
     const cada=parseInt(document.getElementById("plm-priority-every").value,10);
