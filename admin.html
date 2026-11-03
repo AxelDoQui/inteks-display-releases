@@ -1118,6 +1118,12 @@ JPY  Yen        162.5"></textarea>
     <div id="lg-lista"></div>
   </div>
 
+  <div class="card">
+    <div class="card-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Asistente de configuración</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Los primeros pasos de una instalación nueva: nombre de la tienda, acceso remoto y pantallas.</p>
+    <button class="btn btn-ghost" onclick="asistenteAbrir()"><i class="fa-solid fa-wand-magic-sparkles"></i> Abrir el asistente</button>
+  </div>
+
   <div class="card" id="card-acceso">
     <div class="card-title"><i class="fa-solid fa-globe"></i> Acceso remoto</div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Abre este panel desde cualquier sitio, en una dirección propia (por ejemplo tienda1.inteksdisplay.com). En tu cuenta de InTeks añade este PC y copia el PIN de 6 cifras que te da; escríbelo aquí.</p>
@@ -1433,8 +1439,19 @@ JPY  Yen        162.5"></textarea>
       <ol style="font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 12px 18px;padding:0">
         <li>En el televisor, instala <strong>«Developer Mode»</strong> (LG Content Store) e inicia sesión con tu cuenta gratuita de desarrollador de LG.</li>
         <li>Dentro de esa app activa <strong>«Dev Mode Status»</strong> y <strong>«Key Server»</strong>. Ahí salen la <strong>IP</strong> y la <strong>Passphrase</strong> que se piden abajo.</li>
-        <li>El televisor y este PC tienen que estar en la misma red.</li>
+        <li>El televisor y este PC tienen que estar en la misma red. Conviene reservar una <strong>IP fija</strong> para este PC en el router, o la tele pierde el servidor si cambia.</li>
       </ol>
+      <details style="font-size:12px;color:var(--muted);margin:0 0 12px;line-height:1.6">
+        <summary style="cursor:pointer;color:var(--text)">Ajustes de la tele para que no se ponga en reposo</summary>
+        <ul style="margin:6px 0 0 18px;padding:0">
+          <li><strong>Salvapantallas / Modo ambiente</strong> (Ajustes → General → Sistema): ponlo en <strong>Apagado</strong>. Es lo que muestra paisajes cuando la app se cierra.</li>
+          <li><strong>Ahorro de energía</strong> (Ajustes → General): <strong>Apagado</strong>, y desactiva el apagado automático.</li>
+          <li><strong>Aplicación al encender</strong> o inicio automático: elige InTeks Display, si tu modelo lo permite.</li>
+          <li>Si la tele se enciende sola tras un corte de luz, mejor: actívalo si aparece.</li>
+          <li>Los nombres cambian según el modelo. Mantén marcada la casilla de abajo para que este PC reabra la app si se cierra.</li>
+          <li>El «Key Server» de Developer Mode se apaga solo al rato: vuelve a encenderlo antes de instalar.</li>
+        </ul>
+      </details>
       <label style="font-size:11px;color:var(--muted)">IP del televisor</label>
       <input class="finput" id="lg-ip" placeholder="192.168.0.108" autocomplete="off" style="margin-bottom:10px">
       <label style="font-size:11px;color:var(--muted)">Passphrase</label>
@@ -1442,7 +1459,7 @@ JPY  Yen        162.5"></textarea>
       <label style="font-size:11px;color:var(--muted)">Dirección de este servidor (la que verá el televisor)</label>
       <input class="finput" id="lg-srv" autocomplete="off" style="margin-bottom:10px">
       <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--muted);margin-bottom:14px;cursor:pointer">
-        <input type="checkbox" id="lg-vig" style="margin-top:2px;cursor:pointer">
+        <input type="checkbox" id="lg-vig" checked style="margin-top:2px;cursor:pointer">
         <span>Mantenerla abierta: este PC la abre sola si se cierra o tras un corte de luz (solo para un televisor dedicado a la cartelería)</span>
       </label>
       <div style="display:flex;gap:8px;justify-content:flex-end">
@@ -1456,6 +1473,70 @@ JPY  Yen        162.5"></textarea>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button class="btn btn-ghost" id="lg-otra" style="display:none" onclick="volverFormLg()">Volver</button>
         <button class="btn btn-accent" id="lg-fin" style="display:none" onclick="cerrarInstalarLg()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── VER AHORA: lo que una pantalla está mostrando -->
+<div class="modal-bd" id="ahora-modal">
+  <div class="modal" style="width:760px;max-width:96vw">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <h3 id="ahora-titulo">AHORA EN PANTALLA</h3>
+      <button class="btn btn-ghost btn-sm" onclick="cerrarAhora()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="ahora-caja" style="position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:var(--r);overflow:hidden;border:1px solid var(--b)">
+      <iframe id="ahora-frame" style="width:100%;height:100%;border:0" allow="autoplay"></iframe>
+    </div>
+    <div id="ahora-txt" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px">Es el mismo contenido que muestra la pantalla, no una captura de la tele. Se actualiza solo cuando cambia.</div>
+  </div>
+</div>
+
+<!-- ── ASISTENTE DE PRIMER ARRANQUE -->
+<div class="modal-bd" id="asist-modal">
+  <div class="modal" style="width:480px;max-width:94vw">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <h3>CONFIGURAR ESTA INSTALACIÓN</h3>
+      <button class="btn btn-ghost btn-sm" onclick="asistenteCerrar()" title="Cerrar (puedes volver a abrirlo desde Ajustes)"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="asist-pasos" style="font-size:11px;color:var(--muted);margin-bottom:12px"></div>
+    <div id="asist-1">
+      <p style="font-size:13px;margin:0 0 10px">Ponle un nombre a esta tienda. Sale en los avisos de Telegram para saber de cuál vienen.</p>
+      <input class="finput" id="asist-nombre" placeholder="Tienda 2" autocomplete="off" style="margin-bottom:14px">
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-accent" onclick="asistenteNombre()">Siguiente <i class="fa-solid fa-arrow-right"></i></button>
+      </div>
+    </div>
+    <div id="asist-2" style="display:none">
+      <p style="font-size:13px;margin:0 0 6px">¿Quieres abrir este panel desde fuera de la tienda?</p>
+      <ol style="font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 10px 18px;padding:0">
+        <li>Entra en <strong>cuenta.inteksdisplay.com</strong>, elige la dirección de esta tienda y saca el <strong>PIN de 6 cifras</strong>.</li>
+        <li>Escríbelo aquí. El PIN dura 10 minutos y sirve una sola vez.</li>
+      </ol>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+        <input class="finput" id="asist-pin" maxlength="6" inputmode="numeric" autocomplete="off" placeholder="PIN de 6 cifras" style="width:160px">
+        <button class="btn btn-accent" id="asist-pin-go" onclick="asistentePin()"><i class="fa-solid fa-link"></i> Enlazar</button>
+      </div>
+      <div id="asist-acc" style="font-size:12px;color:var(--muted);min-height:18px;margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px;justify-content:space-between">
+        <button class="btn btn-ghost" onclick="asistenteIr(1)"><i class="fa-solid fa-arrow-left"></i> Atrás</button>
+        <button class="btn btn-ghost" id="asist-sig2" onclick="asistenteIr(3)">Saltar este paso <i class="fa-solid fa-arrow-right"></i></button>
+      </div>
+    </div>
+    <div id="asist-3" style="display:none">
+      <p style="font-size:13px;margin:0 0 8px">Ya solo faltan las pantallas.</p>
+      <ul style="font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 12px 18px;padding:0">
+        <li><strong>Un mini PC o un navegador:</strong> abre la dirección de este panel en esa pantalla y emparéjala con el PIN que sale aquí.</li>
+        <li><strong>Un televisor LG:</strong> instala la mini-app desde el botón de abajo.</li>
+        <li>Reserva una IP fija para este PC en tu router.</li>
+      </ul>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between">
+        <button class="btn btn-ghost" onclick="asistenteIr(2)"><i class="fa-solid fa-arrow-left"></i> Atrás</button>
+        <span style="display:flex;gap:8px">
+          <button class="btn btn-ghost" onclick="asistenteCerrar();abrirInstalarLg()"><i class="fa-solid fa-tv"></i> Televisor LG</button>
+          <button class="btn btn-accent" onclick="asistenteCerrar()"><i class="fa-solid fa-check"></i> Terminar</button>
+        </span>
       </div>
     </div>
   </div>
@@ -1835,6 +1916,7 @@ function renderScreens(){
             ? ' · <span style="color:#f0a050">todo caducado, se sigue mostrando</span>' : ''}</div>
         <div class="sc-actions">
           <button class="btn btn-ghost btn-sm" onclick="openPlModal('${sid}')"><i class="fa-solid fa-list"></i> Playlist</button>
+          <button class="btn btn-ghost btn-sm" onclick="verAhora('${sid}')" title="Ver en grande lo que esta pantalla está mostrando ahora"><i class="fa-solid fa-eye"></i> Ver ahora</button>
           <button class="btn btn-a2 btn-sm" onclick="openScheduleModal('${sid}')"><i class="fa-regular fa-clock"></i> Horario</button>
           ${rotBtn}
           ${isWall?`<button class="btn btn-sm btn-danger" onclick="unlinkWall('${sid}')"><i class="fa-solid fa-link-slash"></i> Wall</button>`:''}
@@ -5860,6 +5942,126 @@ setInterval(async()=>{
   document.querySelectorAll(".sc-now-box").forEach(b=>{b.innerHTML=textoAhora(regScreens[b.dataset.sid]);});
 },8000);
 setInterval(loadPairPending,3000);
+// ── «Ver ahora»: el contenido que la pantalla dice estar mostrando, en grande.
+// Usa el reproductor en modo previa (el de las divisas), sin registrarse como pantalla.
+let _ahoraSid=null, _ahoraTimer=null, _ahoraListo=false, _ahoraId=null;
+function _ahoraItem(sid,reg){
+  const n=reg&&reg.now; if(!n||!n.id) return null;
+  const cfg=(content.screens||{})[sid]||{};
+  const it=(cfg.playlist||[]).find(i=>i&&i.id===n.id)||(content.items||[]).find(i=>i.id===n.id);
+  if(it) return {...it,duration:9999};
+  if(n.img) return {type:"image",src:n.img,duration:9999};
+  return null;
+}
+function _ahoraPintar(){
+  const sid=_ahoraSid; if(!sid||!_ahoraListo) return;
+  const reg=regScreens[sid]||{}, cfg=(content.screens||{})[sid]||{};
+  const n=reg.now, txt=document.getElementById("ahora-txt");
+  const it=_ahoraItem(sid,reg);
+  const vivo=reg.connected&&n&&n.name&&(Date.now()/1000-(n.at||0))<300;
+  if(!vivo||!it){ txt.textContent=reg.connected?"La pantalla no ha dicho qué muestra todavía.":"La pantalla está desconectada."; _ahoraId=null; return; }
+  txt.textContent="Mostrando: "+n.name;
+  if(_ahoraId===n.id) return;
+  _ahoraId=n.id;
+  const rot=cfg.rotation!==undefined?cfg.rotation:(cfg.vertical?90:0);
+  document.getElementById("ahora-frame").contentWindow.postMessage({type:"preview-item",item:it,rotation:rot},"*");
+}
+async function _ahoraRefrescar(){
+  try{ const r=await fetch("/api/screens",{cache:"no-store"}); if(r.ok){ const d=await r.json();
+    (Array.isArray(d)?d:Object.values(d)).forEach(p=>{ if(p&&p.id) regScreens[p.id]=Object.assign(regScreens[p.id]||{},p); }); } }catch(e){}
+  _ahoraPintar();
+}
+function verAhora(sid){
+  _ahoraSid=sid; _ahoraListo=false; _ahoraId=null;
+  const cfg=(content.screens||{})[sid]||{};
+  document.getElementById("ahora-titulo").textContent="AHORA EN "+String(cfg.label||sid).toUpperCase();
+  document.getElementById("ahora-txt").textContent="Cargando…";
+  const caja=document.getElementById("ahora-caja");
+  const rot=cfg.rotation!==undefined?cfg.rotation:(cfg.vertical?90:0);
+  caja.style.aspectRatio=(rot===90||rot===270)?"9/16":"16/9";
+  caja.style.maxHeight="70vh"; caja.style.margin="0 auto";
+  caja.style.width=(rot===90||rot===270)?"min(100%,39vh)":"100%";
+  document.getElementById("ahora-frame").src="/player.html?preview=1";
+  document.getElementById("ahora-modal").classList.add("show");
+  clearInterval(_ahoraTimer); _ahoraTimer=setInterval(_ahoraRefrescar,4000);
+}
+function cerrarAhora(){
+  clearInterval(_ahoraTimer); _ahoraTimer=null; _ahoraSid=null; _ahoraListo=false;
+  document.getElementById("ahora-frame").src="about:blank";
+  document.getElementById("ahora-modal").classList.remove("show");
+}
+window.addEventListener("message",(e)=>{
+  const f=document.getElementById("ahora-frame");
+  if(f&&e.source===f.contentWindow&&(e.data||{}).type==="preview-ready"){ _ahoraListo=true; _ahoraPintar(); }
+});
+// ── Asistente de primer arranque: nombre de la tienda → acceso remoto (PIN) → pantallas.
+// Se abre solo tras crear la contraseña (login.html manda a ?asistente=1) y desde Ajustes.
+// Nunca sale solo en una instalación que ya existe.
+let _asPaso=1, _asTimer=null;
+function asistenteIr(n){
+  _asPaso=n;
+  [1,2,3].forEach(i=>{ document.getElementById("asist-"+i).style.display=i===n?"":"none"; });
+  document.getElementById("asist-pasos").textContent="Paso "+n+" de 3";
+  if(n===2) asistenteEstadoAcceso();
+}
+async function asistenteAbrir(){
+  document.getElementById("asist-modal").classList.add("show");
+  try{ const r=await fetch("/api/config"); if(r.ok){ const c=await r.json();
+    document.getElementById("asist-nombre").value=(c.installation_name&&c.installation_name!=="InTeks Display")?c.installation_name:""; } }catch(e){}
+  asistenteIr(1);
+}
+function asistenteCerrar(){
+  clearInterval(_asTimer); _asTimer=null;
+  document.getElementById("asist-modal").classList.remove("show");
+}
+async function asistenteNombre(){
+  const n=document.getElementById("asist-nombre").value.trim();
+  if(n){
+    try{
+      const r=await fetch("/api/config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({installation_name:n})});
+      if(!r.ok){ toast("No se pudo guardar el nombre",true); return; }
+      const campo=document.getElementById("set-name"); if(campo) campo.value=n;
+    }catch(e){ toast("No se pudo contactar con el servidor",true); return; }
+  }
+  asistenteIr(2);
+}
+async function asistenteEstadoAcceso(){
+  const out=document.getElementById("asist-acc"), go=document.getElementById("asist-pin-go"), pin=document.getElementById("asist-pin");
+  let d=null;
+  try{ const r=await fetch("/api/acceso-remoto",{cache:"no-store"}); if(r.ok) d=await r.json(); }catch(e){}
+  if(!d){ out.textContent="Sin conexión con el servidor."; return; }
+  const ocupado=d.estado==="activando";
+  go.disabled=ocupado||!d.password||!d.disponible; pin.disabled=go.disabled;
+  if(d.activo){
+    out.textContent="✓ Listo: este panel se abre desde https://"+d.hostname;
+    out.style.color="var(--ok,#3ecf8e)";
+    document.getElementById("asist-sig2").innerHTML='Siguiente <i class="fa-solid fa-arrow-right"></i>';
+    clearInterval(_asTimer); _asTimer=null; accesoCargar(); return;
+  }
+  out.style.color="var(--muted)";
+  if(!d.disponible) out.textContent="Esta instalación no trae el componente de conexión. Reinstala con la última versión.";
+  else if(!d.password) out.textContent="Antes hay que crear la contraseña del administrador.";
+  else if(ocupado) out.textContent=(d.pasos||[]).join(" · ")||"Enlazando…";
+  else if(d.estado==="error"){ out.textContent="No se pudo: "+d.error; out.style.color="var(--danger)"; }
+  else out.textContent="";
+  if(ocupado&&!_asTimer) _asTimer=setInterval(asistenteEstadoAcceso,1500);
+  if(!ocupado&&_asTimer){ clearInterval(_asTimer); _asTimer=null; }
+}
+async function asistentePin(){
+  const pin=document.getElementById("asist-pin").value.trim();
+  if(!/^\d{6}$/.test(pin)){ toast("El PIN son 6 cifras",true); return; }
+  try{
+    const r=await fetch("/api/acceso-remoto/activar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pin})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){ toast(d.error||"No se pudo empezar",true); return; }
+    document.getElementById("asist-pin").value="";
+  }catch(x){ toast("No se pudo contactar con el servidor",true); return; }
+  asistenteEstadoAcceso();
+}
+if(new URLSearchParams(location.search).has("asistente")){
+  history.replaceState(null,"",location.pathname);
+  window.addEventListener("load",()=>setTimeout(asistenteAbrir,400));
+}
 </script>
 <div id="lib-ficha" class="lib-ficha" style="display:none"></div>
 </body>

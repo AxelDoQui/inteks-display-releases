@@ -197,7 +197,7 @@ Filename: "powershell.exe"; \
   StatusMsg: "Descargando las herramientas para televisores LG..."; \
   Flags: runhidden waituntilterminated; Tasks: lg
 
-Filename: "{app}\InTeksDisplay.exe"; Description: "Abrir el panel de administracion"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\InTeksDisplay.exe"; Description: "Abrir el panel para terminar de configurar (crear la contrasena y, con el PIN de cuenta.inteksdisplay.com, el acceso remoto)"; Flags: nowait postinstall skipifsilent
 ; Tras una actualizacion silenciosa (la del boton «Actualizar ahora»), vuelve a abrir
 ; las ventanas que se cerraron para poder sustituir el .exe, en la sesion del usuario.
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\reabrir-ventanas.ps1"" -AppDir ""{app}"""; \

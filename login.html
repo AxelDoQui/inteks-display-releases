@@ -123,7 +123,7 @@ document.getElementById("form").addEventListener("submit", async (e) => {
     const d = await r.json();
     if(r.ok && d.ok){
       showStatus("✓ Acceso concedido. Entrando...", "success");
-      setTimeout(() => location.href = "/admin.html", 600);
+      setTimeout(() => location.href = SETUP ? "/admin.html?asistente=1" : "/admin.html", 600);
     }else if(d.setup_required){
       // el servidor dice que hay que crear contraseña: cambiar a modo setup
       location.href = "/login.html?setup=1";
