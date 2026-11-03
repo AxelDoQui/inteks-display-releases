@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.78 — 2026-11-03
+
+- **Arreglo del panel.** En la 1.0.77 la pestaña Pantallas se quedaba vacía por un error al dibujar las tarjetas. Ya se ven, con una sola tarjeta por videowall.
+
 ## 1.0.77 — 2026-11-03
 
 - **Videowall: un solo menú.** Un muro sale como una sola tarjeta en Pantallas, con Playlist, Ver ahora, Horario y Girar para todo el muro.
