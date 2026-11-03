@@ -1773,6 +1773,32 @@ async function refreshLiveWeather(){
 }
 setInterval(refreshLiveWeather, 15*60*1000);
 setTimeout(refreshLiveWeather, 3000);
+// LG webOS: algunos televisores apagan la pantalla solos ("Para volver a encender la pantalla,
+// pulse cualquier botón") aunque no haya ahorro de energía. Cada 30 s se le pide al servicio de
+// energía del propio televisor que la encienda: si ya lo está no hace nada. Solo existe en LG.
+// Durante los primeros 20 s se ve en una esquina qué contestó, para saber si lo acepta.
+var lgPantalla={ok:0,mal:0,ultimo:"sin probar"};
+function lgEncenderPantalla(){
+  if(typeof PalmServiceBridge==="undefined") { lgPantalla.ultimo="no es un LG con servicio"; return; }
+  try{
+    var b=new PalmServiceBridge();
+    b.onservicecallback=function(r){
+      var j={}; try{ j=JSON.parse(r); }catch(e){}
+      if(j.returnValue===false){ lgPantalla.mal++; lgPantalla.ultimo="rechazado: "+(j.errorText||r); }
+      else { lgPantalla.ok++; lgPantalla.ultimo="aceptado"; }
+    };
+    b.call("luna://com.webos.service.tvpower/power/turnOnScreen","{}");
+  }catch(e){ lgPantalla.mal++; lgPantalla.ultimo="error: "+e; }
+}
+if(typeof PalmServiceBridge!=="undefined" && !PREVIEW){
+  setInterval(lgEncenderPantalla, 30*1000); setTimeout(lgEncenderPantalla, 2000);
+  setTimeout(function(){
+    var d=document.createElement("div");
+    d.style.cssText="position:fixed;left:6px;bottom:6px;z-index:99999;background:#000;color:#0f0;font:14px monospace;padding:4px 8px;opacity:.9";
+    d.textContent="LG pantalla: "+lgPantalla.ultimo; document.body.appendChild(d);
+    setTimeout(function(){ d.remove(); },20000);
+  },8000);
+}
 setInterval(updateScreenStatus, 60*1000);
 setTimeout(updateScreenStatus, 500);
 </script>

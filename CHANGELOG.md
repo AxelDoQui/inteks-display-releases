@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.83 — 2026-11-03
+
+- **Prueba para televisores LG que apagan la pantalla solos:** el reproductor le pide al televisor cada 30 s que encienda la pantalla y, durante 20 s tras abrirse, enseña abajo a la izquierda si lo ha aceptado. Solo actúa en LG.
+
 ## 1.0.82 — 2026-11-03
 
 - **Ver ahora de un videowall:** cada marco enseña lo que le toca a su pantalla (por ejemplo, las dos imágenes de una pareja), en vez de repetir la primera en los dos.
