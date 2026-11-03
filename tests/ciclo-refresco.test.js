@@ -51,6 +51,7 @@ function cargar(nItems) {
     screenConfig: { shuffle: false },
     timer: null,                    // next() lo limpia antes de avanzar
     clearTimeout: () => {},
+    wallSigue: () => false,         // sin videowall, next() avanza como siempre
     showSlide: (i) => mostrados.push(i),
     mostrados,
   };

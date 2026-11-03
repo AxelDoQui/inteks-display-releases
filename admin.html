@@ -3373,7 +3373,7 @@ function openPlModal(sid){
   renderPlPackages();
   const cfg=(content.screens||{})[sid]||{};
   document.getElementById("plm-title").textContent=`PLAYLIST — ${(cfg.label||sid).toUpperCase()}`;
-  document.getElementById("plm-sub").textContent=cfg.mode==="wall"?`Modo videowall (${cfg.wall_pos||''}).`:"Modo independiente.";
+  document.getElementById("plm-sub").textContent=cfg.mode==="wall"?(cfg.wall_pos==="right"?`Videowall (derecha): enseña la playlist de «${cfg.partner||''}», sincronizada con ella. Edita aquella.`:`Videowall (izquierda): manda; «${cfg.partner||''}» la sigue.`):"Modo independiente.";
   // Un solo tipo de transicion por pantalla, para todos sus pases.
   document.getElementById("plm-trans").value=cfg.transition||"fade";
   document.getElementById("plm-trans-ms").value=

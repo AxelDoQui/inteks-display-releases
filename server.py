@@ -949,9 +949,13 @@ MAX_BODY_BYTES = 512 * 1024 * 1024      # el cuerpo POST se carga entero en RAM
 # leer el cuerpo). Sus cuerpos son JSON de unas pocas líneas.
 POST_PUBLICOS = {"/api/login", "/api/set-password", "/api/logout",
                  "/api/pair-request", "/api/pair-status", "/api/pair",
-                 "/api/screen-now"}
+                 "/api/screen-now", "/api/wall-sync"}
 # Lo que cada pantalla está mostrando ahora (solo memoria, se pierde al reiniciar).
 ahora_pantalla = {}
+# Videowall: lo que muestra la pantalla que manda (la izquierda), para que la otra la siga.
+# {pantalla_que_manda: {id, t, video, at}} con «at» en el reloj del servidor, que es el
+# único reloj que comparten las dos pantallas. Solo memoria: se rehace cada segundo.
+wall_estado = {}
 # Vídeos que una pantalla no consigue reproducir: {pantalla: {id, name, motivo, at}}.
 fallos_video = {}
 MAX_BODY_PUBLICO = 64 * 1024
@@ -2425,6 +2429,19 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(200); self.send_header("Content-Type","application/json")
             self.cors(); self.end_headers(); self.wfile.write(body); return
 
+        # ── Videowall: estado de la pantalla que manda, para la que la sigue. Público
+        #    como /api/playlist; solo da qué contenido y qué segundo, nada más.
+        if path == "/api/wall-sync":
+            sid = qs.get("screen", [""])[0]
+            scr = load_json(CONTENT_FILE).get("screens", {}).get(sid, {})
+            est = None
+            if scr.get("mode") == "wall" and scr.get("wall_pos") == "right":
+                est = wall_estado.get(str(scr.get("partner", "")))
+            body = json.dumps({"ok": True, "estado": est, "ahora": time.time()}).encode()
+            self.send_response(200); self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.cors(); self.end_headers(); self.wfile.write(body); return
+
         # ── API: obtener playlist de una pantalla
         if path == "/api/playlist":
             sid = qs.get("screen",["default"])[0]
@@ -2438,8 +2455,15 @@ class Handler(BaseHTTPRequestHandler):
             # Primero se expanden los paquetes y DESPUÉS se filtra por fechas:
             # así una promo caducada que vive dentro de un paquete también
             # desaparece. Al revés, el paquete entraría entero sin mirar.
+            origen = scr.get("playlist", [])
+            if mode == "wall" and scr.get("wall_pos") == "right":
+                # Videowall: la derecha enseña lo mismo que la izquierda, sincronizada con
+                # ella; su propia playlist no se usa (y así nunca se desfasan los contenidos).
+                maestra = screens_cfg.get(str(scr.get("partner", "")), {})
+                if maestra.get("mode") == "wall" and maestra.get("playlist"):
+                    origen = maestra.get("playlist", [])
             resuelta = filtrar_vigentes(
-                expandir_paquetes(scr.get("playlist", []), content),
+                expandir_paquetes(origen, content),
                 time.strftime("%Y-%m-%d"))
             if mode == "wall":
                 partner = scr.get("partner","")
@@ -2825,6 +2849,20 @@ class Handler(BaseHTTPRequestHandler):
         #    screens.json en cada cambio de diapositiva gastaría el disco por un
         #    dato que no vale la pena conservar. Solo vale para pantallas ya
         #    registradas, para que nadie llene la memoria con nombres inventados.
+        if path == "/api/wall-sync":
+            try:
+                d = json.loads(body or "{}")
+                sid = str(d.get("screen", "") or "") if isinstance(d, dict) else ""
+                scr = load_json(CONTENT_FILE).get("screens", {}).get(sid, {})
+                if scr.get("mode") != "wall" or scr.get("wall_pos") != "left":
+                    jresp(200, {"ok": False}); return        # solo manda la izquierda
+                try: t = max(0.0, min(float(d.get("t", 0) or 0), 86400.0))
+                except Exception: t = 0.0
+                wall_estado[sid] = {"id": str(d.get("id", "") or "")[:200], "t": t,
+                                    "video": d.get("video") is True, "at": time.time()}
+                jresp(200, {"ok": True}); return
+            except Exception as e: err(e); return
+
         if path == "/api/screen-now":
             try:
                 d = json.loads(body or "{}")

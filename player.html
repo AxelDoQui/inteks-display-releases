@@ -1159,7 +1159,8 @@ function reportarVideo(cuerpo){
   }catch(e){}
 }
 // Los vídeos suenan salvo que la pantalla lo apague («Sonido en los vídeos») o ese vídeo esté silenciado.
-function sonidoVideos(item){ return !(screenConfig&&screenConfig.video_sonido===false) && !(item&&item.silencio); }
+// En un videowall solo suena la pantalla que manda: dos altavoces casi a la vez hacen eco.
+function sonidoVideos(item){ return !(screenConfig&&screenConfig.video_sonido===false) && !(item&&item.silencio) && wallRol()!=="sigue"; }
 var vigilanteVideo=null;
 function vigilarVideo(v,item,alTerminar){
   if(vigilanteVideo){ vigilanteVideo(); vigilanteVideo=null; }
@@ -1200,6 +1201,59 @@ function vigilarVideo(v,item,alTerminar){
   },1000);
   vigilanteVideo=limpiar;
 }
+
+// ── Videowall: la pantalla izquierda MANDA y la derecha la SIGUE.
+// Cada una iba por su cuenta y se desfasaban. Ahora la que manda cuenta al servidor qué
+// contenido enseña y en qué segundo va (cada segundo y en cada cambio); la que sigue lo
+// pregunta unas 3 veces por segundo, cambia al mismo contenido y, si es un vídeo, lo
+// coloca en el mismo punto. Se usa solo el reloj del servidor, así que no importa que las
+// horas de las dos teles no coincidan. Si la que manda se calla, la otra sigue sola.
+function wallRol(){
+  var c=screenConfig;
+  if(!c||c.mode!=="wall") return "";
+  return c.wall_pos==="right"?"sigue":"manda";
+}
+var wallMaestro=null, wallVisto=0;
+function wallSigue(){ return wallRol()==="sigue" && !!wallMaestro && (performance.now()-wallVisto)<6000; }
+function wallAnunciar(){
+  try{
+    if(wallRol()!=="manda"||(typeof PREVIEW!=="undefined"&&PREVIEW)) return;
+    var s=document.querySelector(".slide.active"); if(!s) return;
+    var i=parseInt(s.dataset.i,10), it=playlist[i]; if(!it) return;
+    var v=s.querySelector("video");
+    fetch("/api/wall-sync",{method:"POST",headers:{"Content-Type":"application/json"},keepalive:true,
+      body:JSON.stringify({screen:SCREEN_ID,id:String(it.id||""),t:v?(v.currentTime||0):0,video:!!v})}).catch(()=>{});
+  }catch(e){}
+}
+function wallSeguir(){
+  try{
+    if(wallRol()!=="sigue"||(typeof PREVIEW!=="undefined"&&PREVIEW)) return;
+    fetch("/api/wall-sync?screen="+encodeURIComponent(SCREEN_ID),{cache:"no-store"}).then(r=>r.json()).then(d=>{
+      var e=d&&d.estado;
+      if(!e||!(d.ahora-e.at<6)){ wallMaestro=null; return; }   // calla: seguimos solos
+      wallMaestro=e; wallVisto=performance.now();
+      var edad=Math.max(0,d.ahora-e.at);
+      var cur=document.querySelector(".slide.active");
+      var curId=cur?String((playlist[parseInt(cur.dataset.i,10)]||{}).id||""):"";
+      if(curId!==e.id){
+        var idx=playlist.findIndex(function(it){ return String(it.id||"")===e.id; });
+        if(idx<0) return;
+        var p=orden.indexOf(idx); if(p>=0) posOrden=p;
+        clearTimeout(timer); showSlide(idx);
+        cur=document.querySelector(".slide.active");
+      }
+      var v=cur&&cur.querySelector("video");
+      if(v&&e.video){
+        var objetivo=e.t+edad;
+        if(isFinite(v.duration)&&v.duration>0&&objetivo>v.duration) objetivo=v.duration;
+        if(Math.abs((v.currentTime||0)-objetivo)>0.35){ try{ v.currentTime=objetivo; }catch(x){} }
+        if(v.paused) v.play().catch(function(){});
+      }
+    }).catch(function(){});
+  }catch(e){}
+}
+setInterval(wallAnunciar,1000);
+setInterval(wallSeguir,300);
 
 function showSlide(idx){
   const slides=document.querySelectorAll(".slide");
@@ -1269,6 +1323,7 @@ function showSlide(idx){
     startProgress(ms);
     timer=setTimeout(()=>next(),ms);
   }
+  wallAnunciar();
 }
 
 // Cuántas divisas caben por página. Es una regla de LEGIBILIDAD, no una medida.
@@ -1533,6 +1588,9 @@ function refrescarOrden(cambioPlaylist, cambioAleatorio){
 function next(){
   clearTimeout(timer);
   if(!playlist.length) return;
+  // Videowall: la que sigue avanza cuando avanza la que manda, no por su cuenta. Se
+  // reintenta cada 2 s para que, si la otra se calla, retome su propio ritmo.
+  if(wallSigue()){ timer=setTimeout(next,2000); return; }
   posOrden++;
   // Al acabar la vuelta se rehace: con orden fijo sale la misma lista, y con
   // aleatorio una baraja nueva que no empieza por donde acabo la anterior.
