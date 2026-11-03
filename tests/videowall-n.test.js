@@ -32,3 +32,10 @@ test("el panel enlaza N pantallas y desvincula el muro entero", () => {
   assert.ok(admin.includes("const {wall_ids,wall_idx,wall_pos,partner,...resto}=cfg"));
   assert.ok(admin.includes("avisarTamanoWall(sid,item);"));
 });
+
+test("el muro es una sola pantalla para el contenido: editar o añadir va a la que manda", () => {
+  assert.ok(admin.includes("function muroMaestra(sid)"));
+  assert.ok(admin.includes("sid=maestra; }"));                 // openPlModal redirige
+  assert.ok(admin.includes("sid=muroMaestra(sid)||sid;"));     // addToPl redirige
+  assert.ok(admin.includes("Playlist del muro"));
+});

@@ -1873,7 +1873,7 @@ function renderScreens(){
   visibles.forEach(sid=>{
     const reg=regScreens[sid]||{};
     const cfg=(content.screens||{})[sid]||{};
-    const pl=cfg.playlist||[];
+    const pl=((muroMaestra(sid)&&(content.screens[muroMaestra(sid)]||{}).playlist)||cfg.playlist)||[];
     const isWall=cfg.mode==="wall";
     const rot=cfg.rotation!==undefined?cfg.rotation:(cfg.vertical?90:0);
     const isVert=(rot===90||rot===270);
@@ -1912,7 +1912,7 @@ function renderScreens(){
           (pl.length && vigentesHoy(pl)===0)
             ? ' · <span style="color:#f0a050">todo caducado, se sigue mostrando</span>' : ''}</div>
         <div class="sc-actions">
-          <button class="btn btn-ghost btn-sm" onclick="openPlModal('${sid}')"><i class="fa-solid fa-list"></i> Playlist</button>
+          <button class="btn btn-ghost btn-sm" onclick="openPlModal('${sid}')"><i class="fa-solid fa-list"></i> ${muroMaestra(sid)?'Playlist del muro':'Playlist'}</button>
           <button class="btn btn-ghost btn-sm" onclick="verAhora('${sid}')" title="Ver en grande lo que esta pantalla está mostrando ahora"><i class="fa-solid fa-eye"></i> Ver ahora</button>
           <button class="btn btn-a2 btn-sm" onclick="openScheduleModal('${sid}')"><i class="fa-regular fa-clock"></i> Horario</button>
           ${rotBtn}
@@ -3357,7 +3357,17 @@ function ajustesDistintosDeDefecto(cfg){
 // ── Playlist modal
 let plSel=new Set();
 let plFiltro={texto:"",tipo:"todos",carpeta:"all",etiquetas:[]};
+// Un videowall es UNA pantalla a efectos de contenido: si `sid` es una de las que siguen,
+// devuelve la que manda (donde está la playlist de verdad); si no, "".
+function muroMaestra(sid){
+  const cfg=(content.screens||{})[sid];
+  if(!cfg||cfg.mode!=="wall") return "";
+  const ids=Array.isArray(cfg.wall_ids)?cfg.wall_ids:(cfg.wall_pos==="right"?[cfg.partner,sid]:[sid,cfg.partner]);
+  return (ids[0]&&ids[0]!==sid&&(content.screens||{})[ids[0]])?ids[0]:"";
+}
 function openPlModal(sid){
+  const maestra=muroMaestra(sid);
+  if(maestra){ toast("«"+sid+"» es parte de un videowall: se edita la playlist de «"+maestra+"», que es la de todo el muro."); sid=maestra; }
   editingScreen=sid;
   plSel=new Set();
   plAbiertos=new Set();plVistos=new Set();
@@ -3719,6 +3729,7 @@ async function avisarTamanoWall(sid,item){
         (pide>n?'Se verá recortado por los lados.':'Se verá ampliado y recortado por arriba y abajo.'));
 }
 function addToPl(sid,item){
+  sid=muroMaestra(sid)||sid;
   if(!content.screens[sid])content.screens[sid]={mode:"independent",playlist:[]};
   content.screens[sid].playlist.push({...item,duration:item.duration||8});
   avisarTamanoWall(sid,item);

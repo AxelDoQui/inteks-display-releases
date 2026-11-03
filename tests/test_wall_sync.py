@@ -83,6 +83,15 @@ def main():
             it = r["playlist"][0]
             check([i["id"] for i in r["playlist"]] == ["a"] and it["wall_idx"] == idx and it["wall_n"] == 3 and r["config"]["wall_idx"] == idx,
                   f"la pantalla {idx + 1} de 3 usa la playlist de la 1.ª y sabe su sitio")
+        # «Mandar a pantallas» a una del muro va a la que manda; el muro cuenta como UNA pantalla
+        cont = json.load(open(os.path.join(datos, "content.json"), encoding="utf-8"))
+        cont["items"] = [{"id": "nuevo", "type": "text", "name": "N", "title": "N"}]
+        json.dump(cont, open(os.path.join(datos, "content.json"), "w"))
+        st, d = pedir("/api/send-to-screens", {"ids": ["nuevo"], "screens": ["Z", "Y"], "duration": 5})
+        check(st == 200 and d.get("added") == 1, "mandar a dos pantallas del muro lo añade UNA vez")
+        cont = json.load(open(os.path.join(datos, "content.json"), encoding="utf-8"))["screens"]
+        check(any(i["id"] == "nuevo" for i in cont["X"]["playlist"]), "queda en la playlist de la que manda")
+        check(not cont["Y"]["playlist"] and not cont["Z"]["playlist"], "las que siguen no guardan playlist propia")
     finally:
         p.terminate()
         try: p.wait(timeout=5)

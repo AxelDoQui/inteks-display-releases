@@ -3297,7 +3297,16 @@ class Handler(BaseHTTPRequestHandler):
                         for sid in pantallas:
                             if sid not in registro and sid not in scr_all:
                                 raise DestinoNoExiste(f"No existe la pantalla {sid}")
-                        for sid in pantallas:
+                        # Un videowall es UNA pantalla a efectos de contenido: lo que se manda a
+                        # cualquiera de las del muro va a la que manda (la primera).
+                        def _destino(sid):
+                            s0 = scr_all.get(sid)
+                            if isinstance(s0, dict) and s0.get("mode") == "wall":
+                                ids_m, pos_m = wall_de(s0, sid)
+                                if pos_m > 0 and ids_m[0] in scr_all:
+                                    return ids_m[0]
+                            return sid
+                        for sid in list(dict.fromkeys(_destino(x) for x in pantallas)):
                             scr = scr_all.get(sid)
                             if not isinstance(scr, dict):
                                 scr = scr_all[sid] = {"mode": "independent", "playlist": []}
