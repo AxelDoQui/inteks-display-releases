@@ -952,6 +952,73 @@ POST_PUBLICOS = {"/api/login", "/api/set-password", "/api/logout",
                  "/api/screen-now", "/api/wall-sync"}
 # Lo que cada pantalla está mostrando ahora (solo memoria, se pierde al reiniciar).
 ahora_pantalla = {}
+# ── Videowall: imágenes de UNA pantalla en parejas ──────────────────────────────────────
+# Las imágenes del tamaño de una pantalla no se estiran ni se duplican: se van de N en N
+# (la 1.ª en la pantalla izquierda, la 2.ª en la derecha, a la vez). Si sobra alguna suelta,
+# sale entera en todas las pantallas, así que ninguna se queda vacía.
+_dims_cache = {}
+def dims_imagen(src):
+    """(ancho, alto) de una imagen subida (PNG, JPEG, GIF o WebP), o None si no se sabe."""
+    try:
+        if not str(src).startswith("/uploads/"): return None
+        ruta = os.path.join(UPLOAD_DIR, unquote(str(src)[len("/uploads/"):]).replace("/", os.sep))
+        if os.path.commonpath([os.path.abspath(ruta), os.path.abspath(UPLOAD_DIR)]) != os.path.abspath(UPLOAD_DIR):
+            return None
+        marca = (ruta, os.path.getmtime(ruta))
+        if marca in _dims_cache: return _dims_cache[marca]
+        with open(ruta, "rb") as f: b = f.read(65536)
+        d = None
+        if b[:8] == b"\x89PNG\r\n\x1a\n":
+            d = struct.unpack(">II", b[16:24])
+        elif b[:6] in (b"GIF87a", b"GIF89a"):
+            d = struct.unpack("<HH", b[6:10])
+        elif b[:4] == b"RIFF" and b[8:12] == b"WEBP":
+            if b[12:16] == b"VP8X": d = (1 + int.from_bytes(b[24:27], "little"), 1 + int.from_bytes(b[27:30], "little"))
+            elif b[12:16] == b"VP8 ": d = struct.unpack("<HH", b[26:30]); d = (d[0] & 0x3fff, d[1] & 0x3fff)
+            elif b[12:16] == b"VP8L":
+                v = int.from_bytes(b[21:25], "little"); d = ((v & 0x3fff) + 1, ((v >> 14) & 0x3fff) + 1)
+        elif b[:2] == b"\xff\xd8":
+            i = 2
+            while i + 9 < len(b):
+                if b[i] != 0xff: i += 1; continue
+                m = b[i + 1]
+                if m in (0xd8, 0x01) or 0xd0 <= m <= 0xd7: i += 2; continue
+                n = struct.unpack(">H", b[i + 2:i + 4])[0]
+                if 0xc0 <= m <= 0xcf and m not in (0xc4, 0xc8, 0xcc):
+                    h, w = struct.unpack(">HH", b[i + 5:i + 9]); d = (w, h); break
+                i += 2 + n
+        if d and d[0] > 0 and d[1] > 0:
+            _dims_cache[marca] = d; return d
+    except Exception: pass
+    return None
+
+def _es_de_una_pantalla(item, n, vertical):
+    """True si es una imagen cuya proporción se parece más a UNA pantalla que al muro entero."""
+    if item.get("type") != "image": return False
+    d = dims_imagen(item.get("src", ""))
+    if not d: return False
+    import math
+    una = (9 / 16) if vertical else (16 / 9)
+    muro = una * n
+    a = d[0] / d[1]
+    return abs(math.log(a / una)) <= abs(math.log(a / muro))
+
+def agrupar_parejas(items, n, idx, vertical):
+    """Junta las imágenes de una pantalla que van seguidas, de n en n. Cada grupo completo pasa a
+    ser UN elemento con el id del primero (igual en todas las pantallas) y la imagen que le toca
+    a la pantalla `idx`. Lo que sobra al final del grupo se queda como estaba (entero en todas)."""
+    if n < 2: return items
+    out, i = [], 0
+    while i < len(items):
+        grupo = items[i:i + n]
+        if len(grupo) == n and all(_es_de_una_pantalla(g, n, vertical) for g in grupo):
+            mia = dict(grupo[idx]); mia["id"] = grupo[0].get("id"); mia["duration"] = grupo[0].get("duration", 8)
+            mia["name"] = " + ".join(str(g.get("name", "")) for g in grupo)
+            out.append(mia); i += n
+        else:
+            out.append(items[i]); i += 1
+    return out
+
 # Videowall: lo que muestra la pantalla que manda (la izquierda), para que la otra la siga.
 # {pantalla_que_manda: {id, t, video, at}} con «at» en el reloj del servidor, que es el
 # único reloj que comparten las dos pantallas. Solo memoria: se rehace cada segundo.
@@ -2483,6 +2550,8 @@ class Handler(BaseHTTPRequestHandler):
                 time.strftime("%Y-%m-%d"))
             if mode == "wall":
                 wall_pos = scr.get("wall_pos", "left")
+                rot_m = (screens_cfg.get(muro_ids[0], scr) or {}).get("rotation", 0)
+                resuelta = agrupar_parejas(resuelta, len(muro_ids), muro_pos, rot_m in (90, 270))
                 playlist = [dict(item, wall_mode=True, wall_pos=wall_pos,
                                  wall_idx=muro_pos, wall_n=len(muro_ids)) for item in resuelta]
             else:
