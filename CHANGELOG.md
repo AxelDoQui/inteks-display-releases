@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.73 — 2026-11-03
+
+- **Videowall sincronizado.** Las dos pantallas ya no se desfasan: la izquierda manda y la derecha la sigue (mismo contenido, y el vídeo en el mismo segundo). La derecha usa la playlist de la izquierda, y solo suena la izquierda. Si la izquierda se apaga, la derecha sigue sola.
+
 ## 1.0.72 — 2026-11-03
 
 - **Ajustes ordenado en bloques:** Esta instalación, Pantallas, y Avisos, copias y archivos. No se ha quitado ningún ajuste, solo cambia el orden.
