@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.75 — 2026-11-03
+
+- **Videowall: una sola imagen repartida.** Antes cada pantalla del muro enseñaba el vídeo o la imagen entera. Ahora el contenido ocupa el lienzo de todas las pantallas juntas y cada una enseña su porción, como si fuera una sola.
+
 ## 1.0.74 — 2026-11-03
 
 - **Videowall de 2, 3 o más pantallas.** En «Videowall» se pulsan las pantallas de izquierda a derecha y cada una enseña su trozo. La primera manda y las demás la siguen; solo suena la primera. Los muros de 2 que ya existían siguen igual.

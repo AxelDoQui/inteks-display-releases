@@ -12,12 +12,12 @@
 
 [Setup]
 AppName=InTeks Display
-AppVersion=1.0.74
+AppVersion=1.0.75
 AppPublisher=InTeks Solutions
 DefaultDirName={autopf}\InTeks Display
 DefaultGroupName=InTeks Display
 OutputDir=..\dist\installer
-OutputBaseFilename=InTeks_Display_Setup_v1.0.74
+OutputBaseFilename=InTeks_Display_Setup_v1.0.75
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
