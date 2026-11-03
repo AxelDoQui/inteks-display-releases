@@ -1660,18 +1660,9 @@ JPY  Yen        162.5"></textarea>
       <h3>VIDEOWALL</h3>
       <button class="btn btn-ghost btn-sm" onclick="closeWallModal()"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6">Selecciona dos pantallas para mostrar una imagen expandida entre ambas.</p>
-    <div style="display:grid;grid-template-columns:1fr 20px 1fr;gap:8px;align-items:start">
-      <div>
-        <div style="font-size:9px;color:var(--a2);font-family:'Space Mono',monospace;letter-spacing:1px;margin-bottom:7px">IZQUIERDA</div>
-        <div id="wall-left-picker"></div>
-      </div>
-      <div style="font-size:16px;color:var(--muted);text-align:center;padding-top:4px"><i class="fa-solid fa-left-right"></i></div>
-      <div>
-        <div style="font-size:9px;color:var(--a2);font-family:'Space Mono',monospace;letter-spacing:1px;margin-bottom:7px">DERECHA</div>
-        <div id="wall-right-picker"></div>
-      </div>
-    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">Muestra una imagen o un vídeo repartido entre varias pantallas. Pulsa las pantallas <strong>de izquierda a derecha</strong>, en el orden en que están colgadas (2 o más). La primera manda: su playlist es la del muro y las demás la siguen.</p>
+    <div id="wall-picker"></div>
+    <div id="wall-orden" style="font-size:12px;color:var(--a2);margin-top:8px;min-height:18px"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
       <button class="btn btn-ghost" onclick="closeWallModal()">Cancelar</button>
       <button class="btn btn-a2" id="wall-save-btn" onclick="saveWall()" disabled>Enlazar</button>
@@ -1696,7 +1687,7 @@ const IP=location.hostname;
 let content={items:[],screens:{}};
 let regScreens={};
 let editingScreen=null;
-let wallLeft=null,wallRight=null;
+let wallSel=[];
 let dragSrc=null;
 let selWeatherIcon="🌤";
 const WEATHER_ICONS=["☀️","🌤","⛅","🌥","☁️","🌦","🌧","⛈","🌩","🌨","❄️","🌫","🌬","🌊","🔥"];
@@ -1789,7 +1780,7 @@ function clonarConfigPantalla(cfg){
   const c=JSON.parse(JSON.stringify(cfg||{}));
   // Lo que ata esta pantalla a un televisor o a otra pantalla NO se copia.
   delete c.connected; delete c.last_seen; delete c.id;
-  delete c.partner; delete c.wall_pos;
+  delete c.partner; delete c.wall_pos; delete c.wall_ids; delete c.wall_idx;
   delete c.label;  // el nombre para mostrar es de la original; la copia ya trae el suyo
   c.mode="independent";
   if(!Array.isArray(c.playlist)) c.playlist=[];
@@ -1897,7 +1888,8 @@ function renderScreens(){
       else if(fi.type==="text") thumbHtml=`<div style="width:100%;height:100%;background:${fi.bg||'#111'};display:flex;align-items:center;justify-content:center;font-size:9px;color:${fi.color||'#fff'};text-align:center;padding:4px">${fi.title}</div>`;
       else thumbHtml=`<i class="fa-solid ${typeIcon(fi.type)}" style="font-size:18px;color:var(--muted)"></i>`;
     }
-    const partnerInfo=isWall&&cfg.partner?`<div style="font-size:10px;color:var(--a2);margin-bottom:6px"><i class="fa-solid fa-left-right"></i> enlazada con <strong>${cfg.partner}</strong></div>`:'';
+    const muroIds=isWall?(Array.isArray(cfg.wall_ids)?cfg.wall_ids:[cfg.partner].filter(Boolean)):[];
+    const partnerInfo=isWall&&muroIds.length?`<div style="font-size:10px;color:var(--a2);margin-bottom:6px"><i class="fa-solid fa-left-right"></i> videowall${Array.isArray(cfg.wall_ids)?' de '+muroIds.length+' pantallas':''}: <strong>${muroIds.map(esc).join(' → ')}</strong></div>`:'';
     const rotBtn=`<button class="btn btn-sm ${rot?'btn-a4':'btn-ghost'}" onclick="rotateScreen('${sid}')" title="Girar pantalla (0° → 90° → 180° → 270°)"><i class="fa-solid fa-rotate"></i> ${rot}°</button>`;
     card.innerHTML=`
       <div class="sc-hdr">
@@ -3373,7 +3365,7 @@ function openPlModal(sid){
   renderPlPackages();
   const cfg=(content.screens||{})[sid]||{};
   document.getElementById("plm-title").textContent=`PLAYLIST — ${(cfg.label||sid).toUpperCase()}`;
-  document.getElementById("plm-sub").textContent=cfg.mode==="wall"?(cfg.wall_pos==="right"?`Videowall (derecha): enseña la playlist de «${cfg.partner||''}», sincronizada con ella. Edita aquella.`:`Videowall (izquierda): manda; «${cfg.partner||''}» la sigue.`):"Modo independiente.";
+  document.getElementById("plm-sub").textContent=cfg.mode==="wall"?(()=>{const ids=Array.isArray(cfg.wall_ids)?cfg.wall_ids:null,pos=ids?ids.indexOf(sid):(cfg.wall_pos==="right"?1:0),n=ids?ids.length:2;return pos>0?`Videowall (pantalla ${pos+1} de ${n}): enseña la playlist de «${ids?ids[0]:(cfg.partner||'')}», sincronizada con ella. Edita aquella.`:`Videowall (pantalla 1 de ${n}): manda; las demás la siguen.`;})():"Modo independiente.";
   // Un solo tipo de transicion por pantalla, para todos sus pases.
   document.getElementById("plm-trans").value=cfg.transition||"fade";
   document.getElementById("plm-trans-ms").value=
@@ -3701,9 +3693,35 @@ function addVariosToPl(sid,ids,posicion){
   renderPlList(sid);renderPlLib(sid);
   toast(nuevos.length===1?`"${nuevos[0].name}" añadido`:`${nuevos.length} contenidos añadidos`);
 }
+// ── Videowall: ¿cabe este contenido en el muro? Se mide al añadirlo y se avisa si no cuadra.
+function medirMedio(item){
+  return new Promise(res=>{
+    const fin=(v)=>{ clearTimeout(t); res(v); }; const t=setTimeout(()=>res(null),8000);
+    try{
+      if(item.type==="image"){ const im=new Image(); im.onload=()=>fin({w:im.naturalWidth,h:im.naturalHeight}); im.onerror=()=>fin(null); im.src=item.src; }
+      else if(item.type==="video"){ const v=document.createElement("video"); v.preload="metadata"; v.muted=true;
+        v.onloadedmetadata=()=>fin({w:v.videoWidth,h:v.videoHeight}); v.onerror=()=>fin(null); v.src=item.src; }
+      else fin(null);
+    }catch(e){ fin(null); }
+  });
+}
+// Cuántas pantallas pide un contenido de w×h para una pantalla de aspecto `asp` (ancho/alto).
+function pantallasQuePide(w,h,asp){ return Math.max(1,Math.round((w/h)/asp)); }
+async function avisarTamanoWall(sid,item){
+  const cfg=(content.screens||{})[sid]; if(!cfg||cfg.mode!=="wall") return;
+  const n=Array.isArray(cfg.wall_ids)?cfg.wall_ids.length:2;
+  const m=await medirMedio(item); if(!m||!m.w||!m.h) return;
+  const rot=cfg.rotation!==undefined?cfg.rotation:(cfg.vertical?90:0);
+  const asp=(rot===90||rot===270)?9/16:16/9;
+  const pide=pantallasQuePide(m.w,m.h,asp), nombre=item.name||"Este contenido";
+  if(pide===n) return;
+  toast(`«${nombre}» mide ${m.w}×${m.h}: está pensado para ${pide} pantalla${pide===1?'':'s'} y este muro tiene ${n}. `+
+        (pide>n?'Se verá recortado por los lados.':'Se verá ampliado y recortado por arriba y abajo.'));
+}
 function addToPl(sid,item){
   if(!content.screens[sid])content.screens[sid]={mode:"independent",playlist:[]};
   content.screens[sid].playlist.push({...item,duration:item.duration||8});
+  avisarTamanoWall(sid,item);
   renderPlList(sid);toast(`"${item.name}" añadido`);
 }
 function rmFromPl(sid,idx){const q=content.screens[sid].playlist;const [x]=q.splice(idx,1);plAbiertos.delete(x);renderPlList(sid);}
@@ -3748,42 +3766,57 @@ async function savePlModal(){
 
 // ── Videowall
 function openWallModal(){
-  wallLeft=null;wallRight=null;
-  const ids=[...new Set([...Object.keys(regScreens),...Object.keys(content.screens||{})])];
-  renderWallPicker("wall-left-picker","left",ids);
-  renderWallPicker("wall-right-picker","right",ids);
+  wallSel=[];
+  const ids=[...new Set([...Object.keys(regScreens),...Object.keys(content.screens||{})])].filter(i=>i!=="admin");
+  renderWallPicker(ids);
   document.getElementById("wall-modal").classList.add("show");
   document.getElementById("wall-save-btn").disabled=true;
 }
-function renderWallPicker(cid,side,ids){
-  const c=document.getElementById(cid);
-  if(!ids.length){c.innerHTML='<div style="font-size:11px;color:var(--muted)">Sin pantallas</div>';return;}
+function renderWallPicker(ids){
+  const c=document.getElementById("wall-picker");
+  if(!ids.length){c.innerHTML='<div style="font-size:11px;color:var(--muted)">Sin pantallas</div>';document.getElementById("wall-orden").textContent="";return;}
   c.innerHTML="";
+  const pintar=()=>{
+    c.querySelectorAll(".screen-option").forEach(b=>{
+      const k=wallSel.indexOf(b.dataset.id), cfg=(content.screens||{})[b.dataset.id]||{};
+      b.classList.toggle("sel",k>=0);
+      b.textContent=(k>=0?(k+1)+" · ":"")+(cfg.label||b.dataset.id);
+    });
+    document.getElementById("wall-orden").textContent=wallSel.length?"Orden: "+wallSel.map(i=>((content.screens||{})[i]||{}).label||i).join("  →  "):"";
+    document.getElementById("wall-save-btn").disabled=wallSel.length<2;
+  };
   ids.forEach(id=>{
-    const btn=document.createElement("div");btn.className="screen-option";btn.textContent=id;
+    const btn=document.createElement("div");btn.className="screen-option";btn.dataset.id=id;
     btn.onclick=()=>{
-      if(side==="left")wallLeft=id;else wallRight=id;
-      c.querySelectorAll(".screen-option").forEach(b=>{b.classList.remove("sel");});btn.classList.add("sel");
-      document.getElementById("wall-save-btn").disabled=!(wallLeft&&wallRight&&wallLeft!==wallRight);
+      const k=wallSel.indexOf(id);
+      if(k>=0) wallSel.splice(k,1); else wallSel.push(id);
+      pintar();
     };
     c.appendChild(btn);
   });
+  pintar();
 }
 async function saveWall(){
-  if(!wallLeft||!wallRight||wallLeft===wallRight)return;
+  if(wallSel.length<2)return;
   if(!content.screens)content.screens={};
-  const plL=(content.screens[wallLeft]||{}).playlist||[];
-  const plR=(content.screens[wallRight]||{}).playlist||[];
-  content.screens[wallLeft]={mode:"wall",wall_pos:"left",partner:wallRight,playlist:plL};
-  content.screens[wallRight]={mode:"wall",wall_pos:"right",partner:wallLeft,playlist:plR};
+  const ids=[...wallSel], n=ids.length;
+  ids.forEach((id,i)=>{
+    const antes=content.screens[id]||{};
+    content.screens[id]={...antes,mode:"wall",wall_ids:ids,wall_idx:i,
+      wall_pos:i===0?"left":(i===n-1?"right":"mid"),partner:ids[i===0?1:0],playlist:antes.playlist||[]};
+  });
   await saveScreensConfig();closeWallModal();renderScreens();updateStats();
-  toast(`Videowall ${wallLeft} ↔ ${wallRight} ✓`);
+  toast(`Videowall de ${n} pantallas: ${ids.join(" → ")} ✓`);
 }
 function closeWallModal(){document.getElementById("wall-modal").classList.remove("show");}
 async function unlinkWall(sid){
-  const p=content.screens[sid]?.partner;
-  if(content.screens[sid])content.screens[sid]={mode:"independent",playlist:content.screens[sid].playlist||[]};
-  if(p&&content.screens[p])content.screens[p]={mode:"independent",playlist:content.screens[p].playlist||[]};
+  const c=content.screens[sid]||{};
+  const ids=Array.isArray(c.wall_ids)?c.wall_ids:[sid,c.partner].filter(Boolean);
+  ids.forEach(id=>{
+    const cfg=content.screens[id]; if(!cfg) return;
+    const {wall_ids,wall_idx,wall_pos,partner,...resto}=cfg;
+    content.screens[id]={...resto,mode:"independent",playlist:cfg.playlist||[]};
+  });
   await saveScreensConfig();renderScreens();updateStats();toast("Videowall desvinculado");
 }
 

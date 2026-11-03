@@ -46,8 +46,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 .slide>img{width:100%;height:100%;object-fit:contain}
 .slide>video{width:100%;height:100%;object-fit:contain;background:#000}
 .slide>iframe{width:100%;height:100%;border:none;background:#fff}
-.slide.wall-left>img,.slide.wall-left>video{object-fit:cover;object-position:left center}
-.slide.wall-right>img,.slide.wall-right>video{object-fit:cover;object-position:right center}
+.slide.wall>img,.slide.wall>video{object-fit:cover;object-position:var(--wall-x,50%) center}
 
 /* ── Texto */
 .text-slide{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:8vw;text-align:center}
@@ -1030,7 +1029,12 @@ function rebuildSlides(){
   playlist.forEach((item,i)=>{
     const slide=document.createElement("div");
     slide.className="slide";
-    if(item.wall_mode&&item.wall_pos) slide.classList.add("wall-"+item.wall_pos);
+    if(item.wall_mode){
+      // Cada pantalla del muro enseña su trozo: la 1.ª el borde izquierdo, la última el derecho.
+      var wn=item.wall_n||2, wi=(item.wall_idx!==undefined)?item.wall_idx:(item.wall_pos==="right"?1:0);
+      slide.classList.add("wall");
+      slide.style.setProperty("--wall-x",(wn>1?wi*100/(wn-1):50)+"%");
+    }
     slide.dataset.i=i; slide.dataset.dur=item.duration||8;
 
     if(item.type==="video"){
@@ -1202,7 +1206,7 @@ function vigilarVideo(v,item,alTerminar){
   vigilanteVideo=limpiar;
 }
 
-// ── Videowall: la pantalla izquierda MANDA y la derecha la SIGUE.
+// ── Videowall: la primera pantalla (la de más a la izquierda) MANDA y las demás la SIGUEN.
 // Cada una iba por su cuenta y se desfasaban. Ahora la que manda cuenta al servidor qué
 // contenido enseña y en qué segundo va (cada segundo y en cada cambio); la que sigue lo
 // pregunta unas 3 veces por segundo, cambia al mismo contenido y, si es un vídeo, lo
@@ -1211,7 +1215,8 @@ function vigilarVideo(v,item,alTerminar){
 function wallRol(){
   var c=screenConfig;
   if(!c||c.mode!=="wall") return "";
-  return c.wall_pos==="right"?"sigue":"manda";
+  var i=(c.wall_idx!==undefined)?c.wall_idx:(c.wall_pos==="right"?1:0);
+  return i>0?"sigue":"manda";
 }
 var wallMaestro=null, wallVisto=0;
 function wallSigue(){ return wallRol()==="sigue" && !!wallMaestro && (performance.now()-wallVisto)<6000; }

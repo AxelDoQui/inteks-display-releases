@@ -29,8 +29,11 @@ def main():
     json.dump({"rev": 1, "items": [], "screens": {
         "L": {"mode": "wall", "wall_pos": "left", "partner": "R", "playlist": [item]},
         "R": {"mode": "wall", "wall_pos": "right", "partner": "L", "playlist": []},
-        "S": {"mode": "independent", "playlist": []}}}, open(os.path.join(datos, "content.json"), "w"))
-    json.dump({n: {"name": n, "connected": True} for n in "LRS"}, open(os.path.join(datos, "screens.json"), "w"))
+        "S": {"mode": "independent", "playlist": []},
+        "X": {"mode": "wall", "wall_ids": ["X", "Y", "Z"], "wall_idx": 0, "playlist": [item]},
+        "Y": {"mode": "wall", "wall_ids": ["X", "Y", "Z"], "wall_idx": 1, "playlist": []},
+        "Z": {"mode": "wall", "wall_ids": ["X", "Y", "Z"], "wall_idx": 2, "playlist": []}}}, open(os.path.join(datos, "content.json"), "w"))
+    json.dump({n: {"name": n, "connected": True} for n in "LRSXYZ"}, open(os.path.join(datos, "screens.json"), "w"))
     env = dict(os.environ, SIGNALOS_DATA=datos)
     p = subprocess.Popen([sys.executable, "server.py", "--port", str(PORT)], cwd=app, env=env,
                          stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
@@ -69,6 +72,17 @@ def main():
         check([i["id"] for i in pl] == ["a"] and pl[0]["wall_pos"] == "right", "la derecha usa la playlist de la izquierda")
         pl = pedir("/api/playlist?screen=L")[1]["playlist"]
         check([i["id"] for i in pl] == ["a"] and pl[0]["wall_pos"] == "left", "la izquierda sigue con la suya")
+        # Muro de tres: manda la primera, las otras dos la siguen y llevan su trozo
+        pedir("/api/wall-sync", {"screen": "X", "id": "a", "t": 2})
+        check(pedir("/api/wall-sync?screen=Y")[1]["estado"]["t"] == 2, "la 2.ª de 3 recibe el estado de la 1.ª")
+        check(pedir("/api/wall-sync?screen=Z")[1]["estado"]["t"] == 2, "la 3.ª de 3 recibe el estado de la 1.ª")
+        pedir("/api/wall-sync", {"screen": "Y", "id": "zzz", "t": 9})
+        check(pedir("/api/wall-sync?screen=Z")[1]["estado"]["id"] == "a", "la del medio no puede mandar")
+        for sid, idx in (("X", 0), ("Y", 1), ("Z", 2)):
+            r = pedir("/api/playlist?screen=" + sid)[1]
+            it = r["playlist"][0]
+            check([i["id"] for i in r["playlist"]] == ["a"] and it["wall_idx"] == idx and it["wall_n"] == 3 and r["config"]["wall_idx"] == idx,
+                  f"la pantalla {idx + 1} de 3 usa la playlist de la 1.ª y sabe su sitio")
     finally:
         p.terminate()
         try: p.wait(timeout=5)

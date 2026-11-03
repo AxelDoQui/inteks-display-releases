@@ -956,6 +956,19 @@ ahora_pantalla = {}
 # {pantalla_que_manda: {id, t, video, at}} con «at» en el reloj del servidor, que es el
 # único reloj que comparten las dos pantallas. Solo memoria: se rehace cada segundo.
 wall_estado = {}
+
+
+def wall_de(scr, sid):
+    """(ids, posición) de la pantalla `sid` en su videowall. `ids` va de izquierda a derecha y
+    la primera es la que manda. Los muros antiguos solo traen «partner» y «wall_pos»."""
+    ids = scr.get("wall_ids")
+    if isinstance(ids, list) and sid in ids:
+        ids = [str(x) for x in ids]
+        return ids, ids.index(sid)
+    partner = str(scr.get("partner", "") or "")
+    if scr.get("wall_pos") == "right":
+        return [partner, sid], 1
+    return [sid, partner], 0
 # Vídeos que una pantalla no consigue reproducir: {pantalla: {id, name, motivo, at}}.
 fallos_video = {}
 MAX_BODY_PUBLICO = 64 * 1024
@@ -2435,8 +2448,10 @@ class Handler(BaseHTTPRequestHandler):
             sid = qs.get("screen", [""])[0]
             scr = load_json(CONTENT_FILE).get("screens", {}).get(sid, {})
             est = None
-            if scr.get("mode") == "wall" and scr.get("wall_pos") == "right":
-                est = wall_estado.get(str(scr.get("partner", "")))
+            if scr.get("mode") == "wall":
+                ids, pos = wall_de(scr, sid)
+                if pos > 0:
+                    est = wall_estado.get(ids[0])
             body = json.dumps({"ok": True, "estado": est, "ahora": time.time()}).encode()
             self.send_response(200); self.send_header("Content-Type", "application/json")
             self.send_header("Cache-Control", "no-store")
@@ -2456,19 +2471,20 @@ class Handler(BaseHTTPRequestHandler):
             # así una promo caducada que vive dentro de un paquete también
             # desaparece. Al revés, el paquete entraría entero sin mirar.
             origen = scr.get("playlist", [])
-            if mode == "wall" and scr.get("wall_pos") == "right":
-                # Videowall: la derecha enseña lo mismo que la izquierda, sincronizada con
+            muro_ids, muro_pos = wall_de(scr, sid) if mode == "wall" else ([], 0)
+            if mode == "wall" and muro_pos > 0:
+                # Videowall: las que siguen enseñan lo mismo que la primera, sincronizadas con
                 # ella; su propia playlist no se usa (y así nunca se desfasan los contenidos).
-                maestra = screens_cfg.get(str(scr.get("partner", "")), {})
+                maestra = screens_cfg.get(muro_ids[0], {})
                 if maestra.get("mode") == "wall" and maestra.get("playlist"):
                     origen = maestra.get("playlist", [])
             resuelta = filtrar_vigentes(
                 expandir_paquetes(origen, content),
                 time.strftime("%Y-%m-%d"))
             if mode == "wall":
-                partner = scr.get("partner","")
-                wall_pos = scr.get("wall_pos","left")
-                playlist = [dict(item, wall_mode=True, wall_pos=wall_pos) for item in resuelta]
+                wall_pos = scr.get("wall_pos", "left")
+                playlist = [dict(item, wall_mode=True, wall_pos=wall_pos,
+                                 wall_idx=muro_pos, wall_n=len(muro_ids)) for item in resuelta]
             else:
                 playlist = resuelta
             # La versión viaja aquí para que la pantalla note que el servidor se
@@ -2476,8 +2492,9 @@ class Handler(BaseHTTPRequestHandler):
             # instalar, pero la página que el televisor lleva horas abierta
             # sigue ejecutando el código viejo. Ver debeRecargarPorVersion() en
             # player.html.
+            cfg_pantalla = dict(scr, wall_idx=muro_pos, wall_n=len(muro_ids)) if mode == "wall" else scr
             result = {"playlist": playlist, "mode": mode, "screen_id": sid,
-                      "config": scr, "version": APP_VERSION}
+                      "config": cfg_pantalla, "version": APP_VERSION}
             self.send_response(200); self.send_header("Content-Type","application/json")
             self.cors(); self.end_headers(); self.wfile.write(json.dumps(result).encode()); return
 
@@ -2854,8 +2871,8 @@ class Handler(BaseHTTPRequestHandler):
                 d = json.loads(body or "{}")
                 sid = str(d.get("screen", "") or "") if isinstance(d, dict) else ""
                 scr = load_json(CONTENT_FILE).get("screens", {}).get(sid, {})
-                if scr.get("mode") != "wall" or scr.get("wall_pos") != "left":
-                    jresp(200, {"ok": False}); return        # solo manda la izquierda
+                if scr.get("mode") != "wall" or wall_de(scr, sid)[1] != 0:
+                    jresp(200, {"ok": False}); return        # solo manda la primera
                 try: t = max(0.0, min(float(d.get("t", 0) or 0), 86400.0))
                 except Exception: t = 0.0
                 wall_estado[sid] = {"id": str(d.get("id", "") or "")[:200], "t": t,
