@@ -6022,8 +6022,10 @@ function _ahoraItem(sid,reg){
   return null;
 }
 function _ahoraMarcos(){ return Array.from(document.querySelectorAll("#ahora-marcos iframe")); }
-let _ahoraPayload=null;
-function _ahoraEnviar(fr){ if(fr&&fr.dataset.listo&&_ahoraPayload) fr.contentWindow.postMessage(_ahoraPayload,"*"); }
+let _ahoraIds=[];
+// Cada marco lleva SU contenido: en un muro, las imágenes en pareja son distintas en cada pantalla,
+// y eso solo lo sabe lo que el servidor le manda a esa pantalla (su /api/playlist).
+function _ahoraEnviar(fr){ if(fr&&fr.dataset.listo&&fr._payload) fr.contentWindow.postMessage(fr._payload,"*"); }
 function _ahoraPintar(){
   const sid=_ahoraSid; if(!sid) return;
   const reg=regScreens[sid]||{}, cfg=(content.screens||{})[sid]||{};
@@ -6035,8 +6037,19 @@ function _ahoraPintar(){
   if(_ahoraId===n.id) return;
   _ahoraId=n.id;
   const rot=cfg.rotation!==undefined?cfg.rotation:(cfg.vertical?90:0);
-  _ahoraPayload={type:"preview-item",item:it,rotation:rot};
-  _ahoraMarcos().forEach(_ahoraEnviar);
+  const marcos=_ahoraMarcos(), idActual=n.id;
+  marcos.forEach(fr=>{ fr._payload={type:"preview-item",item:it,rotation:rot}; _ahoraEnviar(fr); });
+  if(_ahoraIds.length>1){
+    _ahoraIds.forEach((pid,k)=>{
+      fetch("/api/playlist?screen="+encodeURIComponent(pid),{cache:"no-store"}).then(r=>r.json()).then(d=>{
+        if(_ahoraId!==idActual||!marcos[k]) return;
+        const propio=(d.playlist||[]).find(x=>x&&x.id===idActual);
+        if(!propio) return;
+        marcos[k]._payload={type:"preview-item",item:{...propio,duration:9999},rotation:rot};
+        _ahoraEnviar(marcos[k]);
+      }).catch(()=>{});
+    });
+  }
 }
 async function _ahoraRefrescar(){
   try{ const r=await fetch("/api/screens",{cache:"no-store"}); if(r.ok){ const d=await r.json();
@@ -6047,7 +6060,7 @@ function verAhora(sid){
   // Un videowall se ve entero: tantos marcos como pantallas, con su división, y el estado
   // sale de la que manda.
   const nMarcos=Math.max(1,muroIds(sid).length);
-  _ahoraSid=muroMaestra(sid)||sid; _ahoraListo=false; _ahoraId=null; _ahoraPayload=null;
+  _ahoraSid=muroMaestra(sid)||sid; _ahoraListo=false; _ahoraId=null; _ahoraIds=muroIds(sid);
   const cfg=(content.screens||{})[sid]||{};
   document.getElementById("ahora-titulo").textContent="AHORA EN "+String(cfg.label||sid).toUpperCase();
   document.getElementById("ahora-txt").textContent="Cargando…";
