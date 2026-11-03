@@ -20,8 +20,8 @@ test("cuántas pantallas pide un contenido según su tamaño", () => {
 });
 
 test("cada pantalla del muro enseña su trozo: de 0 % a 100 %", () => {
-  assert.ok(player.includes('slide.style.setProperty("--wall-x",(wn>1?wi*100/(wn-1):50)+"%")'));
-  assert.ok(player.includes("object-position:var(--wall-x,50%) center"));
+  assert.ok(player.includes('slide.style.setProperty("--wall-n",wn); slide.style.setProperty("--wall-i",wi);'));
+  assert.ok(player.includes("width:calc(var(--wall-n,2)*100%)") && player.includes("margin-left:calc(var(--wall-i,0)*-100%)"));
   const pos = (i, n) => (n > 1 ? (i * 100) / (n - 1) : 50);
   assert.deepStrictEqual([0, 1, 2].map((i) => pos(i, 3)), [0, 50, 100]);
   assert.deepStrictEqual([0, 1].map((i) => pos(i, 2)), [0, 100]);   // como el muro de 2 de siempre

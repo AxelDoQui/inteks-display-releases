@@ -46,7 +46,10 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 .slide>img{width:100%;height:100%;object-fit:contain}
 .slide>video{width:100%;height:100%;object-fit:contain;background:#000}
 .slide>iframe{width:100%;height:100%;border:none;background:#fff}
-.slide.wall>img,.slide.wall>video{object-fit:cover;object-position:var(--wall-x,50%) center}
+.slide.wall{overflow:hidden}
+/* Videowall: el medio ocupa el lienzo ENTERO del muro (N pantallas de ancho) y cada pantalla
+   enseña su porción desplazandolo; asi las N pantallas se ven como una sola imagen. */
+.slide.wall>img,.slide.wall>video{object-fit:cover;width:calc(var(--wall-n,2)*100%);max-width:none;height:100%;margin-left:calc(var(--wall-i,0)*-100%)}
 
 /* ── Texto */
 .text-slide{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:8vw;text-align:center}
@@ -1033,7 +1036,7 @@ function rebuildSlides(){
       // Cada pantalla del muro enseña su trozo: la 1.ª el borde izquierdo, la última el derecho.
       var wn=item.wall_n||2, wi=(item.wall_idx!==undefined)?item.wall_idx:(item.wall_pos==="right"?1:0);
       slide.classList.add("wall");
-      slide.style.setProperty("--wall-x",(wn>1?wi*100/(wn-1):50)+"%");
+      slide.style.setProperty("--wall-n",wn); slide.style.setProperty("--wall-i",wi);
     }
     slide.dataset.i=i; slide.dataset.dur=item.duration||8;
 
