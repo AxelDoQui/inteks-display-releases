@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.76 — 2026-11-03
+
+- **Videowall: el recorte salía descuadrado.** El navegador encogía el vídeo del muro y cada pantalla enseñaba un trozo equivocado. Ahora el vídeo ocupa el ancho de todas las pantallas y cada una enseña exactamente su mitad.
+
 ## 1.0.75 — 2026-11-03
 
 - **Videowall: una sola imagen repartida.** Antes cada pantalla del muro enseñaba el vídeo o la imagen entera. Ahora el contenido ocupa el lienzo de todas las pantallas juntas y cada una enseña su porción, como si fuera una sola.
