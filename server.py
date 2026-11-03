@@ -1004,19 +1004,33 @@ def _es_de_una_pantalla(item, n, vertical):
     return abs(math.log(a / una)) <= abs(math.log(a / muro))
 
 def agrupar_parejas(items, n, idx, vertical):
-    """Junta las imágenes de una pantalla que van seguidas, de n en n. Cada grupo completo pasa a
-    ser UN elemento con el id del primero (igual en todas las pantallas) y la imagen que le toca
-    a la pantalla `idx`. Lo que sobra al final del grupo se queda como estaba (entero en todas)."""
+    """Reparte las imágenes de una pantalla entre las pantallas del muro: cada pase enseña n
+    imágenes distintas, una en cada pantalla. Con un número de imágenes múltiplo de n van de n en n
+    ((a,b), (c,d)...). Si no, se encadenan ((a,b), (b,c), (c,a)) para que ninguna pantalla se
+    quede vacía ni repita la misma imagen que la de al lado: cada imagen pasa por todas.
+    El pase usa el id de su primera imagen (el mismo en todas las pantallas, para sincronizarse)
+    y está en el sitio de ella. Las imágenes del tamaño del muro, los vídeos, etc. no se tocan.
+    Con una sola imagen de pantalla no hay con qué emparejarla y se queda como estaba."""
     if n < 2: return items
-    out, i = [], 0
-    while i < len(items):
-        grupo = items[i:i + n]
-        if len(grupo) == n and all(_es_de_una_pantalla(g, n, vertical) for g in grupo):
+    sueltas = [k for k, it in enumerate(items) if _es_de_una_pantalla(it, n, vertical)]
+    K = len(sueltas)
+    if K < 2: return items
+    if K % n == 0:
+        pases = {sueltas[g]: [sueltas[g + d] for d in range(n)] for g in range(0, K, n)}
+        quitar = {k for g in range(0, K, n) for k in sueltas[g + 1:g + n]}
+    else:
+        pases = {sueltas[g]: [sueltas[(g + d) % K] for d in range(n)] for g in range(K)}
+        quitar = set()
+    out = []
+    for k, it in enumerate(items):
+        if k in quitar: continue
+        if k in pases:
+            grupo = [items[m] for m in pases[k]]
             mia = dict(grupo[idx]); mia["id"] = grupo[0].get("id"); mia["duration"] = grupo[0].get("duration", 8)
             mia["name"] = " + ".join(str(g.get("name", "")) for g in grupo)
-            out.append(mia); i += n
+            out.append(mia)
         else:
-            out.append(items[i]); i += 1
+            out.append(it)
     return out
 
 # Videowall: lo que muestra la pantalla que manda (la izquierda), para que la otra la siga.

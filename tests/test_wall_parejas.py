@@ -49,11 +49,20 @@ def main():
             except Exception: time.sleep(0.2)
         pl = lambda s: json.load(urllib.request.urlopen(f"http://127.0.0.1:{PORT}/api/playlist?screen={s}"))["playlist"]
         izq, der = pl("L"), pl("R")
-        check([i["id"] for i in izq] == ["a", "m", "c"], f"izquierda: pareja a+b, la del muro y la suelta ({[i['id'] for i in izq]})")
-        check([i["id"] for i in der] == ["a", "m", "c"], "derecha: mismos ids, para sincronizarse")
-        check(izq[0]["src"].endswith("a.png") and der[0]["src"].endswith("b.png"), "la pareja: a a la izquierda y b a la derecha")
-        check(izq[1]["src"].endswith("muro.png") and der[1]["src"].endswith("muro.png"), "la del tamaño del muro no se junta")
-        check(izq[2]["src"].endswith("c.png") and der[2]["src"].endswith("c.png"), "la suelta sale entera en las dos")
+        ids = lambda l: [i["id"] for i in l]
+        nom = lambda l: [i["src"].split("/")[-1][0] for i in l]
+        check(ids(izq) == ids(der) == ["a", "b", "m", "c"], f"mismos ids en las dos, cada imagen en su sitio ({ids(izq)})")
+        # Tres de una pantalla (a, b, c): impar, se encadenan (a,b) (b,c) (c,a); la ancha no se toca
+        check(nom(izq) == ["a", "b", "m", "c"] and nom(der) == ["b", "c", "m", "a"],
+              f"encadenadas sin repetir en la misma pase ({nom(izq)} / {nom(der)})")
+        check(izq[2]["src"].endswith("muro.png") and der[2]["src"].endswith("muro.png"), "la del tamaño del muro no se junta")
+        # Con una más (cuatro): de dos en dos
+        c = json.load(open(os.path.join(datos, "content.json")))
+        c["screens"]["L"]["playlist"].append(im("d", "a.png")); c["rev"] = 2
+        json.dump(c, open(os.path.join(datos, "content.json"), "w"))
+        izq, der = pl("L"), pl("R")
+        check(ids(izq) == ids(der) == ["a", "m", "c"] and nom(izq) == ["a", "m", "c"] and nom(der) == ["b", "m", "a"],
+              f"cuatro: (a,b) y (c,d) ({nom(izq)} / {nom(der)})")
     finally:
         p.terminate()
         shutil.rmtree(app, ignore_errors=True); shutil.rmtree(datos, ignore_errors=True)
