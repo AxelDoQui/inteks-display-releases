@@ -1889,8 +1889,8 @@ function renderScreens(){
       else if(fi.type==="text") thumbHtml=`<div style="width:100%;height:100%;background:${fi.bg||'#111'};display:flex;align-items:center;justify-content:center;font-size:9px;color:${fi.color||'#fff'};text-align:center;padding:4px">${fi.title}</div>`;
       else thumbHtml=`<i class="fa-solid ${typeIcon(fi.type)}" style="font-size:18px;color:var(--muted)"></i>`;
     }
-    const muroIds=isWall?(Array.isArray(cfg.wall_ids)?cfg.wall_ids:[cfg.partner].filter(Boolean)):[];
-    const partnerInfo=isWall&&muroIds.length?`<div style="font-size:10px;color:var(--a2);margin-bottom:6px"><i class="fa-solid fa-left-right"></i> videowall${Array.isArray(cfg.wall_ids)?' de '+muroIds.length+' pantallas':''}: <strong>${muroIds.map(esc).join(' → ')}</strong></div>`:'';
+    const muroLista=isWall?(Array.isArray(cfg.wall_ids)?cfg.wall_ids:[cfg.partner].filter(Boolean)):[];
+    const partnerInfo=isWall&&muroLista.length?`<div style="font-size:10px;color:var(--a2);margin-bottom:6px"><i class="fa-solid fa-left-right"></i> videowall${Array.isArray(cfg.wall_ids)?' de '+muroLista.length+' pantallas':''}: <strong>${muroLista.map(esc).join(' → ')}</strong></div>`:'';
     const rotBtn=`<button class="btn btn-sm ${rot?'btn-a4':'btn-ghost'}" onclick="rotateScreen('${sid}')" title="Girar pantalla (0° → 90° → 180° → 270°)"><i class="fa-solid fa-rotate"></i> ${rot}°</button>`;
     card.innerHTML=`
       <div class="sc-hdr">
