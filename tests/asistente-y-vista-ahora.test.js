@@ -49,3 +49,17 @@ test("el instalador avisa de que el acceso remoto se termina en el panel", () =>
   const i = leer("installer/setup.iss");
   assert.ok(i.includes("cuenta.inteksdisplay.com"));
 });
+
+test("Ajustes está ordenado en tres bloques y no se pierde ninguna tarjeta", () => {
+  const ini = admin.indexOf('id="page-settings"');
+  const bloque = admin.slice(ini, admin.indexOf('<div class="page"', ini + 10));
+  const grupos = [...bloque.matchAll(/class="aj-grupo">([^<]+)</g)].map((m) => m[1]);
+  assert.deepStrictEqual(grupos, ["ESTA INSTALACIÓN", "PANTALLAS", "AVISOS, COPIAS Y ARCHIVOS"]);
+  assert.strictEqual((bloque.match(/<div class="card[ "]/g) || []).length, 9);
+  ["card-acceso", "card-lg", "set-name", "set-tg-token", "set-newpass"].forEach((id) =>
+    assert.ok(bloque.includes(`id="${id}"`), id));
+});
+
+test("en móvil las ventanas ocupan todo el ancho aunque lleven ancho propio", () => {
+  assert.ok(admin.includes("width:100%!important;max-width:100%!important"));
+});

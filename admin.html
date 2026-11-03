@@ -313,6 +313,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
    reserva para navegadores que no entiendan dvh. */
 .app{height:100vh;height:100dvh}
 
+.aj-grupo{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--muted);margin:26px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--b)}
 @media (max-width:860px){
   /* Una sola columna: la lateral sale del flujo y pasa a cajon. */
   .app{grid-template-columns:minmax(0,1fr)}
@@ -348,7 +349,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
   .form-row{grid-template-columns:minmax(0,1fr)}
 
   /* A 375px un modal "centrado" son margenes desperdiciados. */
-  .modal{width:100%;max-width:100%;height:100%;max-height:100%;border-radius:0;padding:16px}
+  .modal{width:100%!important;max-width:100%!important;height:100%;max-height:100%;border-radius:0;padding:16px}
   .modal-bd{align-items:stretch;justify-content:stretch}
   .pl-botones{bottom:-16px}
 
@@ -993,6 +994,13 @@ JPY  Yen        162.5"></textarea>
   <h1 style="font-size:18px;font-weight:500;margin-bottom:4px">Ajustes del sistema</h1>
   <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Configuración de puerto, nombre e instalación</p>
 
+  <div class="aj-grupo">ESTA INSTALACIÓN</div>
+  <div class="card">
+    <div class="card-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Asistente de configuración</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Los primeros pasos de una instalación nueva: nombre de la tienda, acceso remoto y pantallas.</p>
+    <button class="btn btn-ghost" onclick="asistenteAbrir()"><i class="fa-solid fa-wand-magic-sparkles"></i> Abrir el asistente</button>
+  </div>
+
   <div class="card">
     <div class="card-title">Configuración del servidor</div>
     <div class="form-row">
@@ -1020,14 +1028,93 @@ JPY  Yen        162.5"></textarea>
   </div>
 
   <div class="card">
-    <div class="card-title">Subida de archivos</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">
-      Tamaño máximo de cada imagen o vídeo que se sube a la Librería. Los vídeos largos
-      pesan mucho; si no caben, se avisa con el motivo.
+    <div class="card-title"><i class="fa-solid fa-shield-halved"></i> Seguridad y acceso</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Contraseña del panel y token para la extensión de Chrome. <strong style="color:var(--text)">El PIN de emparejamiento de pantallas es aparte.</strong></p>
+
+    <div class="form-row">
+      <div class="fg"><label class="flabel">Nueva contraseña del admin (mín. 6)</label><input class="finput" id="set-newpass" type="password" autocomplete="new-password" placeholder="Dejar vacío para no cambiar"></div>
+      <div class="fg"><label class="flabel">Repetir contraseña</label><input class="finput" id="set-newpass2" type="password" autocomplete="new-password"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:18px">
+      <button class="btn btn-accent btn-sm" onclick="changePassword()"><i class="fa-solid fa-key"></i> Cambiar contraseña</button>
+      <button class="btn btn-a2 btn-sm" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> Cerrar sesión</button>
+    </div>
+
+    <label class="flabel">Token de API (para la extensión Chrome y otras integraciones)</label>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input class="finput" id="set-apitoken" readonly value="—" style="font-family:monospace;font-size:12px;flex:1">
+      <button class="btn btn-sm" onclick="copyApiToken()" title="Copiar"><i class="fa-solid fa-copy"></i></button>
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-top:6px">Pega este token en la configuración de la extensión para que pueda enviar tipos de cambio de forma segura.</p>
+  </div>
+
+  <div class="card" id="card-acceso">
+    <div class="card-title"><i class="fa-solid fa-globe"></i> Acceso remoto</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Abre este panel desde cualquier sitio, en una dirección propia (por ejemplo tienda1.inteksdisplay.com). En tu cuenta de InTeks añade este PC y copia el PIN de 6 cifras que te da; escríbelo aquí.</p>
+    <p id="acc-sin-pass" style="display:none;font-size:12px;color:var(--danger,#ff5d5d);margin-bottom:10px">Antes crea la contraseña del administrador (más abajo, en «Seguridad y acceso»): sin ella, el panel quedaría abierto a internet.</p>
+    <p id="acc-no-disp" style="display:none;font-size:12px;color:var(--muted);margin-bottom:10px">Esta instalación no trae el componente de conexión. Reinstala InTeks Display con la última versión.</p>
+    <div id="acc-form" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input class="finput" id="acc-pin" maxlength="6" inputmode="numeric" autocomplete="off" placeholder="PIN de 6 cifras" style="width:160px">
+      <button class="btn btn-accent" id="acc-go" onclick="accesoActivar()"><i class="fa-solid fa-link"></i> Enlazar este PC</button>
+    </div>
+    <div id="acc-pasos" style="font-size:12px;color:var(--muted);margin-top:10px"></div>
+    <div id="acc-activo" style="display:none;margin-top:10px">
+      <div style="font-size:13px"><i class="fa-solid fa-circle-check" style="color:#2ecc71"></i> Accesible en <strong id="acc-url"></strong> <span id="acc-aviso" style="font-size:12px;color:var(--muted)"></span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <button class="btn btn-ghost" onclick="accesoCopiar()"><i class="fa-solid fa-copy"></i> Copiar dirección</button>
+        <button class="btn btn-ghost" onclick="accesoDesactivar()"><i class="fa-solid fa-link-slash"></i> Desactivar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="aj-grupo">PANTALLAS</div>
+  <div class="card" id="card-lg">
+    <div class="card-title"><i class="fa-solid fa-tv"></i> Televisores LG (mini-app)</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">El navegador de los LG cierra la página cada ~2 minutos; la mini-app no. Se instala aquí mismo, sin tocar nada más en este PC.</p>
+    <button class="btn btn-accent" onclick="abrirInstalarLg()"><i class="fa-solid fa-download"></i> Instalar en un televisor LG</button>
+    <p id="lg-nota" style="font-size:12px;color:var(--muted);margin:12px 0 10px;display:none">El <em>Developer Mode</em> del televisor caduca a las ~1000 horas y la mini-app deja de abrirse. Para renovarlo, abre la app «Developer Mode» del TV y pulsa «Extend Session Time»; después pulsa «Ya lo renové» aquí.</p>
+    <div id="lg-lista"></div>
+  </div>
+
+  <div class="aj-grupo">AVISOS, COPIAS Y ARCHIVOS</div>
+  <div class="card">
+    <div class="card-title">Avisos al móvil (Telegram)</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6">
+      Avisa cuando una pantalla se cae <strong style="color:var(--text)">dentro de su horario</strong>,
+      cuando vuelve, y cuando un tablero de divisas lleva demasiado sin actualizarse.
+      Cada aviso se manda una sola vez.<br>
+      Para activarlo: habla con <strong style="color:var(--text)">@BotFather</strong> en Telegram,
+      crea un bot y pega aquí su token. El <em>chat ID</em> te lo da
+      <strong style="color:var(--text)">@userinfobot</strong>.
     </p>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <input class="finput" id="set-upload-max" type="number" min="10" max="20480" style="width:120px"> <span style="font-size:12px;color:var(--muted)">MB por archivo</span>
-      <button class="btn btn-accent" onclick="guardarUploadMax()"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
+    <div class="form-row">
+      <div class="fg"><label class="flabel">Token del bot</label><input class="finput" id="set-tg-token" placeholder="123456:ABC-DEF..."></div>
+      <div class="fg"><label class="flabel">Chat ID</label><input class="finput" id="set-tg-chat" placeholder="123456789"></div>
+    </div>
+    <div class="form-row full">
+      <div class="fg"><label class="flabel">Pantalla caída: avisar tras (minutos sin responder)</label><input class="finput" id="set-tg-min" type="number" min="1" max="1440" value="15" style="width:120px"></div>
+    </div>
+
+    <div style="border-top:1px solid var(--b);padding-top:12px;margin-bottom:4px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:'Space Mono',monospace;letter-spacing:1px">RECORDATORIO DE TASAS VIEJAS</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">
+        Una pantalla caída se avisa una vez; unas tasas viejas siguen ahí hasta que
+        alguien las actualice, así que se recuerdan hasta que se hagan.
+        Pon <strong style="color:var(--text)">0</strong> en «repetir» para un único aviso al día.
+      </p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+        <div class="fg"><label class="flabel">Desde</label><input class="finput" id="set-tg-desde" type="time" value="09:00" style="width:120px"></div>
+        <div class="fg"><label class="flabel">Hasta</label><input class="finput" id="set-tg-hasta" type="time" value="22:00" style="width:120px"></div>
+        <div class="fg"><label class="flabel">Repetir cada (horas)</label><input class="finput" id="set-tg-cada" type="number" min="0" max="24" step="1" value="1" style="width:120px"></div>
+      </div>
+    </div>
+    <p style="font-size:11px;color:#f0a050;margin:4px 0 12px">
+      El token se guarda en config.json, que <strong>sí</strong> va dentro de la copia de
+      seguridad. Trata ese archivo como una contraseña.
+    </p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-accent" onclick="guardarAvisos()"><i class="fa-solid fa-floppy-disk"></i> Guardar avisos</button>
+      <button class="btn btn-ghost" onclick="probarAvisos()"><i class="fa-solid fa-paper-plane"></i> Enviar mensaje de prueba</button>
     </div>
   </div>
 
@@ -1070,76 +1157,14 @@ JPY  Yen        162.5"></textarea>
   </div>
 
   <div class="card">
-    <div class="card-title">Avisos al móvil (Telegram)</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6">
-      Avisa cuando una pantalla se cae <strong style="color:var(--text)">dentro de su horario</strong>,
-      cuando vuelve, y cuando un tablero de divisas lleva demasiado sin actualizarse.
-      Cada aviso se manda una sola vez.<br>
-      Para activarlo: habla con <strong style="color:var(--text)">@BotFather</strong> en Telegram,
-      crea un bot y pega aquí su token. El <em>chat ID</em> te lo da
-      <strong style="color:var(--text)">@userinfobot</strong>.
+    <div class="card-title">Subida de archivos</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+      Tamaño máximo de cada imagen o vídeo que se sube a la Librería. Los vídeos largos
+      pesan mucho; si no caben, se avisa con el motivo.
     </p>
-    <div class="form-row">
-      <div class="fg"><label class="flabel">Token del bot</label><input class="finput" id="set-tg-token" placeholder="123456:ABC-DEF..."></div>
-      <div class="fg"><label class="flabel">Chat ID</label><input class="finput" id="set-tg-chat" placeholder="123456789"></div>
-    </div>
-    <div class="form-row full">
-      <div class="fg"><label class="flabel">Pantalla caída: avisar tras (minutos sin responder)</label><input class="finput" id="set-tg-min" type="number" min="1" max="1440" value="15" style="width:120px"></div>
-    </div>
-
-    <div style="border-top:1px solid var(--b);padding-top:12px;margin-bottom:4px">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-family:'Space Mono',monospace;letter-spacing:1px">RECORDATORIO DE TASAS VIEJAS</div>
-      <p style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">
-        Una pantalla caída se avisa una vez; unas tasas viejas siguen ahí hasta que
-        alguien las actualice, así que se recuerdan hasta que se hagan.
-        Pon <strong style="color:var(--text)">0</strong> en «repetir» para un único aviso al día.
-      </p>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
-        <div class="fg"><label class="flabel">Desde</label><input class="finput" id="set-tg-desde" type="time" value="09:00" style="width:120px"></div>
-        <div class="fg"><label class="flabel">Hasta</label><input class="finput" id="set-tg-hasta" type="time" value="22:00" style="width:120px"></div>
-        <div class="fg"><label class="flabel">Repetir cada (horas)</label><input class="finput" id="set-tg-cada" type="number" min="0" max="24" step="1" value="1" style="width:120px"></div>
-      </div>
-    </div>
-    <p style="font-size:11px;color:#f0a050;margin:4px 0 12px">
-      El token se guarda en config.json, que <strong>sí</strong> va dentro de la copia de
-      seguridad. Trata ese archivo como una contraseña.
-    </p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-accent" onclick="guardarAvisos()"><i class="fa-solid fa-floppy-disk"></i> Guardar avisos</button>
-      <button class="btn btn-ghost" onclick="probarAvisos()"><i class="fa-solid fa-paper-plane"></i> Enviar mensaje de prueba</button>
-    </div>
-  </div>
-
-  <div class="card" id="card-lg">
-    <div class="card-title"><i class="fa-solid fa-tv"></i> Televisores LG (mini-app)</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">El navegador de los LG cierra la página cada ~2 minutos; la mini-app no. Se instala aquí mismo, sin tocar nada más en este PC.</p>
-    <button class="btn btn-accent" onclick="abrirInstalarLg()"><i class="fa-solid fa-download"></i> Instalar en un televisor LG</button>
-    <p id="lg-nota" style="font-size:12px;color:var(--muted);margin:12px 0 10px;display:none">El <em>Developer Mode</em> del televisor caduca a las ~1000 horas y la mini-app deja de abrirse. Para renovarlo, abre la app «Developer Mode» del TV y pulsa «Extend Session Time»; después pulsa «Ya lo renové» aquí.</p>
-    <div id="lg-lista"></div>
-  </div>
-
-  <div class="card">
-    <div class="card-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Asistente de configuración</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Los primeros pasos de una instalación nueva: nombre de la tienda, acceso remoto y pantallas.</p>
-    <button class="btn btn-ghost" onclick="asistenteAbrir()"><i class="fa-solid fa-wand-magic-sparkles"></i> Abrir el asistente</button>
-  </div>
-
-  <div class="card" id="card-acceso">
-    <div class="card-title"><i class="fa-solid fa-globe"></i> Acceso remoto</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Abre este panel desde cualquier sitio, en una dirección propia (por ejemplo tienda1.inteksdisplay.com). En tu cuenta de InTeks añade este PC y copia el PIN de 6 cifras que te da; escríbelo aquí.</p>
-    <p id="acc-sin-pass" style="display:none;font-size:12px;color:var(--danger,#ff5d5d);margin-bottom:10px">Antes crea la contraseña del administrador (más abajo, en «Seguridad y acceso»): sin ella, el panel quedaría abierto a internet.</p>
-    <p id="acc-no-disp" style="display:none;font-size:12px;color:var(--muted);margin-bottom:10px">Esta instalación no trae el componente de conexión. Reinstala InTeks Display con la última versión.</p>
-    <div id="acc-form" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <input class="finput" id="acc-pin" maxlength="6" inputmode="numeric" autocomplete="off" placeholder="PIN de 6 cifras" style="width:160px">
-      <button class="btn btn-accent" id="acc-go" onclick="accesoActivar()"><i class="fa-solid fa-link"></i> Enlazar este PC</button>
-    </div>
-    <div id="acc-pasos" style="font-size:12px;color:var(--muted);margin-top:10px"></div>
-    <div id="acc-activo" style="display:none;margin-top:10px">
-      <div style="font-size:13px"><i class="fa-solid fa-circle-check" style="color:#2ecc71"></i> Accesible en <strong id="acc-url"></strong> <span id="acc-aviso" style="font-size:12px;color:var(--muted)"></span></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-        <button class="btn btn-ghost" onclick="accesoCopiar()"><i class="fa-solid fa-copy"></i> Copiar dirección</button>
-        <button class="btn btn-ghost" onclick="accesoDesactivar()"><i class="fa-solid fa-link-slash"></i> Desactivar</button>
-      </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input class="finput" id="set-upload-max" type="number" min="10" max="20480" style="width:120px"> <span style="font-size:12px;color:var(--muted)">MB por archivo</span>
+      <button class="btn btn-accent" onclick="guardarUploadMax()"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
     </div>
   </div>
 
@@ -1161,26 +1186,6 @@ JPY  Yen        162.5"></textarea>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-title"><i class="fa-solid fa-shield-halved"></i> Seguridad y acceso</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Contraseña del panel y token para la extensión de Chrome. <strong style="color:var(--text)">El PIN de emparejamiento de pantallas es aparte.</strong></p>
-
-    <div class="form-row">
-      <div class="fg"><label class="flabel">Nueva contraseña del admin (mín. 6)</label><input class="finput" id="set-newpass" type="password" autocomplete="new-password" placeholder="Dejar vacío para no cambiar"></div>
-      <div class="fg"><label class="flabel">Repetir contraseña</label><input class="finput" id="set-newpass2" type="password" autocomplete="new-password"></div>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:18px">
-      <button class="btn btn-accent btn-sm" onclick="changePassword()"><i class="fa-solid fa-key"></i> Cambiar contraseña</button>
-      <button class="btn btn-a2 btn-sm" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> Cerrar sesión</button>
-    </div>
-
-    <label class="flabel">Token de API (para la extensión Chrome y otras integraciones)</label>
-    <div style="display:flex;gap:8px;align-items:center">
-      <input class="finput" id="set-apitoken" readonly value="—" style="font-family:monospace;font-size:12px;flex:1">
-      <button class="btn btn-sm" onclick="copyApiToken()" title="Copiar"><i class="fa-solid fa-copy"></i></button>
-    </div>
-    <p style="font-size:11px;color:var(--muted);margin-top:6px">Pega este token en la configuración de la extensión para que pueda enviar tipos de cambio de forma segura.</p>
-  </div>
 </div>
 
 <!-- ── AYUDA -->
