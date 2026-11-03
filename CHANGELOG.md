@@ -8,6 +8,12 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.79 — 2026-11-03
+
+- **Videowall: divisas por páginas.** Las páginas de cambio de divisas se reparten entre las pantallas (la 1 enseña la página 1 y la 2 la página 2, a la vez). Si caben en una sola, las filas se reparten a partes iguales.
+- **Videowall: imágenes sin estirar.** Una imagen del tamaño de una pantalla se enseña entera en cada una; una del tamaño del muro se reparte entre ellas.
+- **Videowall: el resto de contenidos** (clima, texto, noticias, QR, páginas web…) se dibujan una vez a lo ancho del muro y cada pantalla enseña su parte.
+
 ## 1.0.78 — 2026-11-03
 
 - **Arreglo del panel.** En la 1.0.77 la pestaña Pantallas se quedaba vacía por un error al dibujar las tarjetas. Ya se ven, con una sola tarjeta por videowall.
