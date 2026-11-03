@@ -47,6 +47,9 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 .slide>video{width:100%;height:100%;object-fit:contain;background:#000}
 .slide>iframe{width:100%;height:100%;border:none;background:#fff}
 .slide.wall{overflow:hidden;justify-content:flex-start}
+.slide.wall>*{flex:none;max-width:none;width:calc(var(--wall-n,2)*100%);height:100%;margin-left:calc(var(--wall-i,0)*-100%)}
+/* Divisas: cada pantalla dibuja SU página, no una porción de una sola. */
+.slide.wall.wall-fx>*{width:100%;margin-left:0}
 /* Videowall: el medio ocupa el lienzo ENTERO del muro (N pantallas de ancho) y cada pantalla
    enseña su porción desplazandolo; asi las N pantallas se ven como una sola imagen. */
 .slide.wall>img,.slide.wall>video{flex:none;object-fit:cover;width:calc(var(--wall-n,2)*100%);max-width:none;height:100%;margin-left:calc(var(--wall-i,0)*-100%)}
@@ -1035,8 +1038,10 @@ function rebuildSlides(){
     if(item.wall_mode){
       // Cada pantalla del muro enseña su trozo: la 1.ª el borde izquierdo, la última el derecho.
       var wn=item.wall_n||2, wi=(item.wall_idx!==undefined)?item.wall_idx:(item.wall_pos==="right"?1:0);
-      slide.classList.add("wall");
       slide.style.setProperty("--wall-n",wn); slide.style.setProperty("--wall-i",wi);
+      // Las imágenes deciden al cargar (según su proporción); lo demás ocupa el muro entero.
+      if(item.type!=="image") slide.classList.add("wall");
+      if(item.type==="fx") slide.classList.add("wall-fx");
     }
     slide.dataset.i=i; slide.dataset.dur=item.duration||8;
 
@@ -1084,6 +1089,19 @@ function rebuildSlides(){
       // Una diapositiva en opacity:0 se sigue pintando, así que un src puesto
       // aquí obliga al navegador a decodificarla aunque no se vea nunca.
       img.dataset.medio=item.src;
+      // En un videowall: una imagen del tamaño de UNA pantalla se enseña entera en cada una
+      // (no se estira); una del tamaño del muro entero se reparte entre ellas. Se elige la
+      // proporción a la que más se parece.
+      if(item.wall_mode){
+        const wn=item.wall_n||2;
+        img.addEventListener("load",function(){
+          const w=slide.clientWidth, h=slide.clientHeight;
+          if(!w||!h||!img.naturalWidth||!img.naturalHeight) return;
+          const a=img.naturalWidth/img.naturalHeight, una=w/h, muro=una*wn;
+          if(Math.abs(Math.log(a/muro))<Math.abs(Math.log(a/una))) slide.classList.add("wall");
+          else slide.classList.remove("wall");
+        });
+      }
       slide.appendChild(img);
     }
     player.appendChild(slide);
@@ -1221,7 +1239,7 @@ function wallRol(){
   var i=(c.wall_idx!==undefined)?c.wall_idx:(c.wall_pos==="right"?1:0);
   return i>0?"sigue":"manda";
 }
-var wallMaestro=null, wallVisto=0;
+var wallMaestro=null, wallVisto=0, wallPg=0, wallFxPoll=null;
 function wallSigue(){ return wallRol()==="sigue" && !!wallMaestro && (performance.now()-wallVisto)<6000; }
 function wallAnunciar(){
   try{
@@ -1230,7 +1248,7 @@ function wallAnunciar(){
     var i=parseInt(s.dataset.i,10), it=playlist[i]; if(!it) return;
     var v=s.querySelector("video");
     fetch("/api/wall-sync",{method:"POST",headers:{"Content-Type":"application/json"},keepalive:true,
-      body:JSON.stringify({screen:SCREEN_ID,id:String(it.id||""),t:v?(v.currentTime||0):0,video:!!v})}).catch(()=>{});
+      body:JSON.stringify({screen:SCREEN_ID,id:String(it.id||""),t:v?(v.currentTime||0):0,video:!!v,pg:wallPg})}).catch(()=>{});
   }catch(e){}
 }
 function wallSeguir(){
@@ -1316,7 +1334,7 @@ function showSlide(idx){
   const isVideo=!!slide.querySelector("video");
   const fx=slide.querySelector(".mod-fx");
   const ms=(parseFloat(slide.dataset.dur)||8)*1000;
-  clearTimeout(timer);
+  clearTimeout(timer); clearInterval(wallFxPoll); wallPg=0;
   if(isVideo){
     const v=slide.querySelector("video");
     v.muted=!sonidoVideos(playlist[parseInt(slide.dataset.i,10)]);
@@ -1488,6 +1506,48 @@ function setupFxPagination(slide, perPageMs, onDone){
     container.style.justifyContent = (filas<MIN_FILAS_VISUALES) ? "center" : "stretch";
     container.style.setProperty("--fx-flex", filas<MIN_FILAS_VISUALES ? "0 0 auto" : "1 1 0");
   };
+
+  // Videowall: las páginas de divisas se REPARTEN entre las pantallas. Con 2 pantallas, la 1
+  // enseña la página 1 y la 2 la página 2, a la vez; luego las dos siguientes, y así. Si
+  // todo cabe en una página, las filas se reparten a partes iguales entre las pantallas.
+  const itFx=playlist[parseInt(slide.dataset.i,10)]||{};
+  const N=(itFx.wall_mode&&itFx.wall_n>1)?itFx.wall_n:1, WI=itFx.wall_idx||0;
+  if(N>1 && rows.length>=N && avail>0){
+    const altoF=avail/capacidadPagina(avail);
+    const base=groupRowsIntoPages(rows.map(()=>altoF), avail).length;
+    const G=Math.max(1,Math.ceil(base/N)), total=G*N;
+    const trozos=[]; let pos=0;
+    for(let k=0;k<total;k++){
+      const n=Math.floor(rows.length/total)+(k<rows.length%total?1:0);
+      trozos.push(rows.slice(pos,pos+n)); pos+=n;
+    }
+    reportPreviewPages(total, trozos[0].length);
+    let gi=0;
+    const show=(g)=>{
+      gi=g; wallPg=g;
+      const mias=trozos[g*N+WI]||[];
+      rows.forEach(r=>r.style.display="none");
+      mias.forEach(r=>r.style.display="");
+      fitRows(mias.length);
+      if(indicator){ if(G>1){ indicator.style.display=""; indicator.textContent=`${g+1} / ${G}`; } else indicator.style.display="none"; }
+      startProgress(perPageMs);
+      const avanza=()=>{
+        if(wallRol()==="sigue" && wallSigue()){ timer=setTimeout(avanza,1000); return; }   // manda la otra
+        if(g+1<G) show(g+1); else onDone();
+      };
+      timer=setTimeout(avanza,perPageMs);
+      wallAnunciar();
+    };
+    show(0);
+    // La que sigue toma la página que dice la que manda, para cambiar las dos a la vez.
+    if(wallRol()==="sigue"){
+      wallFxPoll=setInterval(function(){
+        if(!wallSigue()||wallMaestro.pg===undefined||wallMaestro.pg===gi||wallMaestro.pg>=G) return;
+        clearTimeout(timer); show(wallMaestro.pg);
+      },300);
+    }
+    return;
+  }
 
   if(rows.length<=1 || avail<=0){                      // nada que paginar
     if(indicator) indicator.style.display="none";

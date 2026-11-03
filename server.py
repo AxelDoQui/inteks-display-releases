@@ -2876,7 +2876,8 @@ class Handler(BaseHTTPRequestHandler):
                 try: t = max(0.0, min(float(d.get("t", 0) or 0), 86400.0))
                 except Exception: t = 0.0
                 wall_estado[sid] = {"id": str(d.get("id", "") or "")[:200], "t": t,
-                                    "video": d.get("video") is True, "at": time.time()}
+                                    "video": d.get("video") is True, "at": time.time(),
+                                    "pg": max(0, min(int(d.get("pg", 0) or 0), 999))}
                 jresp(200, {"ok": True}); return
             except Exception as e: err(e); return
 
