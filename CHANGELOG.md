@@ -8,6 +8,12 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.74 — 2026-11-03
+
+- **Videowall de 2, 3 o más pantallas.** En «Videowall» se pulsan las pantallas de izquierda a derecha y cada una enseña su trozo. La primera manda y las demás la siguen; solo suena la primera. Los muros de 2 que ya existían siguen igual.
+- **Un muro es una sola pantalla para el contenido.** «Playlist» en cualquier pantalla del muro edita la de la primera, y lo que se manda a varias pantallas del muro entra una sola vez. Al desvincular una, se libera el muro entero.
+- **Aviso de tamaño.** Al añadir una imagen o un vídeo a un muro, el panel calcula cuántas pantallas pide y avisa si no cuadra con las del muro.
+
 ## 1.0.73 — 2026-11-03
 
 - **Videowall sincronizado.** Las dos pantallas ya no se desfasan: la izquierda manda y la derecha la sigue (mismo contenido, y el vídeo en el mismo segundo). La derecha usa la playlist de la izquierda, y solo suena la izquierda. Si la izquierda se apaga, la derecha sigue sola.
