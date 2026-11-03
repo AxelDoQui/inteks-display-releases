@@ -1491,7 +1491,7 @@ JPY  Yen        162.5"></textarea>
       <button class="btn btn-ghost btn-sm" onclick="cerrarAhora()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div id="ahora-caja" style="position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:var(--r);overflow:hidden;border:1px solid var(--b)">
-      <iframe id="ahora-frame" style="width:100%;height:100%;border:0" allow="autoplay"></iframe>
+      <div id="ahora-marcos" style="display:flex;width:100%;height:100%;gap:3px;background:#2a2a2a"></div>
     </div>
     <div id="ahora-txt" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
     <div style="font-size:11px;color:var(--muted);margin-top:4px">Es el mismo contenido que muestra la pantalla, no una captura de la tele. Se actualiza solo cuando cambia.</div>
@@ -1870,14 +1870,15 @@ function renderScreens(){
   grid.innerHTML="";
   const visibles=Array.from(ids).filter(coincideGrupo);
   if(!visibles.length){grid.innerHTML='<div class="empty-state" style="grid-column:1/-1">No hay pantallas en este grupo</div>';return;}
-  visibles.forEach(sid=>{
+  visibles.filter(sid=>!muroMaestra(sid)).forEach(sid=>{
     const reg=regScreens[sid]||{};
     const cfg=(content.screens||{})[sid]||{};
     const pl=((muroMaestra(sid)&&(content.screens[muroMaestra(sid)]||{}).playlist)||cfg.playlist)||[];
     const isWall=cfg.mode==="wall";
     const rot=cfg.rotation!==undefined?cfg.rotation:(cfg.vertical?90:0);
     const isVert=(rot===90||rot===270);
-    const isOn=reg.connected;
+    const miembros=muroIds(sid), enLinea=miembros.filter(x=>(regScreens[x]||{}).connected).length;
+    const isOn=miembros.length>1?enLinea===miembros.length:reg.connected;
     const card=document.createElement("div");
     card.className="sc-card"+(isWall?" wall-linked":"")+(isVert?" vertical-mode":"");
     let thumbHtml='<i class="fa-solid fa-display" style="font-size:18px;color:#333"></i>';
@@ -1897,7 +1898,7 @@ function renderScreens(){
         <div class="sc-info">
           <div class="sc-name">${esc(cfg.label||sid)}${cfg.label?` <span style="font-size:10px;color:var(--muted);font-weight:400" title="Nombre interno con el que se enlazó el televisor">(${esc(sid)})</span>`:''}</div>
           <div class="sc-meta">
-            <span class="pill ${isOn?'pill-on':'pill-off'}">${isOn?'● online':'○ offline'}</span>
+            <span class="pill ${isOn?'pill-on':'pill-off'}">${isOn?'● online':(miembros.length>1&&enLinea?'◐ '+enLinea+' de '+miembros.length+' online':'○ offline')}</span>
             ${isWall?'<span class="pill pill-wall">videowall</span>':'<span class="pill pill-ind">independiente</span>'}
             ${rot?`<span class="pill pill-vert"><i class="fa-solid fa-rotate"></i> ${rot}°</span>`:''}
             ${cfg.group?`<span class="pill pill-ind" title="Grupo"><i class="fa-solid fa-layer-group"></i> ${esc(cfg.group)}</span>`:''}
@@ -2115,8 +2116,7 @@ function rotateScreen(sid){
   if(!content.screens[sid])content.screens[sid]={mode:"independent",playlist:[]};
   const cur=content.screens[sid].rotation!==undefined?content.screens[sid].rotation:(content.screens[sid].vertical?90:0);
   const next=(cur+90)%360;
-  content.screens[sid].rotation=next;
-  delete content.screens[sid].vertical;  // migrar al modelo de rotación
+  miembrosMuro(sid).forEach(m=>{ content.screens[m].rotation=next; delete content.screens[m].vertical; });   // migrar al modelo de rotación
   saveScreensConfig();renderScreens();
   toast(next===0?"Pantalla horizontal (0°)":`Pantalla girada a ${next}°`);
 }
@@ -2283,9 +2283,12 @@ function saveSchedule(){
       : (f.image ? {date:f.date, enabled:false, image:f.image} : {date:f.date, enabled:false}));
 
   const alwaysOn=document.getElementById("sched-always").checked;
-  content.screens[currentScheduleScreen].always_on=alwaysOn;
-  content.screens[currentScheduleScreen].schedule=schedule;
-  content.screens[currentScheduleScreen].standby_image=document.getElementById("sched-standby").value||"";
+  const standby=document.getElementById("sched-standby").value||"";
+  miembrosMuro(currentScheduleScreen).forEach(m=>{
+    content.screens[m].always_on=alwaysOn;
+    content.screens[m].schedule=JSON.parse(JSON.stringify(schedule));
+    content.screens[m].standby_image=standby;
+  });
 
   saveScreensConfig();
   closeScheduleModal();
@@ -3365,6 +3368,14 @@ function muroMaestra(sid){
   const ids=Array.isArray(cfg.wall_ids)?cfg.wall_ids:(cfg.wall_pos==="right"?[cfg.partner,sid]:[sid,cfg.partner]);
   return (ids[0]&&ids[0]!==sid&&(content.screens||{})[ids[0]])?ids[0]:"";
 }
+// Pantallas del muro de `sid`, de izquierda a derecha (vacío si no es de un muro).
+function muroIds(sid){
+  const cfg=(content.screens||{})[sid];
+  if(!cfg||cfg.mode!=="wall") return [];
+  return (Array.isArray(cfg.wall_ids)?cfg.wall_ids:(cfg.wall_pos==="right"?[cfg.partner,sid]:[sid,cfg.partner])).filter(Boolean);
+}
+// Lo que se cambia en un muro (giro, horario) se aplica a todas sus pantallas: es una sola.
+function miembrosMuro(sid){ const m=muroIds(sid).filter(x=>content.screens[x]); return m.length?m:[sid]; }
 function openPlModal(sid){
   const maestra=muroMaestra(sid);
   if(maestra){ toast("«"+sid+"» es parte de un videowall: se edita la playlist de «"+maestra+"», que es la de todo el muro."); sid=maestra; }
@@ -6002,8 +6013,11 @@ function _ahoraItem(sid,reg){
   if(n.img) return {type:"image",src:n.img,duration:9999};
   return null;
 }
+function _ahoraMarcos(){ return Array.from(document.querySelectorAll("#ahora-marcos iframe")); }
+let _ahoraPayload=null;
+function _ahoraEnviar(fr){ if(fr&&fr.dataset.listo&&_ahoraPayload) fr.contentWindow.postMessage(_ahoraPayload,"*"); }
 function _ahoraPintar(){
-  const sid=_ahoraSid; if(!sid||!_ahoraListo) return;
+  const sid=_ahoraSid; if(!sid) return;
   const reg=regScreens[sid]||{}, cfg=(content.screens||{})[sid]||{};
   const n=reg.now, txt=document.getElementById("ahora-txt");
   const it=_ahoraItem(sid,reg);
@@ -6013,7 +6027,8 @@ function _ahoraPintar(){
   if(_ahoraId===n.id) return;
   _ahoraId=n.id;
   const rot=cfg.rotation!==undefined?cfg.rotation:(cfg.vertical?90:0);
-  document.getElementById("ahora-frame").contentWindow.postMessage({type:"preview-item",item:it,rotation:rot},"*");
+  _ahoraPayload={type:"preview-item",item:it,rotation:rot};
+  _ahoraMarcos().forEach(_ahoraEnviar);
 }
 async function _ahoraRefrescar(){
   try{ const r=await fetch("/api/screens",{cache:"no-store"}); if(r.ok){ const d=await r.json();
@@ -6021,27 +6036,38 @@ async function _ahoraRefrescar(){
   _ahoraPintar();
 }
 function verAhora(sid){
-  _ahoraSid=sid; _ahoraListo=false; _ahoraId=null;
+  // Un videowall se ve entero: tantos marcos como pantallas, con su división, y el estado
+  // sale de la que manda.
+  const nMarcos=Math.max(1,muroIds(sid).length);
+  _ahoraSid=muroMaestra(sid)||sid; _ahoraListo=false; _ahoraId=null; _ahoraPayload=null;
   const cfg=(content.screens||{})[sid]||{};
   document.getElementById("ahora-titulo").textContent="AHORA EN "+String(cfg.label||sid).toUpperCase();
   document.getElementById("ahora-txt").textContent="Cargando…";
   const caja=document.getElementById("ahora-caja");
   const rot=cfg.rotation!==undefined?cfg.rotation:(cfg.vertical?90:0);
-  caja.style.aspectRatio=(rot===90||rot===270)?"9/16":"16/9";
+  const vert=(rot===90||rot===270);
+  caja.style.aspectRatio=(nMarcos*(vert?9:16))+"/"+(vert?16:9);
   caja.style.maxHeight="70vh"; caja.style.margin="0 auto";
-  caja.style.width=(rot===90||rot===270)?"min(100%,39vh)":"100%";
-  document.getElementById("ahora-frame").src="/player.html?preview=1";
+  caja.style.width=vert?"min(100%,"+(39*nMarcos)+"vh)":"100%";
+  const marcos=document.getElementById("ahora-marcos"); marcos.innerHTML="";
+  for(let i=0;i<nMarcos;i++){
+    const fr=document.createElement("iframe");
+    fr.style.cssText="flex:1;min-width:0;height:100%;border:0;background:#000"; fr.allow="autoplay";
+    fr.src="/player.html?preview=1"+(nMarcos>1?"&wall="+i+"/"+nMarcos:"");
+    marcos.appendChild(fr);
+  }
   document.getElementById("ahora-modal").classList.add("show");
   clearInterval(_ahoraTimer); _ahoraTimer=setInterval(_ahoraRefrescar,4000);
 }
 function cerrarAhora(){
   clearInterval(_ahoraTimer); _ahoraTimer=null; _ahoraSid=null; _ahoraListo=false;
-  document.getElementById("ahora-frame").src="about:blank";
+  document.getElementById("ahora-marcos").innerHTML="";
   document.getElementById("ahora-modal").classList.remove("show");
 }
 window.addEventListener("message",(e)=>{
-  const f=document.getElementById("ahora-frame");
-  if(f&&e.source===f.contentWindow&&(e.data||{}).type==="preview-ready"){ _ahoraListo=true; _ahoraPintar(); }
+  if((e.data||{}).type!=="preview-ready") return;
+  const f=_ahoraMarcos().find(x=>x.contentWindow===e.source);
+  if(f){ f.dataset.listo="1"; _ahoraListo=true; _ahoraPintar(); _ahoraEnviar(f); }
 });
 // ── Asistente de primer arranque: nombre de la tienda → acceso remoto (PIN) → pantallas.
 // Se abre solo tras crear la contraseña (login.html manda a ?asistente=1) y desde Ajustes.

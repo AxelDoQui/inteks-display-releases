@@ -3,7 +3,7 @@
 // Diseño SEGURO: nunca intercepta /api/ (datos/SSE) ni vídeos (HTTP Range) para no romperlos.
 // v2: cambiar el nombre borra la caché anterior al activarse, y con ella el
 // admin.html viejo que se había quedado guardado (el panel no mostraba lo nuevo).
-const CACHE = 'signalos-v2';
+const CACHE = 'signalos-v3';
 
 // El panel de administración y su login SE PIDEN SIEMPRE AL SERVIDOR. Solo el
 // player necesita funcionar sin red; el panel sin servidor no sirve para nada, y
@@ -28,6 +28,16 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (url.origin !== self.location.origin) return;   // solo mismo origen (flagcdn/cdn quedan al navegador)
   if (!cacheable(url, e.request)) return;             // passthrough: API, SSE, vídeo
+  // Las páginas (player.html) van primero a la red: con caché primero, tras actualizar la app
+  // una recarga enseñaba el código viejo y las pantallas se quedaban sin la mejora. Solo si
+  // no hay red se sirve lo guardado, para que el player siga funcionando offline.
+  if (e.request.mode === 'navigate' || /\.html$/i.test(url.pathname)) {
+    e.respondWith(fetch(e.request).then((resp) => {
+      if (resp && resp.status === 200) { const c = resp.clone(); caches.open(CACHE).then(ca => ca.put(e.request, c)); }
+      return resp;
+    }).catch(() => caches.match(e.request)));
+    return;
+  }
   // Cache-first + revalidación en segundo plano: reproduce offline lo último cacheado
   e.respondWith(caches.open(CACHE).then(async (cache) => {
     const cached = await cache.match(e.request);
