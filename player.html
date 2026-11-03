@@ -57,7 +57,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 /* ── Texto */
 .text-slide{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:8vw;text-align:center}
 .text-slide h2{font-size:6vw;font-size:clamp(28px,6vw,96px);font-weight:700;line-height:1.1;margin-bottom:.3em}
-.text-slide p{font-size:3vw;font-size:clamp(16px,3vw,48px);opacity:.75;line-height:1.5}
+.text-slide p{font-size:3vw;font-size:clamp(16px,3vw,48px);opacity:.85;line-height:1.5}
 
 /* ── Módulo divisas */
 .mod-fx{width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden}
@@ -126,21 +126,21 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 
 /* ── Módulo clima */
 .mod-weather{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6vw;text-align:center}
-.weather-city{font-size:3vw;font-size:clamp(18px,3vw,40px);font-weight:500;opacity:.5;letter-spacing:3px;text-transform:uppercase;margin-bottom:1vh}
+.weather-city{font-size:3vw;font-size:clamp(20px,3vw,44px);font-weight:500;opacity:.8;letter-spacing:3px;text-transform:uppercase;margin-bottom:1vh}
 .weather-icon{font-size:18vw;font-size:clamp(80px,18vw,200px);line-height:1;margin:2vh 0}
 .weather-temp{font-size:14vw;font-size:clamp(64px,14vw,180px);font-weight:700;font-family:monospace;line-height:1}
-.weather-unit{font-size:5vw;font-size:clamp(28px,5vw,64px);opacity:.4;vertical-align:super}
-.weather-desc{font-size:2.5vw;font-size:clamp(16px,2.5vw,36px);opacity:.55;margin-top:1.5vh;letter-spacing:2px}
-.weather-details{display:flex;gap:4vw;margin-top:3vh;opacity:.4;font-size:1.8vw;font-size:clamp(12px,1.8vw,22px);font-family:monospace}
+.weather-unit{font-size:5vw;font-size:clamp(28px,5vw,64px);opacity:.6;vertical-align:super}
+.weather-desc{font-size:2.5vw;font-size:clamp(18px,2.5vw,40px);opacity:.85;margin-top:1.5vh;letter-spacing:2px}
+.weather-details{display:flex;gap:4vw;margin-top:3vh;opacity:.8;font-size:2.2vw;font-size:clamp(16px,2.2vw,32px);font-family:monospace}
 
 /* ── Módulo noticias ticker */
 .mod-ticker{width:100%;height:100%;display:flex;flex-direction:column}
 .ticker-header{padding:3vh 4vw 2vh;flex-shrink:0}
-.ticker-title{font-size:2vw;font-size:clamp(14px,2vw,28px);font-weight:700;letter-spacing:3px;text-transform:uppercase;opacity:.5}
+.ticker-title{font-size:2vw;font-size:clamp(14px,2vw,28px);font-weight:700;letter-spacing:3px;text-transform:uppercase;opacity:.8}
 .ticker-items{flex:1;overflow:hidden;display:flex;flex-direction:column;justify-content:center;padding:0 4vw}
 .ticker-item{padding:2.5vh 0;padding:clamp(12px,2.5vh,32px) 0;border-bottom:1px solid rgba(255,255,255,.06);opacity:0;transform:translateY(20px);transition:opacity .6s,transform .6s}
 .ticker-item.visible{opacity:1;transform:translateY(0)}
-.ticker-item-source{font-size:1.2vw;font-size:clamp(10px,1.2vw,16px);opacity:.35;letter-spacing:2px;text-transform:uppercase;font-family:monospace;margin-bottom:.4em}
+.ticker-item-source{font-size:1.6vw;font-size:clamp(14px,1.6vw,24px);opacity:.7;letter-spacing:2px;text-transform:uppercase;font-family:monospace;margin-bottom:.4em}
 .ticker-item-text{font-size:2.8vw;font-size:clamp(16px,2.8vw,40px);font-weight:500;line-height:1.35}
 
 /* ── Pantalla de espera */
@@ -168,23 +168,24 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;cursor:none;f
 .product-info{display:flex;flex-direction:column;justify-content:center}
 .product-name{font-size:5vw;font-size:clamp(32px,5vw,64px);font-weight:700;margin-bottom:1vh;line-height:1.1}
 .product-price{font-size:4vw;font-size:clamp(28px,4vw,52px);font-weight:700;margin-bottom:2vh}
-.product-old-price{text-decoration:line-through;opacity:.5;font-size:2.5vw;font-size:clamp(16px,2.5vw,28px);margin-bottom:1vh}
-.product-specs{font-size:2vw;font-size:clamp(14px,2vw,24px);line-height:1.8;opacity:.8}
+.product-old-price{text-decoration:line-through;opacity:.7;font-size:2.5vw;font-size:clamp(16px,2.5vw,28px);margin-bottom:1vh}
+.product-specs{font-size:2.2vw;font-size:clamp(16px,2.2vw,30px);line-height:1.8;opacity:.9}
 .product-badge{display:inline-block;padding:.5em 1em;background:rgba(255,255,255,.2);border-radius:1vw;font-size:1.5vw;font-size:clamp(12px,1.5vw,18px);margin-bottom:2vh;font-weight:600}
 
 /* ── Comparativa */
 .mod-comparison{width:100%;height:100%;display:grid;grid-template-columns:1fr 1fr;grid-gap:4vw;gap:4vw;padding:4vw;align-items:center}
-.comparison-product{display:flex;flex-direction:column;align-items:center;text-align:center}
+.comparison-product{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center}
 .comparison-image{width:90%;aspect-ratio:1;object-fit:contain;margin-bottom:2vh;border-radius:1vw}
 .comparison-name{font-size:3.5vw;font-size:clamp(24px,3.5vw,44px);font-weight:700;margin-bottom:1vh}
 .comparison-price{font-size:3vw;font-size:clamp(20px,3vw,40px);font-weight:700;color:#4ff0c0;margin-bottom:2vh}
-.comparison-features{text-align:left;font-size:1.8vw;font-size:clamp(12px,1.8vw,22px);line-height:1.7;opacity:.8}
+.comparison-features{text-align:left;font-size:2vw;font-size:clamp(14px,2vw,28px);line-height:1.7;opacity:.9}
 .comparison-badge{position:absolute;top:2vw;right:2vw;background:#ff7040;padding:.5em 1.2em;border-radius:1vw;font-weight:700;font-size:1.5vw;font-size:clamp(12px,1.5vw,18px)}
 
 /* ── Cuenta atrás */
+.cd-bloque{margin:0 .12em;display:flex;flex-direction:column;align-items:center;min-width:1.4em}.cd-bloque>small{font-size:.14em;font-weight:500;opacity:.8;letter-spacing:.08em;text-transform:uppercase;font-family:sans-serif;letter-spacing:2px}
 .mod-countdown{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6vw;text-align:center}
 .countdown-message{font-size:3vw;font-size:clamp(20px,3vw,40px);margin-bottom:3vh;opacity:.8}
-.countdown-timer{font-size:16vw;font-size:clamp(72px,16vw,200px);font-weight:700;font-family:monospace;letter-spacing:-2px}
+.countdown-timer{display:flex;align-items:flex-end;justify-content:center;flex-wrap:wrap;font-size:16vw;font-size:clamp(72px,16vw,200px);font-weight:700;font-family:monospace;letter-spacing:-2px}
 .countdown-unit{font-size:2vw;font-size:clamp(14px,2vw,28px);opacity:.5;margin-left:1vw;display:inline-block;vertical-align:top}
 .countdown-end{font-size:2.5vw;font-size:clamp(18px,2.5vw,36px);margin-top:3vh;opacity:.8}
 
@@ -906,20 +907,30 @@ function buildFxSlide(item){
   return div;
 }
 
+// Todo lo que escribe el usuario se inserta ya escapado: una «&» o un «<» en un precio o una
+// noticia no puede romper la diapositiva.
+function escH(s){ return String(s===undefined||s===null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+// «9,99 €» (el símbolo detrás, como se escribe en España); $ y £ van delante.
+function precioFmt(valor, moneda){
+  var v=escH(valor), m=escH(moneda===undefined||moneda===null?"€":moneda).trim();
+  if(!m||v==="—"||v==="") return v;
+  return /^[$£]|^US\$/.test(m)?m+v:v+"\u00a0"+m;
+}
+
 function buildWeatherSlide(item){
   const div=document.createElement("div");
   div.className="mod-weather";
   div.style.background=item.bg||"#0a1628";
   div.style.color=item.color||"#ffffff";
   div.innerHTML=`
-    <div class="weather-city">${item.city||""}</div>
-    <div class="weather-icon">${item.icon||"🌤"}</div>
-    <div class="weather-temp">${item.temp||"—"}<span class="weather-unit">°${item.unit||"C"}</span></div>
-    <div class="weather-desc">${item.description||""}</div>
+    <div class="weather-city">${escH(item.city)}</div>
+    <div class="weather-icon">${escH(item.icon||"🌤")}</div>
+    <div class="weather-temp">${escH(item.temp||"—")}<span class="weather-unit">°${escH(item.unit||"C")}</span></div>
+    <div class="weather-desc">${escH(item.description)}</div>
     <div class="weather-details">
-      <span>💧 ${item.humidity||"—"}%</span>
-      <span>💨 ${item.wind||"—"} km/h</span>
-      ${item.feels_like?`<span>🌡 Sensación ${item.feels_like}°</span>`:""}
+      <span>💧 ${escH(item.humidity||"—")}%</span>
+      <span>💨 ${escH(item.wind||"—")} km/h</span>
+      ${item.feels_like?`<span>🌡 Sensación ${escH(item.feels_like)}°</span>`:""}
     </div>`;
   return div;
 }
@@ -932,11 +943,11 @@ function buildTickerSlide(item){
   const news=item.news||[];
   const itemsHtml=news.map(n=>`
     <div class="ticker-item">
-      ${n.source?`<div class="ticker-item-source">${n.source}</div>`:""}
-      <div class="ticker-item-text">${n.text}</div>
+      ${n.source?`<div class="ticker-item-source">${escH(n.source)}</div>`:""}
+      <div class="ticker-item-text">${escH(n.text)}</div>
     </div>`).join("");
   div.innerHTML=`
-    <div class="ticker-header"><div class="ticker-title">${item.title||"Noticias"}</div></div>
+    <div class="ticker-header"><div class="ticker-title">${escH(item.title||"Noticias")}</div></div>
     <div class="ticker-items" id="ticker-${Date.now()}">${itemsHtml}</div>`;
   // Animate items in sequence after render
   setTimeout(()=>{
@@ -965,14 +976,14 @@ function buildProductSlide(item){
   div.style.background=item.bg||"#0a0a0a";
   div.style.color=item.color||"#ffffff";
   const spec=item.specs||[];
-  const specHtml=spec.map(s=>`<div>✓ ${s}</div>`).join("");
+  const specHtml=spec.map(s=>`<div>✓ ${escH(s)}</div>`).join("");
   div.innerHTML=`
-    ${item.src?`<img class="product-image" src="${item.src}" alt="${item.name||""}">`:"<div style='background:rgba(255,255,255,.1);border-radius:2vw'></div>"}
+    ${item.src?`<img class="product-image" src="${escH(item.src)}" alt="${escH(item.name)}">`:"<div style='background:rgba(255,255,255,.1);border-radius:2vw'></div>"}
     <div class="product-info">
-      ${item.badge?`<div class="product-badge">${item.badge}</div>`:""}
-      <div class="product-name">${item.name||"Producto"}</div>
-      ${item.old_price?`<div class="product-old-price">$${item.old_price}</div>`:""}
-      <div class="product-price">$${item.price||"—"}</div>
+      ${item.badge?`<div class="product-badge">${escH(item.badge)}</div>`:""}
+      <div class="product-name">${escH(item.name||"Producto")}</div>
+      ${item.old_price?`<div class="product-old-price">${precioFmt(item.old_price,item.currency)}</div>`:""}
+      <div class="product-price">${precioFmt(item.price||"—",item.currency)}</div>
       ${spec.length?`<div class="product-specs">${specHtml}</div>`:""}
     </div>`;
   return div;
@@ -989,18 +1000,18 @@ function buildComparisonSlide(item){
   const feat2=p2.features||[];
   div.innerHTML=`
     <div class="comparison-product">
-      ${p1.src?`<img class="comparison-image" src="${p1.src}" alt="${p1.name||""}">`:""}
-      ${p1.badge?`<div class="comparison-badge">${p1.badge}</div>`:""}
-      <div class="comparison-name">${p1.name||"Producto 1"}</div>
-      <div class="comparison-price">$${p1.price||"—"}</div>
-      <div class="comparison-features">${feat1.map(f=>`✓ ${f}`).join("<br>")}</div>
+      ${p1.src?`<img class="comparison-image" src="${escH(p1.src)}" alt="${escH(p1.name)}">`:""}
+      ${p1.badge?`<div class="comparison-badge">${escH(p1.badge)}</div>`:""}
+      <div class="comparison-name">${escH(p1.name||"Producto 1")}</div>
+      <div class="comparison-price">${precioFmt(p1.price||"—",item.currency)}</div>
+      <div class="comparison-features">${feat1.map(f=>`✓ ${escH(f)}`).join("<br>")}</div>
     </div>
     <div class="comparison-product">
-      ${p2.src?`<img class="comparison-image" src="${p2.src}" alt="${p2.name||""}">`:""}
-      ${p2.badge?`<div class="comparison-badge">${p2.badge}</div>`:""}
-      <div class="comparison-name">${p2.name||"Producto 2"}</div>
-      <div class="comparison-price">$${p2.price||"—"}</div>
-      <div class="comparison-features">${feat2.map(f=>`✓ ${f}`).join("<br>")}</div>
+      ${p2.src?`<img class="comparison-image" src="${escH(p2.src)}" alt="${escH(p2.name)}">`:""}
+      ${p2.badge?`<div class="comparison-badge">${escH(p2.badge)}</div>`:""}
+      <div class="comparison-name">${escH(p2.name||"Producto 2")}</div>
+      <div class="comparison-price">${precioFmt(p2.price||"—",item.currency)}</div>
+      <div class="comparison-features">${feat2.map(f=>`✓ ${escH(f)}`).join("<br>")}</div>
     </div>`;
   return div;
 }
@@ -1010,19 +1021,28 @@ function buildCountdownSlide(item){
   div.className="mod-countdown";
   div.style.background=item.bg||"#0a0a0a";
   div.style.color=item.color||"#ffffff";
-  const timerDiv=document.createElement("div");
-  timerDiv.dataset.endTime=new Date(item.end_time||Date.now()+3600000).getTime();
-  timerDiv.dataset.endMsg=item.end_message||"¡Oferta finalizada!";
-  timerDiv.dataset.startMsg=item.start_message||"Tiempo restante:";
-  div.innerHTML=`<div style="opacity:.8;font-size:clamp(18px,2.5vw,36px);margin-bottom:3vh">${item.start_message||"Tiempo restante:"}</div><div class="countdown-timer" id="countdown-${Date.now()}">—</div>`;
-  const updateTimer=()=>{
-    const now=Date.now();const end=parseInt(timerDiv.dataset.endTime);const diff=Math.max(0,end-now);
-    if(diff<=0){div.innerHTML=`<div style="font-size:clamp(24px,4vw,48px)">${timerDiv.dataset.endMsg}</div>`;return;}
-    const d=Math.floor(diff/86400000);const h=Math.floor((diff%86400000)/3600000);const m=Math.floor((diff%3600000)/60000);const s=Math.floor((diff%60000)/1000);
-    const timer=div.querySelector(".countdown-timer");if(timer){timer.innerHTML=`${d}:<span style="font-size:clamp(48px,11vw,144px)">${String(h).padStart(2,"0")}</span>:<span style="font-size:clamp(48px,11vw,144px)">${String(m).padStart(2,"0")}</span>:<span style="font-size:clamp(48px,11vw,144px)">${String(s).padStart(2,"0")}</span>`;}
-    setTimeout(updateTimer,1000);
+  const fin=new Date(item.end_time||Date.now()+3600000).getTime();
+  const msgFin=escH(item.end_message||"¡Oferta finalizada!");
+  const msgIni=escH(item.start_message||"Tiempo restante:");
+  div.innerHTML=`<div style="opacity:.9;font-size:clamp(18px,2.5vw,36px);margin-bottom:3vh">${msgIni}</div><div class="countdown-timer">—</div>`;
+  // Cada cifra lleva su etiqueta (días, horas, min, s) y los días solo salen si quedan.
+  const bloque=(n,et,grande)=>`<span class="cd-bloque"><span style="${grande?"":"font-size:.6em"}">${n}</span><small>${et}</small></span>`;
+  let vivo=true;
+  const actualizar=()=>{
+    // Si la diapositiva se reconstruyó (cambió la playlist) este reloj ya no pinta nada: se para.
+    if(!vivo) return;
+    if(div.dataset.fin==="1") return;
+    if(!document.body.contains(div) && div.dataset.visto){ vivo=false; return; }
+    if(document.body.contains(div)) div.dataset.visto="1";
+    const diff=Math.max(0,fin-Date.now());
+    if(diff<=0){ div.dataset.fin="1"; div.innerHTML=`<div style="font-size:clamp(24px,4vw,48px)">${msgFin}</div>`; return; }
+    const d=Math.floor(diff/86400000), h=Math.floor((diff%86400000)/3600000), m=Math.floor((diff%3600000)/60000), s=Math.floor((diff%60000)/1000);
+    const dos=x=>String(x).padStart(2,"0");
+    const t=div.querySelector(".countdown-timer");
+    if(t) t.innerHTML=(d>0?bloque(d,d===1?"día":"días"):"")+bloque(dos(h),"h",1)+bloque(dos(m),"min",1)+bloque(dos(s),"s",1);
+    setTimeout(actualizar,1000);
   };
-  setTimeout(updateTimer,100);
+  setTimeout(actualizar,100);
   return div;
 }
 
@@ -1059,7 +1079,7 @@ function rebuildSlides(){
     } else if(item.type==="text"){
       const d=document.createElement("div");
       d.className="text-slide";d.style.background=item.bg||"#0a0a0a";
-      d.innerHTML=`<div><h2 style="color:${item.color||'#fff'}">${item.title||""}</h2><p style="color:${item.color||'#fff'}">${item.subtitle||""}</p></div>`;
+      d.innerHTML=`<div><h2 style="color:${escH(item.color||'#fff')}">${escH(item.title)}</h2><p style="color:${escH(item.color||'#fff')}">${escH(item.subtitle)}</p></div>`;
       slide.appendChild(d);
     } else if(item.type==="fx"){
       slide.appendChild(buildFxSlide(item));
@@ -1742,7 +1762,7 @@ async function refreshLiveWeather(){
       const wmod=slide.querySelector(".mod-weather");
       if(!wmod) continue;
       const ti=wmod.querySelector(".weather-icon"); if(ti) ti.textContent=icon;
-      const tt=wmod.querySelector(".weather-temp"); if(tt) tt.firstChild.textContent=`${Math.round(c.temperature_2m)}°`;
+      const tt=wmod.querySelector(".weather-temp"); if(tt) tt.firstChild.textContent=`${Math.round(c.temperature_2m)}`;
       const td=wmod.querySelector(".weather-desc"); if(td) td.textContent=desc;
       const spans=wmod.querySelectorAll(".weather-details span");
       if(spans[0]) spans[0].textContent=`💧${Math.round(c.relative_humidity_2m)}%`;

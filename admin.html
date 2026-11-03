@@ -888,6 +888,9 @@ JPY  Yen        162.5"></textarea>
       <div class="fg"><label class="flabel">Especificaciones (una por línea)</label><textarea class="finput" id="prod-specs" rows="4" placeholder="Pantalla OLED 6.1&#34;&#10;Chip A18 Pro&#10;48MP Camera&#10;Batería 3000mAh" style="font-family:monospace;font-size:12px;resize:vertical"></textarea></div>
     </div>
     <div class="form-row">
+      <div class="fg"><label class="flabel">Moneda (símbolo)</label><input class="finput" id="prod-cur" value="€" maxlength="4" style="width:90px" title="€, $, £… Sale detrás del precio (los $ y £, delante)"></div>
+    </div>
+    <div class="form-row">
       <div class="fg"><label class="flabel">Color fondo</label><input class="finput" id="prod-bg" type="color" value="#0a0a0a" style="height:38px;padding:4px"></div>
       <div class="fg"><label class="flabel">Color texto</label><input class="finput" id="prod-color" type="color" value="#ffffff" style="height:38px;padding:4px"></div>
     </div>
@@ -934,6 +937,9 @@ JPY  Yen        162.5"></textarea>
   </div>
 
   <div class="card">
+    <div class="form-row">
+      <div class="fg"><label class="flabel">Moneda (símbolo)</label><input class="finput" id="comp-cur" value="€" maxlength="4" style="width:90px" title="€, $, £… Sale detrás del precio (los $ y £, delante)"></div>
+    </div>
     <div class="form-row">
       <div class="fg"><label class="flabel">Color fondo</label><input class="finput" id="comp-bg" type="color" value="#0a0a0a" style="height:38px;padding:4px"></div>
       <div class="fg"><label class="flabel">Color texto</label><input class="finput" id="comp-color" type="color" value="#ffffff" style="height:38px;padding:4px"></div>
@@ -5611,6 +5617,7 @@ function saveProductModule(){
     src:document.getElementById("prod-src").value||"",
     price:document.getElementById("prod-price").value||"—",
     old_price:document.getElementById("prod-old").value||"",
+    currency:document.getElementById("prod-cur").value.trim(),
     badge:document.getElementById("prod-badge").value||"",
     specs:specs,
     bg:document.getElementById("prod-bg").value,
@@ -5634,7 +5641,7 @@ function renderProductSaved(){
   items.forEach(item=>{
     const el=document.createElement("div");
     el.style.cssText="background:var(--s1);border:1px solid var(--b);border-radius:var(--r);padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px";
-    el.innerHTML=`<i class="fa-solid fa-box-open" style="font-size:18px;color:var(--muted);width:22px;text-align:center"></i><div style="flex:1"><div style="font-size:13px;font-weight:500">${esc(item.name)}</div><div style="font-size:11px;color:var(--muted)">$${item.price} · ${item.duration}s</div></div><button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}',event)"><i class="fa-solid fa-xmark"></i></button>`;
+    el.innerHTML=`<i class="fa-solid fa-box-open" style="font-size:18px;color:var(--muted);width:22px;text-align:center"></i><div style="flex:1"><div style="font-size:13px;font-weight:500">${esc(item.name)}</div><div style="font-size:11px;color:var(--muted)">${esc((item.currency===undefined?"€":item.currency)==="$"?"$"+item.price:item.price+" "+(item.currency===undefined?"€":item.currency))} · ${item.duration}s</div></div><button class="btn btn-danger btn-sm" onclick="deleteItem('${item.id}',event)"><i class="fa-solid fa-xmark"></i></button>`;
     c.appendChild(el);
   });
 }
@@ -5650,6 +5657,7 @@ function saveComparisonModule(){
     type:"comparison",
     product1:{name:n1,src:document.getElementById("comp-src1").value||"",price:document.getElementById("comp-price1").value||"—",features:feat1,badge:document.getElementById("comp-badge1").value||""},
     product2:{name:n2,src:document.getElementById("comp-src2").value||"",price:document.getElementById("comp-price2").value||"—",features:feat2,badge:document.getElementById("comp-badge2").value||""},
+    currency:document.getElementById("comp-cur").value.trim(),
     bg:document.getElementById("comp-bg").value,
     color:document.getElementById("comp-color").value,
     duration:parseInt(document.getElementById("comp-dur").value)||25
