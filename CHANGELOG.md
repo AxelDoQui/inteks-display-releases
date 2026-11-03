@@ -8,6 +8,13 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.71 — 2026-11-03
+
+- **Asistente de primer arranque.** Al crear la contraseña por primera vez se abre solo: nombre de la tienda, acceso remoto con el PIN y primeros pasos con las pantallas. Se puede volver a abrir desde Ajustes.
+- **«Ver ahora».** Cada pantalla tiene un botón para ver en grande lo que está mostrando.
+- **Televisores LG:** la mini-app se mantiene abierta por defecto y la ventana de instalación explica los ajustes de la tele contra el reposo y la IP fija.
+- El instalador avisa de que el acceso remoto se termina en el panel.
+
 ## 1.0.70 — 2026-11-02
 
 - **Silenciar un vídeo concreto.** En la playlist, cada vídeo tiene un botón de altavoz: pulsado, ese vídeo va sin sonido aunque la pantalla deje sonar los demás.
