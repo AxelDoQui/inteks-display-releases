@@ -8,6 +8,15 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.81 — 2026-11-03
+
+- **Producto y Comparativa: moneda configurable.** Campo «Moneda (símbolo)» con € por defecto (antes salía siempre «$»).
+- **Clima:** arreglado el doble grado («20°°C») que salía tras la actualización en vivo.
+- **Cuenta atrás:** cifras con etiquetas (días, h, min, s), sin días cuando son 0, y el reloj se detiene cuando la diapositiva se reconstruye (ya no se acumulan).
+- **Comparativa:** la etiqueta de oferta queda sobre su producto.
+- **Textos protegidos:** una «&» o un «<» en nombres, precios o noticias ya no rompe la diapositiva.
+- **Más legibles:** más contraste y tamaño en los textos apagados de Clima, Noticias, Producto, Comparativa y Texto.
+
 ## 1.0.80 — 2026-11-03
 
 - **Videowall: imágenes de una pantalla en parejas.** Cada pase enseña imágenes distintas, una en cada pantalla (la 1.ª a la izquierda y la 2.ª a la derecha). Con un número impar se encadenan (a+b, b+c, c+a) para que ninguna pantalla se quede vacía ni repita. Las imágenes del tamaño del muro se siguen repartiendo entre las pantallas.
