@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.80 — 2026-11-03
+
+- **Videowall: imágenes de una pantalla en parejas.** Cada pase enseña imágenes distintas, una en cada pantalla (la 1.ª a la izquierda y la 2.ª a la derecha). Con un número impar se encadenan (a+b, b+c, c+a) para que ninguna pantalla se quede vacía ni repita. Las imágenes del tamaño del muro se siguen repartiendo entre las pantallas.
+
 ## 1.0.79 — 2026-11-03
 
 - **Videowall: divisas por páginas.** Las páginas de cambio de divisas se reparten entre las pantallas (la 1 enseña la página 1 y la 2 la página 2, a la vez). Si caben en una sola, las filas se reparten a partes iguales.
