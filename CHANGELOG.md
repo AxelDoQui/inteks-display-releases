@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.82 — 2026-11-03
+
+- **Ver ahora de un videowall:** cada marco enseña lo que le toca a su pantalla (por ejemplo, las dos imágenes de una pareja), en vez de repetir la primera en los dos.
+
 ## 1.0.81 — 2026-11-03
 
 - **Producto y Comparativa: moneda configurable.** Campo «Moneda (símbolo)» con € por defecto (antes salía siempre «$»).
