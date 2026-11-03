@@ -8,6 +8,11 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.72 — 2026-11-03
+
+- **Ajustes ordenado en bloques:** Esta instalación, Pantallas, y Avisos, copias y archivos. No se ha quitado ningún ajuste, solo cambia el orden.
+- **Móvil:** las ventanas del asistente, «Ver ahora» y la instalación de la LG ocupan todo el ancho, como el resto.
+
 ## 1.0.71 — 2026-11-03
 
 - **Asistente de primer arranque.** Al crear la contraseña por primera vez se abre solo: nombre de la tienda, acceso remoto con el PIN y primeros pasos con las pantallas. Se puede volver a abrir desde Ajustes.
