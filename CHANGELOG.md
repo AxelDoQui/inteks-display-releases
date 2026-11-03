@@ -8,6 +8,13 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.77 — 2026-11-03
+
+- **Videowall: un solo menú.** Un muro sale como una sola tarjeta en Pantallas, con Playlist, Ver ahora, Horario y Girar para todo el muro.
+- **Ver ahora enseña el muro entero**, con un marco por pantalla y su división.
+- **El reproductor se actualiza al recargar.** Antes enseñaba primero una copia vieja guardada y las pantallas tardaban en tener las mejoras.
+- **La pantalla que sigue ya no se entrecorta:** corrige el desfase acelerando o frenando un poco el vídeo, sin saltos.
+
 ## 1.0.76 — 2026-11-03
 
 - **Videowall: el recorte salía descuadrado.** El navegador encogía el vídeo del muro y cada pantalla enseñaba un trozo equivocado. Ahora el vídeo ocupa el ancho de todas las pantallas y cada una enseña exactamente su mitad.
