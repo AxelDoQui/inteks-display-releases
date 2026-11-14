@@ -8,6 +8,10 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.84 — 2026-11-14
+
+- **Mini-app de LG: se puede escribir un enlace completo** (con su ruta y su código, no solo la IP). Al abrirla, el botón «Cambiar enlace» deja teclearlo con el mando; queda guardado y se abre tras 5 s. «Automático» lo borra y vuelve a buscar el servidor solo. Hay que reinstalar la mini-app en el televisor para tenerlo.
+
 ## 1.0.83 — 2026-11-03
 
 - **Prueba para televisores LG que apagan la pantalla solos:** el reproductor le pide al televisor cada 30 s que encienda la pantalla y, durante 20 s tras abrirse, enseña abajo a la izquierda si lo ha aceptado. Solo actúa en LG.

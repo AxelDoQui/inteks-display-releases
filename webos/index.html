@@ -7,11 +7,17 @@
   html,body{margin:0;height:100%;background:#000;color:#fff;font-family:sans-serif}
   body{display:flex;align-items:center;justify-content:center;text-align:center}
   #m{font-size:28px;opacity:.85;padding:0 40px}
-  #d{font-size:18px;opacity:.5;margin-top:14px}
+  #d{font-size:18px;opacity:.5;margin-top:14px;word-break:break-all;padding:0 40px}
+  button,input{font-size:22px;padding:10px 18px;margin:18px 6px 0;border:2px solid #555;background:#111;color:#fff;border-radius:6px}
+  button:focus,input:focus{outline:none;border-color:#ffeb3b}
+  input{width:70%}
 </style>
 </head>
 <body>
-<div><div id="m">Conectando con InTeks Display…</div><div id="d"></div></div>
+<div><div id="m">Conectando con InTeks Display…</div><div id="d"></div>
+<div id="ctl"><button id="bc" type="button">Cambiar enlace</button></div>
+<div id="ed" style="display:none"><input id="en" type="url" placeholder="http://… o https://…"><br>
+<button id="ok" type="button">Abrir</button><button id="au" type="button">Automático</button></div></div>
 <script>
 // Dirección del servidor InTeks Display de la tienda (el PC) con la que se instaló la
 // mini-app. Es solo el punto de partida: si el router le cambia la IP al PC, la mini-app
@@ -21,6 +27,33 @@ var SERVIDOR = "http://192.168.0.90/";
 
 var CLAVE = "inteks_servidor";
 var msg = document.getElementById("m"), det = document.getElementById("d");
+
+// Enlace propio: si se escribe uno (completo: con ruta y todo), se abre ese en vez de buscar
+// el servidor. Se queda guardado; «Automático» lo borra y vuelve a buscar solo.
+var CLAVE_ENLACE = "inteks_enlace", editando = false, plazo = null;
+var PLAZO_ENLACE = 5000;   // ms que se espera antes de abrir el enlace guardado (para poder cambiarlo)
+function enlaceGuardado() { try { return localStorage.getItem(CLAVE_ENLACE) || ""; } catch (e) { return ""; } }
+function guardarEnlace(u) { try { if (u) localStorage.setItem(CLAVE_ENLACE, u); else localStorage.removeItem(CLAVE_ENLACE); } catch (e) {} }
+function normEnlace(u) { u = String(u || "").replace(/\s+/g, ""); if (!u) return ""; if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(u)) u = "http://" + u; return u; }
+function mostrarEditor() {
+  editando = true; clearTimeout(plazo);
+  document.getElementById("ctl").style.display = "none";
+  document.getElementById("ed").style.display = "block";
+  var en = document.getElementById("en"); en.value = enlaceGuardado(); en.focus();
+  msg.textContent = "Escribe el enlace que debe abrir esta pantalla"; det.textContent = "";
+}
+document.getElementById("bc").onclick = mostrarEditor;
+document.getElementById("ok").onclick = function () {
+  var v = normEnlace(document.getElementById("en").value);
+  if (!v) { det.textContent = "Escribe un enlace o pulsa «Automático»."; return; }
+  guardarEnlace(v); location.replace(v);
+};
+document.getElementById("au").onclick = function () {
+  guardarEnlace(""); editando = false;
+  document.getElementById("ed").style.display = "none"; document.getElementById("ctl").style.display = "block";
+  arrancar();
+};
+document.getElementById("bc").focus();
 
 function norm(u) { u = String(u || "").replace(/\s+/g, ""); if (!u) return ""; if (!/^https?:\/\//.test(u)) u = "http://" + u; return u.replace(/\/*$/, "/"); }
 function guardado() { try { return norm(localStorage.getItem(CLAVE)); } catch (e) { return ""; } }
@@ -40,7 +73,7 @@ function probar(base, ms, cb) {
   } catch (e) { fin(false); }
 }
 
-function abrir(base) { recordar(base); msg.textContent = "Abriendo InTeks Display…"; location.replace(base); }
+function abrir(base) { if (editando) return; recordar(base); msg.textContent = "Abriendo InTeks Display…"; location.replace(base); }
 
 // Direcciones de la misma red que las que conocemos: x.y.z.1 … x.y.z.254
 function candidatas(bases) {
@@ -77,6 +110,13 @@ function buscar(lista, hecho) {
 }
 
 function arrancar() {
+  if (editando) return;
+  var propio = enlaceGuardado();
+  if (propio) {                       // enlace escrito a mano: se abre tras 5 s (para poder cambiarlo)
+    msg.textContent = "Abriendo el enlace guardado…"; det.textContent = propio;
+    clearTimeout(plazo); plazo = setTimeout(function () { if (!editando) location.replace(propio); }, PLAZO_ENLACE);
+    return;
+  }
   var conocidas = [], g = guardado(), s = norm(SERVIDOR);
   if (g) conocidas.push(g);
   if (s && s !== g) conocidas.push(s);
@@ -95,7 +135,7 @@ function arrancar() {
       if (u) return abrir(u);
       msg.textContent = "No encuentro el servidor InTeks Display en la red";
       det.textContent = "Comprueba que el PC está encendido y en la misma red. Reintento en 15 s…";
-      setTimeout(arrancar, 15000);
+      setTimeout(arrancar, 15000);   // arrancar() no hace nada si se está editando el enlace
     });
   }
 }

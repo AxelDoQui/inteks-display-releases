@@ -33,17 +33,18 @@ function cargar(respuestas) {
     }
     abort() {}
   }
-  const el = () => ({ textContent: "" });
+  const els = {};
+  const el = (id) => els[id] || (els[id] = { textContent: "", value: "", style: {}, focus() {} });
   const ctx = {
-    XMLHttpRequest: XHR, setTimeout, JSON, Math, Date, String, RegExp,
+    XMLHttpRequest: XHR, setTimeout, clearTimeout, JSON, Math, Date, String, RegExp,
     document: { getElementById: el },
-    localStorage: { getItem: (k) => almacen[k] || null, setItem: (k, v) => { almacen[k] = v; } },
+    localStorage: { getItem: (k) => almacen[k] || null, setItem: (k, v) => { almacen[k] = v; }, removeItem: (k) => { delete almacen[k]; } },
     location: { replace: (u) => abiertas.push(u) },
   };
   vm.createContext(ctx);
   // Todo menos la llamada final a arrancar(), para controlarla desde el test.
   vm.runInContext(js.replace(/\narrancar\(\);\s*$/, "\n"), ctx);
-  return { ctx, abiertas, almacen };
+  return { ctx, abiertas, almacen, els };
 }
 
 const esperar = (f) => new Promise((ok, ko) => {
@@ -74,6 +75,39 @@ test("con la última IP buena recordada, va directo", async () => {
 test("el router (contesta sin ser el servidor) no se confunde con él", async () => {
   const h = cargar({ "http://192.168.0.1/": false, "http://192.168.0.115/": true });
   h.ctx.arrancar();
+  await esperar(() => h.abiertas.length);
+  assert.deepEqual(h.abiertas, ["http://192.168.0.115/"]);
+});
+
+test("un enlace escrito a mano se guarda completo (ruta y código) y se abre tal cual", () => {
+  const h = cargar({});
+  h.ctx.mostrarEditor();
+  h.els.en.value = "  midominio.com/visor?c=1234 ";
+  h.els.ok.onclick();
+  assert.equal(h.almacen.inteks_enlace, "http://midominio.com/visor?c=1234");
+  assert.deepEqual(h.abiertas, ["http://midominio.com/visor?c=1234"]);
+});
+
+test("con enlace guardado no busca el servidor: abre ese enlace tras unos segundos", async () => {
+  const h = cargar({ "http://192.168.0.115/": true });
+  h.almacen.inteks_enlace = "https://ejemplo.es/tienda?c=9";
+  h.ctx.PLAZO_ENLACE = 100;
+  h.ctx.arrancar();
+  assert.deepEqual(h.abiertas, []);   // primero deja tiempo para cambiarlo
+  await esperar(() => h.abiertas.length);
+  assert.deepEqual(h.abiertas, ["https://ejemplo.es/tienda?c=9"]);
+});
+
+test("«Cambiar enlace» detiene la apertura y «Automático» vuelve a buscar el servidor", async () => {
+  const h = cargar({ "http://192.168.0.115/": true });
+  h.almacen.inteks_enlace = "https://ejemplo.es/tienda?c=9";
+  h.ctx.PLAZO_ENLACE = 100;
+  h.ctx.arrancar();
+  h.els.bc.onclick();
+  await new Promise((r) => setTimeout(r, 400));
+  assert.deepEqual(h.abiertas, []);
+  h.els.au.onclick();
+  assert.equal(h.almacen.inteks_enlace, undefined);
   await esperar(() => h.abiertas.length);
   assert.deepEqual(h.abiertas, ["http://192.168.0.115/"]);
 });
