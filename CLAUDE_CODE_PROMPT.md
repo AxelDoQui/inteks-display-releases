@@ -1,6 +1,6 @@
 # InTeks Display — Contexto para Claude Code
 
-> Actualizado: 1 de septiembre de 2026 (v1.0.34). Este documento describe el estado **real** del
+> Actualizado: 21 de noviembre de 2026 (v1.0.85). Este documento describe el estado **real** del
 > código. Si algo aquí no cuadra con lo que ves en los archivos, gana el código:
 > avísalo y se corrige el documento.
 
@@ -24,7 +24,7 @@ restaurantes, casas de cambio y similares.
 
 ## Arquitectura
 
-### Servidor — `server.py` (~113 KB, stdlib pura)
+### Servidor — `server.py` (~197 KB, stdlib pura)
 
 `ThreadingHTTPServer`: cada conexión en su propio hilo, imprescindible porque
 las conexiones SSE de `/api/events` viven indefinidamente y bloquearían al
@@ -46,10 +46,11 @@ línea 403). Quien necesite saber el puerto real no puede fiarse de
 |---|---|
 | `index.html` | Raíz `/`. Router de arranque: si el dispositivo ya está enlazado (localStorage) redirige al player; si no, a emparejar. |
 | `login.html` | Puerta de autenticación. En el primer arranque cambia a modo "crear contraseña". |
-| `admin.html` | Panel de administración (~226 KB, monolito). Responsive desde la 1.0.29. |
-| `player.html` | Reproductor para pantallas y tablets (~72 KB). |
+| `admin.html` | Panel de administración (~371 KB, monolito). Responsive desde la 1.0.29. |
+| `player.html` | Reproductor para pantallas y tablets (~103 KB). |
 | `pair.html` | Emparejamiento por PIN. |
 | `sw.js` | Service worker de la PWA. Solo se activa bajo HTTPS o localhost. |
+| `visor-cliente/` | Visor de cliente: recuadro del mostrador en la tablet, servido por InTeks Display (`/api/visor/*`). Trae `LEEME.md` y `PRUEBAS.md`; tests en `tests/test_visor_cliente.py` y `tests/visor-cliente-player.test.js`. **Sin commit y sin probar en aparatos reales.** |
 
 ### Secciones del admin
 
@@ -311,6 +312,8 @@ POST      /api/upload  /api/delete
 POST      /api/screens/config  /api/screens/delete
 POST      /api/screen-unlink   soltar el aparato sin borrar la pantalla
 POST      /api/fx-update       divisas desde la extensión (token)
+GET/POST  /api/visor/oferta    Visor de cliente: oferta WebRTC del PC (POST con token; GET público, lo lee la pantalla)
+GET/POST  /api/visor/respuesta respuesta de la pantalla (POST público, una por oferta; GET con token). /api/visor/cerrar (token). Solo memoria; ver `visor-cliente/`
 POST      /api/restore         restaurar una copia
 POST      /api/alert-test      mensaje de prueba de Telegram
 POST      /api/restart         reiniciar el servidor
@@ -507,7 +510,7 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
    manos. Se arregla el día que haya dos empleados editando a la vez; el
    arreglo de raíz es guardado granular por entidad (`/api/items/<id>`), que
    hoy es desproporcionado: `saveContentLocal()` se llama desde doce sitios de
-   un `admin.html` de 226 KB.
+   un `admin.html` de 371 KB.
 
    **No confundir con el arreglo de la 1.0.11**, que es otro fallo distinto:
    `/api/screens/config` (crear pantalla, asignar playlist, videowall —
@@ -564,7 +567,7 @@ primer cambio. Mismo patrón reutilizable para el resto de la lógica del player
      tipo de diapositiva es rutina, hay diez y todos siguen el mismo patrón. Lo
      costoso es **su editor en el panel**: sería el formulario más complejo que
      tendría `admin.html` —una lista dentro de otra lista, productos con sus
-     sabores— en un monolito de 226 KB, y el único precedente parecido son las
+     sabores— en un monolito de 371 KB, y el único precedente parecido son las
      filas de divisas.
 
    **Orden natural si se retoma:** módulo primero, mando después. El mando sin

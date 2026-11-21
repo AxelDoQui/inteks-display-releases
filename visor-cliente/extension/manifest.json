@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Visor de cliente",
+  "version": "3.0",
+  "description": "Enseña en una pantalla de InTeks Display (una tablet) solo el recuadro que elijas de una web (por ejemplo, el Resumen de un envío).",
+  "permissions": ["activeTab", "scripting", "storage", "tabCapture", "offscreen"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "service_worker": "fondo.js" },
+  "action": { "default_title": "Visor de cliente", "default_popup": "popup.html" },
+  "content_scripts": [
+    { "matches": ["<all_urls>"], "js": ["seguir.js"], "run_at": "document_idle" }
+  ]
+}

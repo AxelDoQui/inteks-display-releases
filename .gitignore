@@ -61,3 +61,7 @@ lg_tvs.json.bak
 # Acceso remoto: dirección enlazada de este PC
 acceso-remoto.json
 vendor/cloudflared/
+
+# Visor de cliente: zona elegida en el PC
+config_visor_cliente.json
+visor-cliente/*.apk

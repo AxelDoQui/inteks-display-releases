@@ -1736,6 +1736,92 @@ if(PREVIEW){
 }
 setInterval(()=>{ if(SCREEN_ID && !PREVIEW) loadPlaylist(); },15000);
 
+// ── Visor de cliente ──────────────────────────────────────────────────────────
+// El mostrador puede enseñar en ESTA pantalla un recuadro de su web (extensión de Chrome,
+// «Visor de cliente»). El vídeo llega directo del PC por la red local (WebRTC); el servidor
+// solo hace de buzón del saludo (/api/visor/oferta y /api/visor/respuesta).
+// Se ve encima de la publicidad SOLO mientras hay imagen Y el mostrador lo tiene activado
+// (el PC manda «1» u «0» por el canal «ctl», y repite el aviso cada pocos segundos). Ante la
+// duda se oculta: sin aviso reciente, o si se corta la conexión, vuelve la publicidad.
+// Pensado para el navegador de 2017: promesas y eventos ICE clásicos, nada reciente.
+function visorCliente(env){
+  var ESPERA_MS=5000, LATIDO_MS=15000, CONECTAR_MS=30000;
+  var capa=env.document.createElement("div");
+  capa.id="visor-capa";
+  capa.style.cssText="position:fixed;left:0;top:0;width:100%;height:100%;background:#000;z-index:2000;display:none";
+  var vid=env.document.createElement("video");
+  vid.muted=true; vid.autoplay=true; vid.setAttribute("playsinline","");
+  vid.style.cssText="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;background:#000";
+  capa.appendChild(vid); env.document.body.appendChild(capa);
+  var pc=null, conectado=false, mostrando=false, ultimaN=0, ultimoAviso=0;
+
+  function refrescar(){ capa.style.display=(conectado&&mostrando)?"block":"none"; }
+  function esperarHielo(p){
+    return new Promise(function(ok){
+      if(p.iceGatheringState==="complete") return ok();
+      var t=env.setTimeout(ok,3000);
+      p.onicegatheringstatechange=function(){ if(p.iceGatheringState==="complete"){ env.clearTimeout(t); ok(); } };
+    });
+  }
+  function soltar(p){
+    if(pc!==p) return;
+    pc=null; conectado=false; mostrando=false;
+    try{ p.close(); }catch(e){}
+    try{ vid.srcObject=null; }catch(e){}
+    refrescar();
+  }
+  function contestar(o){
+    var p=new env.RTCPeerConnection({iceServers:[]});   // red local: no hace falta ningún servidor externo
+    pc=p; ultimaN=o.n; ultimoAviso=env.Date.now();
+    env.setTimeout(function(){ if(pc===p&&!conectado) soltar(p); },CONECTAR_MS);
+    p.oniceconnectionstatechange=function(){
+      if(pc!==p) return;
+      var st=p.iceConnectionState;
+      if(st==="connected"||st==="completed"){ conectado=true; refrescar(); }
+      else if(st==="failed"||st==="closed") soltar(p);
+      else if(st==="disconnected") env.setTimeout(function(){ if(pc===p&&p.iceConnectionState==="disconnected") soltar(p); },5000);
+    };
+    p.ontrack=function(e){
+      try{ vid.srcObject=(e.streams&&e.streams[0])||new env.MediaStream([e.track]); var r=vid.play(); if(r&&r.catch) r.catch(function(){}); }catch(x){}
+    };
+    p.ondatachannel=function(e){
+      e.channel.onmessage=function(m){
+        if(pc!==p) return;
+        ultimoAviso=env.Date.now(); mostrando=(m.data==="1"); refrescar();
+      };
+    };
+    p.setRemoteDescription({type:"offer",sdp:o.sdp})
+      .then(function(){ return p.createAnswer(); })
+      .then(function(a){ return p.setLocalDescription(a); })
+      .then(function(){ return esperarHielo(p); })
+      .then(function(){
+        return env.fetch("/api/visor/respuesta",{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({screen:env.SCREEN_ID,n:o.n,sdp:p.localDescription.sdp})});
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ if(!j||!j.ok) soltar(p); })
+      .catch(function(){ soltar(p); });
+  }
+  function sondear(){
+    if(pc) return;
+    env.fetch("/api/visor/oferta?screen="+encodeURIComponent(env.SCREEN_ID),{cache:"no-store"})
+      .then(function(r){ return r.json(); })
+      .then(function(o){ if(!pc&&o&&o.ok&&!o.respondida&&o.n!==ultimaN) contestar(o); })
+      .catch(function(){});
+  }
+  refrescar(); sondear();
+  env.setInterval(sondear,ESPERA_MS);
+  // Sin aviso del PC en un rato (se cerró el navegador, se fue la wifi): fuera la imagen.
+  env.setInterval(function(){ if(pc&&mostrando&&env.Date.now()-ultimoAviso>LATIDO_MS){ mostrando=false; refrescar(); } },2000);
+  return {sondear:sondear};
+}
+// ── fin del visor de cliente
+if(SCREEN_ID && !PREVIEW && window.RTCPeerConnection){
+  try{ visorCliente({document:document,fetch:function(u,o){return fetch(u,o);},RTCPeerConnection:RTCPeerConnection,
+    MediaStream:window.MediaStream,setTimeout:function(f,t){return setTimeout(f,t);},clearTimeout:function(x){clearTimeout(x);},
+    setInterval:function(f,t){return setInterval(f,t);},Date:Date,SCREEN_ID:SCREEN_ID}); }catch(e){}
+}
+
 // Re-paginar/re-adaptar el slide actual si cambia el tamaño o la orientación de la pantalla
 let resizeTimer=null;
 window.addEventListener("resize",()=>{
@@ -1795,10 +1881,43 @@ if(typeof PalmServiceBridge!=="undefined" && !PREVIEW){
   setTimeout(function(){
     var d=document.createElement("div");
     d.style.cssText="position:fixed;left:6px;bottom:6px;z-index:99999;background:#000;color:#0f0;font:14px monospace;padding:4px 8px;opacity:.9";
-    d.textContent="LG pantalla: "+lgPantalla.ultimo; document.body.appendChild(d);
+    d.textContent="LG pantalla: "+lgPantalla.ultimo+" | "+keepAwakeEstado(); document.body.appendChild(d);
     setTimeout(function(){ d.remove(); },20000);
   },8000);
 }
+// Mantener la pantalla despierta: vídeo diminuto en bucle (como hacen las apps de streaming
+// mientras reproducen) + Wake Lock. Sin verificar en webOS: el estado sale en el aviso verde.
+var keepAwake={video:null,lock:"no",err:""};
+function keepAwakeEstado(){
+  var v=keepAwake.video;
+  return "vídeo: "+(v?(v.paused?"pausado":"reproduciendo")+(keepAwake.err?" ("+keepAwake.err+")":""):"no creado")+" · wakelock: "+keepAwake.lock;
+}
+function keepAwakeLock(){
+  try{
+    if(!navigator.wakeLock||document.visibilityState!=="visible"){ if(!navigator.wakeLock) keepAwake.lock="no disponible"; return; }
+    navigator.wakeLock.request("screen").then(function(s){
+      keepAwake.lock="activo";
+      s.addEventListener("release",function(){ keepAwake.lock="liberado"; });
+    },function(e){ keepAwake.lock="rechazado"; });
+  }catch(e){ keepAwake.lock="error"; }
+}
+function keepAwakeIniciar(){
+  try{
+    var v=document.createElement("video");
+    v.src="assets/keepawake.mp4"; v.muted=true; v.defaultMuted=true; v.loop=true; v.autoplay=true;
+    v.setAttribute("muted",""); v.setAttribute("playsinline","");
+    v.style.cssText="position:fixed;left:0;top:0;width:1px;height:1px;opacity:0.01;pointer-events:none;z-index:-1";
+    v.addEventListener("error",function(){ keepAwake.err="error de carga"; });
+    document.body.appendChild(v); keepAwake.video=v;
+    var jugar=function(){ try{ var p=v.play(); if(p&&p.catch) p.catch(function(e){ keepAwake.err=String(e&&e.name||e); }); }catch(e){} };
+    jugar();
+    v.addEventListener("pause",function(){ setTimeout(jugar,500); });
+    setInterval(function(){ if(v.paused) jugar(); },10*1000);
+  }catch(e){ keepAwake.err=String(e); }
+  keepAwakeLock();
+  document.addEventListener("visibilitychange",keepAwakeLock);
+}
+if(!PREVIEW) keepAwakeIniciar();
 setInterval(updateScreenStatus, 60*1000);
 setTimeout(updateScreenStatus, 500);
 </script>

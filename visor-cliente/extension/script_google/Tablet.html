@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es"><head><base target="_top"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden;color:#fff;font-family:sans-serif}
+#v{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+#s{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+background:#000;font-size:6vmin;text-align:center;gap:3vmin}
+#s input{font-size:6vmin;width:50vmin;text-align:center;padding:1vmin}
+#s button{font-size:5vmin;padding:1.5vmin 4vmin}
+</style></head><body>
+<video id="v" autoplay muted playsinline></video>
+<div id="s"><div id="msg">Sin se&ntilde;al&hellip;</div>
+<div id="pide" style="display:none"><div style="font-size:4vmin">Clave de enlace:</div>
+<input id="cod" autocapitalize="none" maxlength="16"> <button id="ok">Conectar</button></div></div>
+<script>
+var URL_SCRIPT = <?!= JSON.stringify(urlScript) ?>;
+var codigo = <?!= JSON.stringify(codigo) ?>;
+var v = document.getElementById('v'), s = document.getElementById('s'), msg = document.getElementById('msg');
+var pc = null, conectado = false, mostrando = true;
+function refrescar(){ var ok = conectado && mostrando; s.style.display = ok ? 'none' : 'flex'; msg.textContent = 'Sin señal…'; try { VisorApp.estado(ok); } catch (e) {} }
+
+function dormir(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+function pedir(fn){ return fetch(URL_SCRIPT+'?fn='+fn+'&cod='+codigo+'&_='+Date.now()).then(function(r){ return r.json(); }); }
+function esperarHielo(p){
+  return new Promise(function(ok){
+    if (p.iceGatheringState === 'complete') return ok();
+    var t = setTimeout(ok, 3000);
+    p.addEventListener('icegatheringstatechange', function(){ if (p.iceGatheringState === 'complete'){ clearTimeout(t); ok(); } });
+  });
+}
+function senal(texto){ msg.textContent = texto; s.style.display = 'flex'; }
+
+async function bucle(){
+  while (true) {
+    try {
+      var o = await pedir('oferta');
+      if (!o.ok) { await dormir(3000); continue; }
+      pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+      var caida = new Promise(function(ok){
+        pc.addEventListener('connectionstatechange', function(){
+          if (['failed','closed'].indexOf(pc.connectionState) >= 0) ok();
+          if (pc.connectionState === 'disconnected') setTimeout(function(){ if (pc.connectionState === 'disconnected') ok(); }, 5000);
+        });
+      });
+      pc.ontrack = function(e){ v.srcObject = e.streams[0] || new MediaStream([e.track]); v.play().catch(function(){}); conectado = true; refrescar(); };
+      pc.ondatachannel = function(e){ e.channel.onmessage = function(m){ mostrando = (m.data === '1'); refrescar(); }; };
+      await pc.setRemoteDescription({ type: 'offer', sdp: o.sdp });
+      await pc.setLocalDescription(await pc.createAnswer());
+      await esperarHielo(pc);
+      await fetch(URL_SCRIPT, { method: 'POST', body: JSON.stringify({ fn: 'respuesta', c: codigo, sdp: pc.localDescription.sdp }) });
+      await caida;
+    } catch (e) { await dormir(3000); }
+    conectado = false; mostrando = true; refrescar();
+    try { pc.close(); } catch (e) {}
+  }
+}
+
+document.body.addEventListener('click', function(e){
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+  var el = document.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen || function(){}).call(el);
+});
+if (codigo) { bucle(); }
+else {
+  document.getElementById('msg').style.display = 'none';
+  document.getElementById('pide').style.display = 'block';
+  document.getElementById('ok').onclick = function(){
+    var c = document.getElementById('cod').value.trim().toLowerCase();
+    if (/^[a-z0-9]{8,16}$/.test(c)) { codigo = c; document.getElementById('pide').style.display = 'none'; msg.style.display = 'block'; senal('Conectando…'); bucle(); }
+  };
+}
+</script></body></html>

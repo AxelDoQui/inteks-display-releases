@@ -8,6 +8,16 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.85 — 2026-11-21
+
+- **La pantalla del televisor LG ya no se apaga sola**: el reproductor lleva ahora un vídeo diminuto, negro y sin sonido que se repite sin parar (lo mismo que hacen las apps de streaming mientras reproducen), y además pide al sistema que mantenga la pantalla despierta. Funciona en el navegador y en la mini-app de LG.
+- **El servidor ahora sirve archivos `.mp4`**: hacía falta para que el televisor pueda descargar ese vídeo.
+- **El aviso verde «LG pantalla» enseña más información**: además del estado de encendido, ahora indica si el vídeo está reproduciéndose y si el bloqueo de pantalla está activo, para poder comprobar en el televisor que funciona.
+- **No hace falta reinstalar la mini-app de LG**: carga el reproductor desde el servidor, así que basta con actualizar el servidor.
+- **Visor de cliente (en el árbol de trabajo, sin commit)**: `visor-cliente/` (con `LEEME.md` y `PRUEBAS.md`) y los endpoints `/api/visor/*` de `server.py`; pruebas en `tests/test_visor_cliente.py` y `tests/visor-cliente-player.test.js`. Aún no se ha probado en aparatos reales.
+
+---
+
 ## 1.0.84 — 2026-11-14
 
 - **Mini-app de LG: se puede escribir un enlace completo** (con su ruta y su código, no solo la IP). Al abrirla, el botón «Cambiar enlace» deja teclearlo con el mando; queda guardado y se abre tras 5 s. «Automático» lo borra y vuelve a buscar el servidor solo. Hay que reinstalar la mini-app en el televisor para tenerlo.

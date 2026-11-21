@@ -1,29 +1,34 @@
 # InTeks Display — Construcción del Instalador
 
-> Actualizado: 7 de agosto de 2026.
+> Actualizado: 21 de noviembre de 2026 (v1.0.85).
 
 ## Requisitos
 
 1. **Inno Setup 6** — https://jrsoftware.org/isdl.php
-2. **Python 3.10 o superior** en la máquina donde se compila y **también en la
-   del cliente** (ver más abajo).
+2. **Conexión a internet, una sola vez**, en la máquina donde se compila: hace
+   falta para bajar el Python embebido (ver más abajo). El equipo del cliente
+   **no necesita tener Python**.
 
-## ⚠️ El instalador NO incluye Python
+## El instalador SÍ incluye Python
 
-Conviene tenerlo claro antes de distribuir. `setup.iss` empaqueta los archivos
-de InTeks Display, no un intérprete: `abrir-panel.bat` invoca el `python.exe` del
-PATH del sistema. En un equipo sin Python el lanzador se detiene y muestra
-instrucciones para instalarlo, en lugar de fallar en silencio como antes.
+El instalador lleva dentro un intérprete **embebido** de python.org en
+`{app}\vendor\python\` (~21 MB). El cliente no instala nada aparte, y la tarea
+programada arranca el servidor con ese `pythonw.exe`.
 
-Las opciones son tres:
+- **No va en git** (son binarios de python.org). Antes de compilar hay que
+  bajarlo una vez:
 
-- **Pedir Python como requisito previo** (lo actual). Simple, pero añade un
-  paso a la instalación del cliente.
-- **Empaquetar el Python embebido** de python.org (~15 MB descomprimido) dentro
-  de `{app}\python\` y apuntar el `.bat` ahí. Es el camino natural si el
-  producto se distribuye en volumen.
-- **Distribuir la variante Electron**, que sí trae su propio runtime, pero pesa
-  355 MB y hoy es una ruta de empaquetado distinta y desatendida.
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File tools\descargar-python.ps1
+  ```
+
+- Si falta `vendor\python\pythonw.exe`, `setup.iss` **aborta la compilación**
+  con `#error`, para no generar nunca un instalador sin intérprete.
+- Al **actualizar**, `[InstallDelete]` borra `{app}\vendor\python` antes de
+  copiar el nuevo, para no mezclar archivos de dos versiones de Python (ese
+  Frankenstein no arranca).
+- La variante Electron (`escritorio/`) trae su propio runtime, pero pesa
+  355 MB y es una ruta de empaquetado distinta.
 
 ## Pasos para construir
 
@@ -49,6 +54,7 @@ Digital Signage/
 ├── abrir-panel.bat
 ├── assets/
 ├── vendor/
+│   └── python/         ← intérprete embebido (no va en git; tools\descargar-python.ps1)
 ├── inteks-extension/ ← se copia a {app}\extension\
 └── installer/
     └── instalar-extension.html  ← la guía de 3 pasos
@@ -189,8 +195,8 @@ causa más habitual de que la instalación acabe en el 9000.
 | Síntoma | Causa | Solución |
 |---|---|---|
 | "Inno Setup no encontrado" | Ruta distinta | Edita `$ISCC` en `build_installer.ps1` |
-| "Python no está instalado o no está en el PATH" | Falta Python | Instálalo marcando *Add Python to PATH* |
-| "El servidor no respondió en 30 segundos" | El servidor cascó al arrancar | `cd` a la carpeta y ejecuta `python server.py` a mano para ver el error |
+| Al compilar: "Falta vendor\python" | No se ha bajado el Python embebido | `powershell -ExecutionPolicy Bypass -File tools\descargar-python.ps1` y vuelve a compilar |
+| El servidor no arranca tras instalar | Falla al iniciar | Mira `C:\ProgramData\InTeks Display\server.log`; o ejecuta `"{app}\vendor\python\python.exe" server.py` a mano para ver el error |
 | Instalación nueva da 404 en todo | Falta un archivo en `[Files]` | Revisa la sección `[Files]` de `setup.iss` |
 | El contenido "desaparece" tras reiniciar | Working directory incorrecto | El `.bat` debe hacer `cd /d` antes de lanzar el servidor; las rutas de `server.py` son relativas |
 | Un TV/tablet se queda cargando indefinidamente al abrir la IP, aunque el PC vea el servidor por `localhost` | Windows Firewall bloquea las conexiones entrantes de otros dispositivos por defecto. Desde 1.0.14 la regla la crea el instalador (`registrar-tarea.ps1`, función `AbrirCortafuegos`); en instalaciones anteriores no existe | `New-NetFirewallRule -DisplayName "InTeks Display (HTTP)" -Direction Inbound -Protocol TCP -LocalPort 80,9000 -Action Allow -Profile Any` (PowerShell como administrador). **`Any`, no `Private`**: una red sin marcar es Pública para Windows, y una regla de perfil Privado no se aplica ahí |
@@ -199,6 +205,5 @@ causa más habitual de que la instalación acabe en el 9000.
 ## Distribución
 
 - Comparte `InTeks_Display_Setup_v<VERSION>.exe`, el de `dist/installer/`
-- Requiere Python 3.10+ en el equipo destino (ver arriba)
-- No requiere Node.js
+- No requiere Python ni Node.js en el equipo destino (el intérprete va dentro)
 - Windows 10 y 11, 64 bits

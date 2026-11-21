@@ -23,7 +23,7 @@ import urllib.request, urllib.error
 # tests/version-sync.test.js exige que las tres coincidan: si divergen, el panel
 # de una tienda dice una cosa y el instalador otra, y el soporte se vuelve
 # adivinanza sobre qué código corre realmente ese equipo.
-APP_VERSION = "1.0.84"
+APP_VERSION = "1.0.85"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -949,9 +949,61 @@ MAX_BODY_BYTES = 512 * 1024 * 1024      # el cuerpo POST se carga entero en RAM
 # leer el cuerpo). Sus cuerpos son JSON de unas pocas líneas.
 POST_PUBLICOS = {"/api/login", "/api/set-password", "/api/logout",
                  "/api/pair-request", "/api/pair-status", "/api/pair",
-                 "/api/screen-now", "/api/wall-sync"}
+                 "/api/screen-now", "/api/wall-sync", "/api/visor/respuesta"}
 # Lo que cada pantalla está mostrando ahora (solo memoria, se pierde al reiniciar).
 ahora_pantalla = {}
+# ── Visor de cliente: buzón del «saludo» WebRTC ────────────────────────────────────────
+# La extensión de Chrome del mostrador enseña un recuadro de su web en una pantalla; el vídeo
+# va directo del PC a la pantalla por la red local (WebRTC). El servidor SOLO guarda, en
+# memoria, los dos textos técnicos del saludo (oferta del PC, respuesta de la pantalla): ni
+# imágenes ni datos del negocio pasan por aquí, y todo se pierde al reiniciar o a los 30 min.
+#   · La oferta la pone la extensión (api_token). La lee la pantalla (público, como /api/playlist).
+#   · La respuesta la pone la pantalla (público) y solo la lee la extensión (api_token).
+#   · Cada oferta lleva un número «n». La respuesta solo vale para la oferta vigente y solo
+#     la primera: así una pantalla repetida o un intruso no pisan a la buena.
+VISOR_CADUCA_S = 1800
+VISOR_MAX_SDP = 30000
+visor_buzon = {}
+visor_lock = threading.Lock()
+
+def visor_poner_oferta(sid, sdp):
+    """Guarda la oferta nueva de esa pantalla (anula la respuesta vieja). Devuelve su número."""
+    with visor_lock:
+        n = visor_buzon.get(sid, {}).get("n", 0) + 1
+        visor_buzon[sid] = {"n": n, "sdp": sdp, "at": time.time(), "resp": None}
+        return n
+
+def visor_ver_oferta(sid):
+    """{'n', 'sdp', 'respondida'} de la oferta vigente, o None si no hay o caducó."""
+    with visor_lock:
+        b = visor_buzon.get(sid)
+        if not b or not b.get("sdp"): return None
+        if time.time() - b["at"] > VISOR_CADUCA_S:
+            visor_buzon[sid] = {"n": b["n"], "sdp": None, "at": b["at"], "resp": None}
+            return None
+        return {"n": b["n"], "sdp": b["sdp"], "respondida": b["resp"] is not None}
+
+def visor_poner_respuesta(sid, n, sdp):
+    """True si se aceptó: es para la oferta vigente y nadie respondió antes."""
+    with visor_lock:
+        b = visor_buzon.get(sid)
+        if not b or not b.get("sdp") or b["n"] != n or b["resp"] is not None: return False
+        if time.time() - b["at"] > VISOR_CADUCA_S: return False
+        b["resp"] = sdp
+        return True
+
+def visor_tomar_respuesta(sid, n):
+    """La respuesta a la oferta número n (de un solo uso), o None."""
+    with visor_lock:
+        b = visor_buzon.get(sid)
+        if not b or b["n"] != n or b["resp"] is None or b.get("leida"): return None
+        b["leida"] = True            # sigue contando como respondida: nadie más puede contestar
+        return b["resp"]
+
+def visor_cerrar(sid):
+    with visor_lock:
+        b = visor_buzon.get(sid)
+        if b: visor_buzon[sid] = {"n": b["n"], "sdp": None, "at": b["at"], "resp": None}
 # ── Videowall: imágenes de UNA pantalla en parejas ──────────────────────────────────────
 # Las imágenes del tamaño de una pantalla no se estiran ni se duplican: se van de N en N
 # (la 1.ª en la pantalla izquierda, la 2.ª en la derecha, a la vez). Si sobra alguna suelta,
@@ -2510,6 +2562,26 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(200); self.send_header("Content-Type","application/json")
             self.cors(); self.end_headers(); self.wfile.write(body); return
 
+        # ── Visor de cliente: la pantalla recoge la oferta del PC (público, como /api/playlist;
+        #    es solo un texto técnico que caduca) y la extensión recoge la respuesta (api_token).
+        if path == "/api/visor/oferta" or path == "/api/visor/respuesta":
+            sid = qs.get("screen", [""])[0]
+            if path == "/api/visor/respuesta" and not self.require_auth(): return
+            if sid not in load_json(SCREENS_FILE):
+                res = (404, {"ok": False, "error": "Pantalla desconocida"})
+            elif path == "/api/visor/oferta":
+                o = visor_ver_oferta(sid)
+                res = (200, {"ok": True, **o} if o else {"ok": False})
+            else:
+                try: n = int(qs.get("n", ["0"])[0])
+                except ValueError: n = 0
+                r = visor_tomar_respuesta(sid, n)
+                res = (200, {"ok": True, "sdp": r} if r else {"ok": False})
+            body = json.dumps(res[1]).encode()
+            self.send_response(res[0]); self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.cors(); self.end_headers(); self.wfile.write(body); return
+
         # ── API: obtener pantallas registradas  (solo admin / extensión con token)
         if path == "/api/screens":
             if not self.require_auth(): return
@@ -2750,7 +2822,7 @@ class Handler(BaseHTTPRequestHandler):
         #    y siempre dentro del directorio de la app (evita ../ traversal y fuga de pin.json/config/código)
         #    Raíz "/" → index.html (router de pantallas), NO el panel admin.
         fp = path.lstrip("/") or "index.html"
-        ALLOWED_EXT = (".html",".css",".js",".png",".jpg",".jpeg",".gif",".webp",".svg",".ico",".woff",".woff2",".ttf",".map")
+        ALLOWED_EXT = (".html",".css",".js",".png",".jpg",".jpeg",".gif",".webp",".svg",".ico",".woff",".woff2",".ttf",".map",".mp4")
         # Anclado a APP_DIR y no al directorio de trabajo: así los estáticos se
         # sirven igual arranque quien arranque el servidor y desde donde sea.
         base = os.path.realpath(APP_DIR)
@@ -3006,9 +3078,41 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e: err(e)
             return
 
+        # ── Visor de cliente: la pantalla contesta a la oferta del PC (público; solo vale
+        #    la primera respuesta a la oferta vigente, ver visor_poner_respuesta).
+        if path == "/api/visor/respuesta":
+            try:
+                d = json.loads(body or "{}")
+                sid = str(d.get("screen", "") or "") if isinstance(d, dict) else ""
+                sdp = d.get("sdp") if isinstance(d, dict) else None
+                n = d.get("n") if isinstance(d, dict) else None
+                if sid not in load_json(SCREENS_FILE):
+                    jresp(404, {"ok": False, "error": "Pantalla desconocida"}); return
+                if not isinstance(sdp, str) or not sdp.startswith("v=0") or len(sdp) > VISOR_MAX_SDP                         or not isinstance(n, int) or isinstance(n, bool):
+                    jresp(400, {"ok": False, "error": "Datos no válidos"}); return
+                jresp(200, {"ok": visor_poner_respuesta(sid, n, sdp)}); return
+            except Exception as e: err(e)
+            return
+
         # ── PUERTA DE CONTROL: todo lo que sigue exige sesión válida (cookie) o api_token.
         #    Excepción: /api/pair es público (las pantallas se enlazan con el PIN).
         if path != "/api/pair" and not self.require_auth():
+            return
+
+        # ── Visor de cliente: la extensión del mostrador deja su oferta / la retira.
+        if path == "/api/visor/oferta" or path == "/api/visor/cerrar":
+            try:
+                d = json.loads(body or "{}")
+                sid = str(d.get("screen", "") or "") if isinstance(d, dict) else ""
+                if sid not in load_json(SCREENS_FILE):
+                    jresp(404, {"ok": False, "error": "Pantalla desconocida"}); return
+                if path == "/api/visor/cerrar":
+                    visor_cerrar(sid); jresp(200, {"ok": True}); return
+                sdp = d.get("sdp")
+                if not isinstance(sdp, str) or not sdp.startswith("v=0") or len(sdp) > VISOR_MAX_SDP:
+                    jresp(400, {"ok": False, "error": "Datos no válidos"}); return
+                jresp(200, {"ok": True, "n": visor_poner_oferta(sid, sdp)}); return
+            except Exception as e: err(e)
             return
 
         # ── Fusión de filas de divisas conservando el orden del admin ──────
