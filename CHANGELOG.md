@@ -8,6 +8,14 @@ Para subir de versión: `powershell -File tools\subir-version.ps1 1.0.2`
 
 ---
 
+## 1.0.86 — 2026-11-21
+
+- **Versión 1.0.86**: sube el número en `server.py`, `installer/setup.iss`, `package.json` y `android/app/build.gradle.kts`. El contenido de la versión es el de 1.0.85 más lo de abajo.
+- **Las referencias a la guía apuntan a `DOCS.md`**: el aviso de la tarea de arranque (`installer/registrar-tarea.ps1`) y la prueba de ayuda por aparato (`tests/ayuda-aparatos.test.js`) ya no nombran `MANUAL.md`.
+- **Visor de cliente (sin commit, sin probar en aparatos)**: sigue en el árbol de trabajo tal como se describe en 1.0.85.
+
+---
+
 ## 1.0.85 — 2026-11-21
 
 - **La pantalla del televisor LG ya no se apaga sola**: el reproductor lleva ahora un vídeo diminuto, negro y sin sonido que se repite sin parar (lo mismo que hacen las apps de streaming mientras reproducen), y además pide al sistema que mantenga la pantalla despierta. Funciona en el navegador y en la mini-app de LG.

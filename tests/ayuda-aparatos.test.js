@@ -103,7 +103,7 @@ test("la ayuda cubre los fallos que ya han pasado en tienda", () => {
     "Faltan sintomas en la tarjeta de diagnostico:\n  " + faltan.join("\n  "));
 });
 
-const MANUAL = path.join(__dirname, "..", "MANUAL.md");
+const MANUAL = path.join(__dirname, "..", "DOCS.md");
 
 /**
  * No puede haber dos textos largos sobre lo mismo.
@@ -116,7 +116,7 @@ const MANUAL = path.join(__dirname, "..", "MANUAL.md");
 test("el manual no duplica la guia de aparatos, remite al panel", () => {
   const m = fs.readFileSync(MANUAL, "utf8");
   const i = m.indexOf("## Con qué reproducir");
-  assert.ok(i >= 0, "no se encuentra la sección de aparatos en MANUAL.md");
+  assert.ok(i >= 0, "no se encuentra la sección de aparatos en DOCS.md");
   const j = m.indexOf("\n## ", i + 5);
   const seccion = m.slice(i, j > 0 ? j : m.length);
 

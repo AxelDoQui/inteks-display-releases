@@ -68,7 +68,7 @@ function AbrirCortafuegos($dir) {
         # Que no se pueda abrir el puerto no puede impedir instalar: en local
         # funciona igual, y el manual explica como crear la regla a mano.
         Write-Host "AVISO: no se pudo crear la regla del cortafuegos ($_)." -ForegroundColor Yellow
-        Write-Host "       Las pantallas no veran el servidor hasta crearla. Ver MANUAL.md." -ForegroundColor Yellow
+        Write-Host "       Las pantallas no veran el servidor hasta crearla. Ver DOCS.md." -ForegroundColor Yellow
     }
 }
 
